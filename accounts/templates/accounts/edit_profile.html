@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+
+{% block title %}Edit Profile{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3 mt-3">
+    <h3>Edit Profile</h3>
+    <a href="{% url 'dashboard' %}" class="btn btn-outline-secondary btn-sm">Back to Dashboard</a>
+</div>
+
+{% if messages %}
+<div class="row">
+    <div class="col-md-8">
+        {% for message in messages %}
+        <div class="alert alert-{{ message.tags }}">{{ message }}</div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
+<div class="row">
+    <!-- Personal Information -->
+    <div class="col-md-6 mb-4">
+        <div class="card shadow-sm">
+            <div class="card-body">
+                <h5 class="card-title mb-3">Personal Information</h5>
+
+                {% if profile_form.errors %}
+                <div class="alert alert-danger">
+                    {% for field, errors in profile_form.errors.items %}
+                        {% for error in errors %}
+                        <p class="mb-0">{{ error }}</p>
+                        {% endfor %}
+                    {% endfor %}
+                </div>
+                {% endif %}
+
+                <form method="post">
+                    {% csrf_token %}
+                    <div class="mb-3">
+                        <label for="id_first_name" class="form-label">First Name</label>
+                        {{ profile_form.first_name }}
+                    </div>
+                    <div class="mb-3">
+                        <label for="id_last_name" class="form-label">Last Name</label>
+                        {{ profile_form.last_name }}
+                    </div>
+                    <div class="mb-3">
+                        <label for="id_email" class="form-label">Email</label>
+                        {{ profile_form.email }}
+                    </div>
+                    <div class="mb-3">
+                        <label for="id_birthdate" class="form-label">Birth Date</label>
+                        {{ profile_form.birthdate }}
+                    </div>
+                    <button type="submit" name="save_profile" class="btn btn-primary">Save Changes</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Change Password -->
+    <div class="col-md-6 mb-4">
+        <div class="card shadow-sm">
+            <div class="card-body">
+                <h5 class="card-title mb-3">Change Password</h5>
+
+                {% if password_form.errors %}
+                <div class="alert alert-danger">
+                    {% for field, errors in password_form.errors.items %}
+                        {% for error in errors %}
+                        <p class="mb-0">{{ error }}</p>
+                        {% endfor %}
+                    {% endfor %}
+                </div>
+                {% endif %}
+
+                <form method="post">
+                    {% csrf_token %}
+                    <div class="mb-3">
+                        <label for="id_current_password" class="form-label">Current Password</label>
+                        {{ password_form.current_password }}
+                    </div>
+                    <div class="mb-3">
+                        <label for="id_new_password" class="form-label">New Password</label>
+                        {{ password_form.new_password }}
+                        <div class="form-text text-muted">
+                            {{ password_form.fields.new_password.help_text }}
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="id_confirm_new_password" class="form-label">Confirm New Password</label>
+                        {{ password_form.confirm_new_password }}
+                    </div>
+                    <button type="submit" name="change_password" class="btn btn-warning">Change Password</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

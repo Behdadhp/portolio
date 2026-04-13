@@ -1,0 +1,54 @@
+{% load query_helpers %}
+{% comment %}
+Reusable pagination + per-page selector.
+Preserves all current query params (filters, sort, etc).
+{% endcomment %}
+
+<div class="d-flex justify-content-between align-items-center mt-3">
+    <!-- Per-page selector -->
+    <div class="d-flex align-items-center gap-2">
+        <span class="text-muted small">Show:</span>
+        <a href="{% query_string per_page=20 page=1 %}"
+           class="btn btn-sm {% if per_page == 20 %}btn-primary{% else %}btn-outline-secondary{% endif %}">
+            20
+        </a>
+        <a href="{% query_string per_page=40 page=1 %}"
+           class="btn btn-sm {% if per_page == 40 %}btn-primary{% else %}btn-outline-secondary{% endif %}">
+            40
+        </a>
+        <span class="text-muted small">per page</span>
+    </div>
+
+    <!-- Page navigation -->
+    {% if page_obj.paginator.num_pages > 1 %}
+    <nav>
+        <ul class="pagination pagination-sm mb-0">
+            {% if page_obj.has_previous %}
+            <li class="page-item">
+                <a class="page-link" href="{% query_string page=page_obj.previous_page_number %}">Previous</a>
+            </li>
+            {% else %}
+            <li class="page-item disabled"><span class="page-link">Previous</span></li>
+            {% endif %}
+
+            {% for num in page_obj.paginator.page_range %}
+                {% if page_obj.number == num %}
+                <li class="page-item active"><span class="page-link">{{ num }}</span></li>
+                {% elif num > page_obj.number|add:"-3" and num < page_obj.number|add:"3" %}
+                <li class="page-item">
+                    <a class="page-link" href="{% query_string page=num %}">{{ num }}</a>
+                </li>
+                {% endif %}
+            {% endfor %}
+
+            {% if page_obj.has_next %}
+            <li class="page-item">
+                <a class="page-link" href="{% query_string page=page_obj.next_page_number %}">Next</a>
+            </li>
+            {% else %}
+            <li class="page-item disabled"><span class="page-link">Next</span></li>
+            {% endif %}
+        </ul>
+    </nav>
+    {% endif %}
+</div>

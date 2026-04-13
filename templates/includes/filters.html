@@ -1,0 +1,221 @@
+{% comment %}
+Reusable collapsible filter panel with date pickers, range sliders for price/amount, and status toggle.
+Expects from view context: filters, price_min_bound, price_max_bound, amount_min_bound, amount_max_bound
+{% endcomment %}
+
+<style>
+    .range-slider {
+        position: relative;
+        height: 36px;
+        display: flex;
+        align-items: center;
+    }
+    .range-slider input[type="range"] {
+        -webkit-appearance: none;
+        appearance: none;
+        position: absolute;
+        width: 100%;
+        height: 6px;
+        background: transparent;
+        pointer-events: none;
+        z-index: 2;
+    }
+    .range-slider input[type="range"]::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        appearance: none;
+        width: 18px;
+        height: 18px;
+        border-radius: 50%;
+        background: #0d6efd;
+        cursor: pointer;
+        pointer-events: all;
+        border: 2px solid #fff;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+    }
+    .range-slider input[type="range"]::-moz-range-thumb {
+        width: 18px;
+        height: 18px;
+        border-radius: 50%;
+        background: #0d6efd;
+        cursor: pointer;
+        pointer-events: all;
+        border: 2px solid #fff;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+    }
+    .range-track {
+        position: absolute;
+        height: 6px;
+        width: 100%;
+        background: #dee2e6;
+        border-radius: 3px;
+        z-index: 1;
+    }
+    .range-track-active {
+        position: absolute;
+        height: 6px;
+        background: #0d6efd;
+        border-radius: 3px;
+        z-index: 1;
+    }
+</style>
+
+<div class="mb-3">
+    <button class="btn btn-outline-primary btn-sm" type="button" data-bs-toggle="collapse" data-bs-target="#filterPanel" aria-expanded="{% if filters %}true{% else %}false{% endif %}" aria-controls="filterPanel">
+        Filters {% if filters %}<span class="badge bg-primary ms-1">Active</span>{% endif %}
+    </button>
+    {% if filters %}
+    <a href="?sort={{ current_sort }}&order={{ current_order }}&per_page={{ per_page }}" class="btn btn-outline-secondary btn-sm ms-1">Clear Filters</a>
+    {% endif %}
+</div>
+
+<div class="collapse {% if filters %}show{% endif %}" id="filterPanel">
+    <div class="card shadow-sm mb-3">
+        <div class="card-body">
+            <form method="get" id="filterForm">
+                <!-- Preserve sort/pagination params -->
+                <input type="hidden" name="sort" value="{{ current_sort }}">
+                <input type="hidden" name="order" value="{{ current_order }}">
+                <input type="hidden" name="per_page" value="{{ per_page }}">
+
+                <div class="row g-3">
+                    <!-- Date range -->
+                    <div class="col-md-3">
+                        <label class="form-label small fw-semibold">Date From</label>
+                        <input type="date" name="date_from" class="form-control form-control-sm"
+                               value="{{ filters.date_from|default:'' }}">
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label small fw-semibold">Date To</label>
+                        <input type="date" name="date_to" class="form-control form-control-sm"
+                               value="{{ filters.date_to|default:'' }}">
+                    </div>
+
+                    <!-- Status -->
+                    <div class="col-md-3">
+                        <label class="form-label small fw-semibold">Status</label>
+                        <select name="status" class="form-select form-select-sm">
+                            <option value="" {% if not filters.status %}selected{% endif %}>All</option>
+                            <option value="bought" {% if filters.status == "bought" %}selected{% endif %}>Bought</option>
+                            <option value="sold" {% if filters.status == "sold" %}selected{% endif %}>Sold</option>
+                        </select>
+                    </div>
+
+                    <!-- Apply button -->
+                    <div class="col-md-3 d-flex align-items-end">
+                        <button type="submit" class="btn btn-primary btn-sm w-100">Apply Filters</button>
+                    </div>
+
+                    <!-- Price range slider -->
+                    <div class="col-md-6">
+                        <label class="form-label small fw-semibold">
+                            Price Range: <span id="priceLabelMin">{{ filters.price_min|default:price_min_bound }}</span>
+                            — <span id="priceLabelMax">{{ filters.price_max|default:price_max_bound }}</span>
+                        </label>
+                        <div class="range-slider">
+                            <div class="range-track"></div>
+                            <div class="range-track-active" id="priceTrack"></div>
+                            <input type="range" id="priceMinSlider"
+                                   min="{{ price_min_bound }}" max="{{ price_max_bound }}"
+                                   step="0.01"
+                                   value="{{ filters.price_min|default:price_min_bound }}">
+                            <input type="range" id="priceMaxSlider"
+                                   min="{{ price_min_bound }}" max="{{ price_max_bound }}"
+                                   step="0.01"
+                                   value="{{ filters.price_max|default:price_max_bound }}">
+                        </div>
+                        <input type="hidden" name="price_min" id="priceMinInput" value="{{ filters.price_min|default:'' }}">
+                        <input type="hidden" name="price_max" id="priceMaxInput" value="{{ filters.price_max|default:'' }}">
+                    </div>
+
+                    <!-- Amount range slider -->
+                    <div class="col-md-6">
+                        <label class="form-label small fw-semibold">
+                            Amount Range: <span id="amountLabelMin">{{ filters.amount_min|default:amount_min_bound }}</span>
+                            — <span id="amountLabelMax">{{ filters.amount_max|default:amount_max_bound }}</span>
+                        </label>
+                        <div class="range-slider">
+                            <div class="range-track"></div>
+                            <div class="range-track-active" id="amountTrack"></div>
+                            <input type="range" id="amountMinSlider"
+                                   min="{{ amount_min_bound }}" max="{{ amount_max_bound }}"
+                                   step="0.01"
+                                   value="{{ filters.amount_min|default:amount_min_bound }}">
+                            <input type="range" id="amountMaxSlider"
+                                   min="{{ amount_min_bound }}" max="{{ amount_max_bound }}"
+                                   step="0.01"
+                                   value="{{ filters.amount_max|default:amount_max_bound }}">
+                        </div>
+                        <input type="hidden" name="amount_min" id="amountMinInput" value="{{ filters.amount_min|default:'' }}">
+                        <input type="hidden" name="amount_max" id="amountMaxInput" value="{{ filters.amount_max|default:'' }}">
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+(function() {
+    function setupDualSlider(minSliderId, maxSliderId, minInputId, maxInputId, minLabelId, maxLabelId, trackId, boundMin, boundMax) {
+        const minSlider = document.getElementById(minSliderId);
+        const maxSlider = document.getElementById(maxSliderId);
+        const minInput = document.getElementById(minInputId);
+        const maxInput = document.getElementById(maxInputId);
+        const minLabel = document.getElementById(minLabelId);
+        const maxLabel = document.getElementById(maxLabelId);
+        const track = document.getElementById(trackId);
+
+        if (!minSlider || !maxSlider) return;
+
+        function updateTrack() {
+            const range = boundMax - boundMin || 1;
+            const left = ((parseFloat(minSlider.value) - boundMin) / range) * 100;
+            const right = ((parseFloat(maxSlider.value) - boundMin) / range) * 100;
+            track.style.left = left + '%';
+            track.style.width = (right - left) + '%';
+        }
+
+        function updateValues() {
+            let minVal = parseFloat(minSlider.value);
+            let maxVal = parseFloat(maxSlider.value);
+
+            if (minVal > maxVal) {
+                [minSlider.value, maxSlider.value] = [maxVal, minVal];
+                minVal = parseFloat(minSlider.value);
+                maxVal = parseFloat(maxSlider.value);
+            }
+
+            minLabel.textContent = minVal.toFixed(2);
+            maxLabel.textContent = maxVal.toFixed(2);
+
+            if (minVal > boundMin) {
+                minInput.value = minVal.toFixed(2);
+            } else {
+                minInput.value = '';
+            }
+            if (maxVal < boundMax) {
+                maxInput.value = maxVal.toFixed(2);
+            } else {
+                maxInput.value = '';
+            }
+
+            updateTrack();
+        }
+
+        minSlider.addEventListener('input', updateValues);
+        maxSlider.addEventListener('input', updateValues);
+
+        updateTrack();
+    }
+
+    const priceMin = {{ price_min_bound }};
+    const priceMax = {{ price_max_bound }};
+    const amountMin = {{ amount_min_bound }};
+    const amountMax = {{ amount_max_bound }};
+
+    setupDualSlider('priceMinSlider', 'priceMaxSlider', 'priceMinInput', 'priceMaxInput',
+                     'priceLabelMin', 'priceLabelMax', 'priceTrack', priceMin, priceMax);
+    setupDualSlider('amountMinSlider', 'amountMaxSlider', 'amountMinInput', 'amountMaxInput',
+                     'amountLabelMin', 'amountLabelMax', 'amountTrack', amountMin, amountMax);
+})();
+</script>

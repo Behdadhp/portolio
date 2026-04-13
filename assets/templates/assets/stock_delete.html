@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+
+{% block title %}Delete Transaction — {{ stock.name }}{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center mt-5">
+    <div class="col-md-6">
+        <div class="card shadow-sm">
+            <div class="card-body text-center p-4">
+                <h4 class="mb-3">Are you sure?</h4>
+                <p class="text-muted">
+                    You are about to delete this transaction:
+                </p>
+                <table class="table table-bordered mx-auto" style="max-width: 400px;">
+                    <tr><th>Stock</th><td>{{ stock.name }} ({{ stock.symbol }})</td></tr>
+                    <tr><th>Date</th><td>{{ transaction.date }}</td></tr>
+                    <tr><th>Price</th><td>${{ transaction.price|floatformat:2 }}</td></tr>
+                    <tr><th>Amount</th><td>{{ transaction.amount|floatformat:2 }}</td></tr>
+                    <tr><th>Status</th><td>{{ transaction.get_status_display }}</td></tr>
+                </table>
+                <p class="text-danger fw-semibold">This action cannot be undone.</p>
+
+                <form method="post" class="d-inline">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-danger me-2">Yes, Delete</button>
+                    <a href="{% url 'stock_detail' stock.symbol %}" class="btn btn-secondary">Cancel</a>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

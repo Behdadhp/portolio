@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% load query_helpers %}
+
+{% block title %}{{ stock.name }} ({{ stock.symbol }}) — Stock Detail{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3 mt-3">
+    <h3>{{ stock.name }} <small class="text-muted">({{ stock.symbol }})</small></h3>
+    <div class="d-flex align-items-center gap-3">
+        <span class="fs-5 fw-semibold {% if total >= 0 %}text-success{% else %}text-danger{% endif %}">
+            Total Amount: {{ total|floatformat:2 }}
+        </span>
+        <a href="{% url 'stock_add_for' stock.symbol %}" class="btn btn-primary btn-sm">Add Transaction</a>
+        <a href="{% url 'stocks' %}" class="btn btn-outline-secondary btn-sm">Back to Stocks</a>
+    </div>
+</div>
+
+{% include "includes/filters.html" %}
+
+<div class="card shadow-sm">
+    <div class="card-body">
+        {% if page_obj %}
+        <table class="table table-striped mb-0">
+            <thead>
+                <tr>
+                    {% for col_field, col_label in columns %}
+                    <th>
+                        <a href="{% if current_sort == col_field and current_order == 'asc' %}{% query_string sort=col_field order='desc' page=1 %}{% else %}{% query_string sort=col_field order='asc' page=1 %}{% endif %}"
+                           class="text-decoration-none text-dark">
+                            {{ col_label }}
+                            {% if current_sort == col_field %}
+                                {% if current_order == "asc" %}&#9650;{% else %}&#9660;{% endif %}
+                            {% endif %}
+                        </a>
+                    </th>
+                    {% endfor %}
+                    <th class="text-end">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for tx in page_obj %}
+                <tr>
+                    <td>{{ tx.date }}</td>
+                    <td>${{ tx.price|floatformat:2 }}</td>
+                    <td>{{ tx.amount|floatformat:2 }}</td>
+                    <td>
+                        <span class="badge {% if tx.status == 'bought' %}bg-success{% else %}bg-danger{% endif %}">
+                            {{ tx.get_status_display }}
+                        </span>
+                    </td>
+                    <td class="text-end">
+                        <a href="{% url 'stock_edit' tx.pk %}" class="btn btn-outline-primary btn-sm">Edit</a>
+                        <a href="{% url 'stock_delete' tx.pk %}" class="btn btn-outline-danger btn-sm">Delete</a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        {% include "includes/pagination.html" %}
+
+        {% else %}
+        <p class="text-muted text-center mb-0 py-4">No transactions found.</p>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

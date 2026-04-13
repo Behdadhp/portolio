@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+
+{% block title %}Crypto Assets{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3 mt-3">
+    <h3>Crypto Assets</h3>
+    <div class="d-flex gap-2">
+        <a href="{% url 'crypto_add' %}" class="btn btn-primary btn-sm">Add Transaction</a>
+        <a href="{% url 'dashboard' %}" class="btn btn-outline-secondary btn-sm">Back to Dashboard</a>
+    </div>
+</div>
+
+<div class="card shadow-sm">
+    <div class="card-body">
+        {% if cryptos %}
+        <table class="table table-hover mb-0">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Symbol</th>
+                    <th class="text-end">Net Total Amount</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for crypto in cryptos %}
+                <tr onclick="window.location='{% url 'crypto_detail' crypto.symbol %}'" style="cursor: pointer;">
+                    <td>{{ crypto.name }}</td>
+                    <td>{{ crypto.symbol }}</td>
+                    <td class="text-end {% if crypto.total >= 0 %}text-success{% else %}text-danger{% endif %}">
+                        {{ crypto.total|floatformat:2 }}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <p class="text-muted text-center mb-0 py-4">You have no crypto assets yet.</p>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
