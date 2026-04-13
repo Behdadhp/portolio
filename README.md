@@ -1,6 +1,6 @@
 # Portfolio App
 
-A web application for tracking your stock and cryptocurrency assets. Built with Django and Django REST Framework.
+A web application for tracking your stock and cryptocurrency assets. Built with Django.
 
 ## Features
 
@@ -12,7 +12,7 @@ A web application for tracking your stock and cryptocurrency assets. Built with 
 
 ## Tech Stack
 
-- **Backend:** Django 6.0, Django REST Framework
+- **Backend:** Django 6.0
 - **Frontend:** Django Templates, Bootstrap 5
 - **Database:** SQLite
 
