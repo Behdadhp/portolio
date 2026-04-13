@@ -1,5 +1,3 @@
-import math
-
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
 from django.db.models import Case, F, FloatField, Max, Min, Sum, Value, When

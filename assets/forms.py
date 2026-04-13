@@ -1,5 +1,5 @@
 from django import forms
-from .models import Crypto, CryptoAsset, Stock, StockAsset
+from .models import CryptoAsset, StockAsset
 
 
 class CryptoAssetForm(forms.ModelForm):
