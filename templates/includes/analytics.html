@@ -1,0 +1,359 @@
+{% if analytics %}
+<div class="card shadow-sm mb-4">
+    <div class="card-header d-flex align-items-center" role="button"
+         data-bs-toggle="collapse" data-bs-target="#analyticsBody" aria-expanded="false" aria-controls="analyticsBody"
+         style="cursor: pointer;">
+        <h5 class="mb-0 me-2">Analytics</h5>
+        <svg id="analyticsChevron" xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="currentColor"
+             class="text-muted transition-transform" viewBox="0 0 16 16" style="transition: transform 0.3s;">
+            <path fill-rule="evenodd" d="M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z"/>
+        </svg>
+    </div>
+    <div class="collapse" id="analyticsBody">
+    <div class="card-body">
+        <div class="row g-4">
+
+            <!-- Position Overview -->
+            <div class="col-md-6 col-lg-4">
+                <h6 class="text-muted text-uppercase small fw-bold mb-3">Position Overview</h6>
+                <table class="table table-sm table-borderless mb-0">
+                    <tbody>
+                        <tr>
+                            <td class="text-muted">Avg. Cost</td>
+                            <td class="text-end fw-semibold" data-fmt-number="$">{{ analytics.avg_price|floatformat:2 }}</td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted">Holdings</td>
+                            <td class="text-end fw-semibold">{{ analytics.units|floatformat:6 }}</td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted">Cost Basis
+                                <div class="text-muted small fst-italic" style="font-size:.7rem;">Total cost of your remaining holdings</div>
+                            </td>
+                            <td class="text-end fw-semibold" data-fmt-number="$">{{ analytics.cost_basis|floatformat:2 }}</td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted">Total Invested</td>
+                            <td class="text-end fw-semibold" data-fmt-number="$">{{ analytics.total_invested|floatformat:2 }}</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Profit / Loss -->
+            <div class="col-md-6 col-lg-4">
+                <h6 class="text-muted text-uppercase small fw-bold mb-3">Profit / Loss</h6>
+                <table class="table table-sm table-borderless mb-0">
+                    <tbody>
+                        {% if analytics.current_price != None %}
+                        <tr>
+                            <td class="text-muted">Current Price</td>
+                            <td class="text-end fw-semibold" data-fmt-number="$">{{ analytics.current_price|floatformat:2 }}</td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted">Current Value</td>
+                            <td class="text-end fw-semibold" data-fmt-number="$">{{ analytics.current_value|floatformat:2 }}</td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted">Unrealized P&L
+                                <div class="text-muted small fst-italic" style="font-size:.7rem;">Profit or loss if you sold everything now</div>
+                            </td>
+                            <td class="text-end fw-semibold {% if analytics.unrealized_pnl >= 0 %}text-success{% else %}text-danger{% endif %}"
+                                data-fmt-pnl="${{ analytics.unrealized_pnl|floatformat:2 }}|{{ analytics.unrealized_pnl_pct|floatformat:2 }}">
+                                ${{ analytics.unrealized_pnl|floatformat:2 }}
+                                <small>({{ analytics.unrealized_pnl_pct|floatformat:2 }}%)</small>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td class="text-muted" colspan="2">
+                                <span class="text-muted fst-italic">Live price unavailable</span>
+                            </td>
+                        </tr>
+                        {% endif %}
+                        <tr>
+                            <td class="text-muted">Realized P&L
+                                <div class="text-muted small fst-italic" style="font-size:.7rem;">Profit or loss already locked in from sales</div>
+                            </td>
+                            <td class="text-end fw-semibold {% if analytics.realized_pnl >= 0 %}text-success{% else %}text-danger{% endif %}"
+                                data-fmt-number="$">{{ analytics.realized_pnl|floatformat:2 }}</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Targets -->
+            <div class="col-md-6 col-lg-4">
+                <h6 class="text-muted text-uppercase small fw-bold mb-3">Targets</h6>
+                <table class="table table-sm table-borderless mb-0" id="targetsTable"
+                       data-symbol="{{ asset_symbol }}"
+                       data-cost-basis="{{ analytics.cost_basis }}"
+                       data-units="{{ analytics.units }}"
+                       data-avg-price="{{ analytics.avg_price }}">
+                    <tbody>
+                        {% if analytics.sell_25 != None %}
+                        <tr data-alert-key="sell_25" data-alert-price="{{ analytics.sell_25 }}">
+                            <td class="text-muted">Sell @ +25%</td>
+                            <td class="text-end fw-semibold text-success">
+                                <span data-fmt-number="$">{{ analytics.sell_25|floatformat:2 }}</span>
+                            </td>
+                            <td class="text-end alert-btn-cell"></td>
+                        </tr>
+                        {% endif %}
+                        {% if analytics.sell_50 != None %}
+                        <tr data-alert-key="sell_50" data-alert-price="{{ analytics.sell_50 }}">
+                            <td class="text-muted">Sell @ +50%</td>
+                            <td class="text-end fw-semibold text-success">
+                                <span data-fmt-number="$">{{ analytics.sell_50|floatformat:2 }}</span>
+                            </td>
+                            <td class="text-end alert-btn-cell"></td>
+                        </tr>
+                        {% endif %}
+                        {% if analytics.sell_75 != None %}
+                        <tr data-alert-key="sell_75" data-alert-price="{{ analytics.sell_75 }}">
+                            <td class="text-muted">Sell @ +75%</td>
+                            <td class="text-end fw-semibold text-success">
+                                <span data-fmt-number="$">{{ analytics.sell_75|floatformat:2 }}</span>
+                            </td>
+                            <td class="text-end alert-btn-cell"></td>
+                        </tr>
+                        {% endif %}
+                        {% if analytics.buy_avg_minus_20 != None %}
+                        <tr data-alert-key="buy_avg20" data-alert-price="{{ analytics.buy_avg_minus_20 }}">
+                            <td class="text-muted">Buy to lower avg by 20%</td>
+                            <td class="text-end fw-semibold text-primary">
+                                <span data-fmt-number="$">{{ analytics.buy_avg_minus_20|floatformat:2 }}</span>
+                            </td>
+                            <td class="text-end alert-btn-cell"></td>
+                        </tr>
+                        {% endif %}
+
+                        <!-- Separator -->
+                        <tr><td colspan="3"><hr class="my-2"></td></tr>
+
+                        <!-- Custom Sell % -->
+                        <tr>
+                            <td class="text-muted" style="vertical-align:middle;">Sell @</td>
+                            <td>
+                                <div class="input-group input-group-sm">
+                                    <span class="input-group-text">+</span>
+                                    <input type="number" id="customSellPct" class="form-control form-control-sm"
+                                           placeholder="%" step="any" min="0" style="max-width:80px;">
+                                    <span class="input-group-text">%</span>
+                                </div>
+                            </td>
+                            <td class="text-end fw-semibold" id="customSellResult" style="vertical-align:middle; white-space:nowrap;">
+                                <span class="text-muted">—</span>
+                            </td>
+                        </tr>
+
+                        <!-- Custom Buy to lower avg % -->
+                        <tr>
+                            <td class="text-muted" style="vertical-align:middle;">Lower avg by</td>
+                            <td>
+                                <div class="input-group input-group-sm">
+                                    <span class="input-group-text">-</span>
+                                    <input type="number" id="customBuyPct" class="form-control form-control-sm"
+                                           placeholder="%" step="any" min="0" max="100" style="max-width:80px;">
+                                    <span class="input-group-text">%</span>
+                                </div>
+                            </td>
+                            <td class="text-end fw-semibold" id="customBuyResult" style="vertical-align:middle; white-space:nowrap;">
+                                <span class="text-muted">—</span>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+        </div>
+    </div>
+    </div>
+</div>
+
+<style>
+    .alert-btn-cell { width: 42px; vertical-align: middle; }
+    .btn-alert-toggle {
+        border: none;
+        background: none;
+        padding: 4px 6px;
+        border-radius: 6px;
+        cursor: pointer;
+        line-height: 1;
+        transition: background-color 0.15s;
+    }
+    .btn-alert-toggle:hover { background-color: rgba(255,255,255,0.06); }
+    .btn-alert-toggle svg { display: block; }
+    .alert-active-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        color: var(--accent-light);
+        background: rgba(79,70,229,0.12);
+        border-radius: 20px;
+        padding: 3px 10px 3px 8px;
+        white-space: nowrap;
+    }
+    .alert-active-badge .alert-disable {
+        border: none;
+        background: none;
+        padding: 0;
+        cursor: pointer;
+        color: var(--text-muted);
+        line-height: 1;
+        transition: color 0.15s;
+    }
+    .alert-active-badge .alert-disable:hover { color: #f87171; }
+</style>
+
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+        /* ── Chevron toggle ── */
+        const chevron = document.getElementById("analyticsChevron");
+        const collapse = document.getElementById("analyticsBody");
+        collapse.addEventListener("show.bs.collapse", function () {
+            chevron.style.transform = "rotate(180deg)";
+        });
+        collapse.addEventListener("hide.bs.collapse", function () {
+            chevron.style.transform = "rotate(0deg)";
+        });
+
+        /* ── Number formatting ── */
+        function fmtUSD(val) {
+            return val.toLocaleString("en-US", {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+            });
+        }
+
+        document.querySelectorAll("[data-fmt-number]").forEach(function (el) {
+            const raw = el.textContent.replace(/[^0-9.\-]/g, "");
+            const val = parseFloat(raw);
+            if (!isNaN(val)) {
+                el.textContent = (el.dataset.fmtNumber || "") + fmtUSD(val);
+            }
+        });
+
+        document.querySelectorAll("[data-fmt-pnl]").forEach(function (el) {
+            const parts = el.dataset.fmtPnl.split("|");
+            const pnlRaw = parseFloat(parts[0].replace(/[^0-9.\-]/g, ""));
+            const pctRaw = parseFloat(parts[1]);
+            if (!isNaN(pnlRaw) && !isNaN(pctRaw)) {
+                el.innerHTML = "$" + fmtUSD(pnlRaw) + ' <small>(' + fmtUSD(pctRaw) + '%)</small>';
+            }
+        });
+
+        /* ── Price alert toggles ── */
+        const STORAGE_KEY = "price_alerts";
+        const table = document.getElementById("targetsTable");
+        if (!table) return;
+        const symbol = table.dataset.symbol;
+
+        function getAlerts() {
+            try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || {}; }
+            catch { return {}; }
+        }
+
+        function saveAlerts(alerts) {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(alerts));
+        }
+
+        function alertId(key) {
+            return symbol + ":" + key;
+        }
+
+        /* SVG icons */
+        const bellOffSVG = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="#64748b" viewBox="0 0 16 16">'
+            + '<path d="M8 16a2 2 0 0 0 2-2H6a2 2 0 0 0 2 2M8 1.918l-.797.161A4 4 0 0 0 4 6c0 .628-.134 2.197-.459 3.742-.16.767-.376 1.566-.663 2.258h10.244c-.287-.692-.502-1.49-.663-2.258C12.134 8.197 12 6.628 12 6a4 4 0 0 0-3.203-3.92zM14.22 12c.223.447.481.801.78 1H1c.299-.199.557-.553.78-1C2.68 10.2 3 6.88 3 6c0-2.42 1.72-4.44 4.005-4.901a1 1 0 1 1 1.99 0A5 5 0 0 1 13 6c0 .88.32 4.2 1.22 6"/>'
+            + '</svg>';
+
+        const bellOnSVG = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="#818cf8" viewBox="0 0 16 16">'
+            + '<path d="M8 16a2 2 0 0 0 2-2H6a2 2 0 0 0 2 2m.995-14.901a1 1 0 1 0-1.99 0A5 5 0 0 0 3 6c0 1.098-.5 6-2 7h14c-1.5-1-2-5.902-2-7 0-2.42-1.72-4.44-4.005-4.901"/>'
+            + '</svg>';
+
+        const xSVG = '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="currentColor" viewBox="0 0 16 16">'
+            + '<path d="M4.646 4.646a.5.5 0 0 1 .708 0L8 7.293l2.646-2.647a.5.5 0 0 1 .708.708L8.707 8l2.647 2.646a.5.5 0 0 1-.708.708L8 8.707l-2.646 2.647a.5.5 0 0 1-.708-.708L7.293 8 4.646 5.354a.5.5 0 0 1 0-.708"/>'
+            + '</svg>';
+
+        function renderRow(row) {
+            const key = row.dataset.alertKey;
+            const price = parseFloat(row.dataset.alertPrice);
+            const cell = row.querySelector(".alert-btn-cell");
+            const alerts = getAlerts();
+            const active = !!alerts[alertId(key)];
+
+            if (active) {
+                cell.innerHTML =
+                    '<span class="alert-active-badge">'
+                    + bellOnSVG
+                    + ' $' + fmtUSD(price)
+                    + '<button class="alert-disable" title="Disable alert">' + xSVG + '</button>'
+                    + '</span>';
+                cell.querySelector(".alert-disable").addEventListener("click", function (e) {
+                    e.stopPropagation();
+                    const a = getAlerts();
+                    delete a[alertId(key)];
+                    saveAlerts(a);
+                    renderRow(row);
+                });
+            } else {
+                cell.innerHTML =
+                    '<button class="btn-alert-toggle" title="Notify me at $' + fmtUSD(price) + '">'
+                    + bellOffSVG
+                    + '</button>';
+                cell.querySelector(".btn-alert-toggle").addEventListener("click", function (e) {
+                    e.stopPropagation();
+                    const a = getAlerts();
+                    a[alertId(key)] = { symbol: symbol, price: price, enabled: true };
+                    saveAlerts(a);
+                    renderRow(row);
+                });
+            }
+        }
+
+        table.querySelectorAll("tr[data-alert-key]").forEach(renderRow);
+
+        /* ── Custom sell / buy simulators ── */
+        const costBasis = parseFloat(table.dataset.costBasis);
+        const units = parseFloat(table.dataset.units);
+        const avgPrice = parseFloat(table.dataset.avgPrice);
+
+        const sellPctInput = document.getElementById("customSellPct");
+        const sellResult = document.getElementById("customSellResult");
+        const buyPctInput = document.getElementById("customBuyPct");
+        const buyResult = document.getElementById("customBuyResult");
+
+        function updateSell() {
+            const pct = parseFloat(sellPctInput.value);
+            if (isNaN(pct) || pct < 0 || isNaN(avgPrice) || avgPrice <= 0) {
+                sellResult.innerHTML = '<span class="text-muted">\u2014</span>';
+                return;
+            }
+            const sellPrice = avgPrice * (1 + pct / 100);
+            sellResult.innerHTML = '<span class="text-success">$' + fmtUSD(sellPrice) + '</span>';
+        }
+
+        function updateBuy() {
+            const pct = parseFloat(buyPctInput.value);
+            if (isNaN(pct) || pct <= 0 || pct >= 100 || isNaN(avgPrice) || avgPrice <= 0) {
+                buyResult.innerHTML = '<span class="text-muted">\u2014</span>';
+                return;
+            }
+            /* target_avg = avg * (1 - pct/100)
+               buy_price = target_avg * (units + 1) - cost_basis  (for 1 unit) */
+            const targetAvg = avgPrice * (1 - pct / 100);
+            const buyPrice = targetAvg * (units + 1) - costBasis;
+            if (buyPrice <= 0) {
+                buyResult.innerHTML = '<span class="text-muted">Not possible with 1 unit</span>';
+                return;
+            }
+            buyResult.innerHTML = '<span class="text-primary">$' + fmtUSD(buyPrice) + '</span>';
+        }
+
+        sellPctInput.addEventListener("input", updateSell);
+        buyPctInput.addEventListener("input", updateBuy);
+    });
+</script>
+{% endif %}
