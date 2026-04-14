@@ -7,6 +7,12 @@ from .forms import ChangePasswordForm, EditProfileForm, LoginForm, RegisterForm
 from .models import User
 
 
+def home_view(request):
+    if request.user.is_authenticated:
+        return redirect("dashboard")
+    return render(request, "accounts/home.html")
+
+
 def login_view(request):
     if request.user.is_authenticated:
         return redirect("dashboard")
@@ -93,4 +99,4 @@ def edit_profile_view(request):
 
 def logout_view(request):
     logout(request)
-    return redirect("login")
+    return redirect("home")
