@@ -61,7 +61,9 @@ def dashboard_view(request):
         result = []
         for symbol in model.objects.exclude(finnhub_symbol="").values_list("symbol", flat=True):
             price = cache.get(f"finnhub_{symbol}")
-            result.append({"short": symbol, "price": price})
+            mcap = cache.get(f"finnhub_{symbol}_mcap")
+            result.append({"short": symbol, "price": price, "market_cap": mcap or 0})
+        result.sort(key=lambda x: x["market_cap"], reverse=True)
         return result
 
     return render(request, "accounts/dashboard.html", {

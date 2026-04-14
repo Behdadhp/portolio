@@ -12,9 +12,13 @@ class PriceConsumer(AsyncWebsocketConsumer):
         await self.channel_layer.group_add(self.GROUP_NAME, self.channel_name)
         await self.accept()
 
-        prices = await self._get_cached_prices()
-        if prices:
-            await self.send(text_data=json.dumps({"type": "price_update", "prices": prices}))
+        data = await self._get_cached_data()
+        if data["prices"]:
+            await self.send(text_data=json.dumps({
+                "type": "price_update",
+                "prices": data["prices"],
+                "market_caps": data["market_caps"],
+            }))
 
     async def disconnect(self, close_code):
         await self.channel_layer.group_discard(self.GROUP_NAME, self.channel_name)
@@ -23,16 +27,17 @@ class PriceConsumer(AsyncWebsocketConsumer):
         await self.send(text_data=json.dumps(event))
 
     @sync_to_async
-    def _get_cached_prices(self):
+    def _get_cached_data(self):
         from assets.models import Crypto, Stock
 
         prices = {}
-        for symbol in Crypto.objects.exclude(finnhub_symbol="").values_list("symbol", flat=True):
-            price = cache.get(f"finnhub_{symbol}")
-            if price is not None:
-                prices[symbol] = price
-        for symbol in Stock.objects.exclude(finnhub_symbol="").values_list("symbol", flat=True):
-            price = cache.get(f"finnhub_{symbol}")
-            if price is not None:
-                prices[symbol] = price
-        return prices
+        market_caps = {}
+        for model in (Crypto, Stock):
+            for symbol in model.objects.exclude(finnhub_symbol="").values_list("symbol", flat=True):
+                price = cache.get(f"finnhub_{symbol}")
+                mcap = cache.get(f"finnhub_{symbol}_mcap")
+                if price is not None:
+                    prices[symbol] = price
+                if mcap is not None:
+                    market_caps[symbol] = mcap
+        return {"prices": prices, "market_caps": market_caps}
