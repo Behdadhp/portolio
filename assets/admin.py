@@ -5,13 +5,13 @@ from .models import Crypto, CryptoAsset, Stock, StockAsset
 
 @admin.register(Crypto)
 class CryptoAdmin(admin.ModelAdmin):
-    list_display = ("name", "symbol")
+    list_display = ("name", "symbol", "finnhub_symbol", "date_added")
     search_fields = ("name", "symbol")
 
 
 @admin.register(Stock)
 class StockAdmin(admin.ModelAdmin):
-    list_display = ("name", "symbol")
+    list_display = ("name", "symbol", "finnhub_symbol", "date_added")
     search_fields = ("name", "symbol")
 
 

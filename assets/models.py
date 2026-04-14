@@ -1,12 +1,19 @@
 import uuid
+
 from django.conf import settings
 from django.db import models
+from django.utils import timezone
 
 
 class Crypto(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     name = models.CharField(max_length=100, unique=True)
     symbol = models.CharField(max_length=20, unique=True)
+    finnhub_symbol = models.CharField(
+        max_length=50, blank=True, default="",
+        help_text="Finnhub symbol (e.g. BINANCE:BTCUSDT). Leave blank to skip live tracking.",
+    )
+    date_added = models.DateTimeField(default=timezone.now)
 
     class Meta:
         verbose_name_plural = "Cryptos"
@@ -20,6 +27,11 @@ class Stock(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     name = models.CharField(max_length=100, unique=True)
     symbol = models.CharField(max_length=20, unique=True)
+    finnhub_symbol = models.CharField(
+        max_length=50, blank=True, default="",
+        help_text="Finnhub symbol (e.g. AAPL). Leave blank to skip live tracking.",
+    )
+    date_added = models.DateTimeField(default=timezone.now)
 
     class Meta:
         ordering = ["name"]
