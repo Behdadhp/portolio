@@ -1,4 +1,5 @@
 from django.contrib.auth.decorators import login_required
+from django.core.cache import cache
 from django.shortcuts import get_object_or_404, redirect, render
 
 from .forms import CryptoAssetForm, StockAssetForm
@@ -6,6 +7,7 @@ from .models import Crypto, CryptoAsset, Stock, StockAsset
 from .services import (
     DETAIL_COLUMNS,
     apply_filters,
+    compute_analytics,
     get_asset_summary,
     get_filter_ranges,
     sort_and_paginate,
@@ -20,7 +22,13 @@ def _list_view(request, transaction_model, name_field, symbol_field, template, c
         name_field,
         symbol_field,
     )
-    return render(request, template, {context_key: summary})
+    enriched = []
+    for row in summary:
+        price = cache.get(f"finnhub_{row['symbol']}")
+        row["price"] = price
+        row["worth"] = round(row["total"] * price, 2) if price is not None else None
+        enriched.append(row)
+    return render(request, template, {context_key: enriched})
 
 
 def _detail_view(request, symbol, master_model, transaction_model, fk_field,
@@ -31,6 +39,8 @@ def _detail_view(request, symbol, master_model, transaction_model, fk_field,
     summary = get_asset_summary(base_qs, name_field, symbol_field).first()
     total = summary["total"] if summary else 0
 
+    analytics = compute_analytics(base_qs, symbol)
+
     ranges = get_filter_ranges(base_qs)
     transactions, filters = apply_filters(request, base_qs.order_by("-date"))
     page_obj, current_sort, current_order, per_page = sort_and_paginate(request, transactions)
@@ -39,6 +49,8 @@ def _detail_view(request, symbol, master_model, transaction_model, fk_field,
         "page_obj": page_obj,
         fk_field: master,
         "total": total,
+        "analytics": analytics,
+        "asset_symbol": symbol,
         "current_sort": current_sort,
         "current_order": current_order,
         "per_page": per_page,
