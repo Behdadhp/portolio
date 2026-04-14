@@ -53,22 +53,12 @@ def register_view(request):
 
 @login_required
 def dashboard_view(request):
-    from django.core.cache import cache
-
     from assets.models import Crypto, Stock
-
-    def _load_prices(model):
-        result = []
-        for symbol in model.objects.exclude(finnhub_symbol="").values_list("symbol", flat=True):
-            price = cache.get(f"finnhub_{symbol}")
-            mcap = cache.get(f"finnhub_{symbol}_mcap")
-            result.append({"short": symbol, "price": price, "market_cap": mcap or 0})
-        result.sort(key=lambda x: x["market_cap"], reverse=True)
-        return result
+    from assets.services import load_live_prices
 
     return render(request, "accounts/dashboard.html", {
-        "stock_prices": _load_prices(Stock),
-        "crypto_prices": _load_prices(Crypto),
+        "stock_prices": load_live_prices(Stock),
+        "crypto_prices": load_live_prices(Crypto),
     })
 
 
