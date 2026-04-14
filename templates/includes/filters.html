@@ -26,51 +26,54 @@ Expects from view context: filters, price_min_bound, price_max_bound, amount_min
         width: 18px;
         height: 18px;
         border-radius: 50%;
-        background: #0d6efd;
+        background: var(--accent);
         cursor: pointer;
         pointer-events: all;
-        border: 2px solid #fff;
-        box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+        border: 2px solid var(--bg-card);
+        box-shadow: 0 1px 6px rgba(0,0,0,0.4);
     }
     .range-slider input[type="range"]::-moz-range-thumb {
         width: 18px;
         height: 18px;
         border-radius: 50%;
-        background: #0d6efd;
+        background: var(--accent);
         cursor: pointer;
         pointer-events: all;
-        border: 2px solid #fff;
-        box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+        border: 2px solid var(--bg-card);
+        box-shadow: 0 1px 6px rgba(0,0,0,0.4);
     }
     .range-track {
         position: absolute;
         height: 6px;
         width: 100%;
-        background: #dee2e6;
+        background: var(--border-color);
         border-radius: 3px;
         z-index: 1;
     }
     .range-track-active {
         position: absolute;
         height: 6px;
-        background: #0d6efd;
+        background: var(--accent);
         border-radius: 3px;
         z-index: 1;
     }
 </style>
 
 <div class="mb-3">
-    <button class="btn btn-outline-primary btn-sm" type="button" data-bs-toggle="collapse" data-bs-target="#filterPanel" aria-expanded="{% if filters %}true{% else %}false{% endif %}" aria-controls="filterPanel">
+    <button class="btn btn-ghost btn-sm" type="button" data-bs-toggle="collapse" data-bs-target="#filterPanel" aria-expanded="{% if filters %}true{% else %}false{% endif %}" aria-controls="filterPanel">
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16" class="me-1">
+            <path d="M1.5 1.5A.5.5 0 0 1 2 1h12a.5.5 0 0 1 .5.5v2a.5.5 0 0 1-.128.334L10 8.692V13.5a.5.5 0 0 1-.342.474l-3 1A.5.5 0 0 1 6 14.5V8.692L1.628 3.834A.5.5 0 0 1 1.5 3.5z"/>
+        </svg>
         Filters {% if filters %}<span class="badge bg-primary ms-1">Active</span>{% endif %}
     </button>
     {% if filters %}
-    <a href="?sort={{ current_sort }}&order={{ current_order }}&per_page={{ per_page }}" class="btn btn-outline-secondary btn-sm ms-1">Clear Filters</a>
+    <a href="?sort={{ current_sort }}&order={{ current_order }}&per_page={{ per_page }}" class="btn btn-ghost btn-sm ms-1" style="font-size:0.8rem;">Clear</a>
     {% endif %}
 </div>
 
 <div class="collapse {% if filters %}show{% endif %}" id="filterPanel">
-    <div class="card shadow-sm mb-3">
-        <div class="card-body">
+    <div class="card mb-3">
+        <div class="card-body p-3">
             <form method="get" id="filterForm">
                 <!-- Preserve sort/pagination params -->
                 <input type="hidden" name="sort" value="{{ current_sort }}">
@@ -102,14 +105,14 @@ Expects from view context: filters, price_min_bound, price_max_bound, amount_min
 
                     <!-- Apply button -->
                     <div class="col-md-3 d-flex align-items-end">
-                        <button type="submit" class="btn btn-primary btn-sm w-100">Apply Filters</button>
+                        <button type="submit" class="btn btn-accent btn-sm w-100">Apply</button>
                     </div>
 
                     <!-- Price range slider -->
                     <div class="col-md-6">
                         <label class="form-label small fw-semibold">
-                            Price Range: <span id="priceLabelMin">{{ filters.price_min|default:price_min_bound }}</span>
-                            — <span id="priceLabelMax">{{ filters.price_max|default:price_max_bound }}</span>
+                            Price Range: <span id="priceLabelMin" class="text-primary">{{ filters.price_min|default:price_min_bound }}</span>
+                            — <span id="priceLabelMax" class="text-primary">{{ filters.price_max|default:price_max_bound }}</span>
                         </label>
                         <div class="range-slider">
                             <div class="range-track"></div>
@@ -130,8 +133,8 @@ Expects from view context: filters, price_min_bound, price_max_bound, amount_min
                     <!-- Amount range slider -->
                     <div class="col-md-6">
                         <label class="form-label small fw-semibold">
-                            Amount Range: <span id="amountLabelMin">{{ filters.amount_min|default:amount_min_bound }}</span>
-                            — <span id="amountLabelMax">{{ filters.amount_max|default:amount_max_bound }}</span>
+                            Amount Range: <span id="amountLabelMin" class="text-primary">{{ filters.amount_min|default:amount_min_bound }}</span>
+                            — <span id="amountLabelMax" class="text-primary">{{ filters.amount_max|default:amount_max_bound }}</span>
                         </label>
                         <div class="range-slider">
                             <div class="range-track"></div>

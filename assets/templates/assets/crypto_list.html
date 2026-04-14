@@ -1,41 +1,64 @@
 {% extends "base.html" %}
 
-{% block title %}Crypto Assets{% endblock %}
+{% block title %}Crypto Portfolio — Folio{% endblock %}
 
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-3 mt-3">
-    <h3>Crypto Assets</h3>
+<div class="page-header">
+    <div>
+        <h3>Crypto Portfolio</h3>
+        <p class="mb-0" style="color:var(--text-secondary); font-size:0.9rem;">Your crypto holdings at a glance</p>
+    </div>
     <div class="d-flex gap-2">
-        <a href="{% url 'crypto_add' %}" class="btn btn-primary btn-sm">Add Transaction</a>
-        <a href="{% url 'dashboard' %}" class="btn btn-outline-secondary btn-sm">Back to Dashboard</a>
+        <a href="{% url 'crypto_add' %}" class="btn btn-accent btn-sm">+ Add Transaction</a>
+        <a href="{% url 'dashboard' %}" class="btn btn-ghost btn-sm">Dashboard</a>
     </div>
 </div>
 
-<div class="card shadow-sm">
-    <div class="card-body">
+<div class="card">
+    <div class="card-body p-0">
         {% if cryptos %}
         <table class="table table-hover mb-0">
             <thead>
                 <tr>
-                    <th>Name</th>
+                    <th style="padding-left:1.25rem;">Name</th>
                     <th>Symbol</th>
-                    <th class="text-end">Net Total Amount</th>
+                    <th class="text-end">Net Total</th>
+                    <th class="text-end">Price ($)</th>
+                    <th class="text-end" style="padding-right:1.25rem;">Total Worth ($)</th>
                 </tr>
             </thead>
             <tbody>
                 {% for crypto in cryptos %}
-                <tr onclick="window.location='{% url 'crypto_detail' crypto.symbol %}'" style="cursor: pointer;">
-                    <td>{{ crypto.name }}</td>
-                    <td>{{ crypto.symbol }}</td>
+                <tr onclick="window.location='{% url 'crypto_detail' crypto.symbol %}'" style="cursor:pointer;">
+                    <td style="padding-left:1.25rem;" class="fw-semibold">{{ crypto.name }}</td>
+                    <td>
+                        <span style="background:rgba(6,182,212,0.12);color:#22d3ee;padding:2px 8px;border-radius:6px;font-weight:600;font-size:0.85rem;">
+                            {{ crypto.symbol }}
+                        </span>
+                    </td>
                     <td class="text-end {% if crypto.total >= 0 %}text-success{% else %}text-danger{% endif %}">
                         {{ crypto.total|floatformat:2 }}
+                    </td>
+                    <td class="text-end" style="font-family:'SF Mono','Fira Code',monospace;font-size:0.9rem;">
+                        {% if crypto.price != None %}{{ crypto.price|floatformat:2 }}{% else %}<span class="text-muted">—</span>{% endif %}
+                    </td>
+                    <td class="text-end fw-semibold {% if crypto.worth != None %}{% if crypto.worth >= 0 %}text-success{% else %}text-danger{% endif %}{% endif %}" style="padding-right:1.25rem;">
+                        {% if crypto.worth != None %}${{ crypto.worth|floatformat:2 }}{% else %}<span class="text-muted">—</span>{% endif %}
                     </td>
                 </tr>
                 {% endfor %}
             </tbody>
         </table>
         {% else %}
-        <p class="text-muted text-center mb-0 py-4">You have no crypto assets yet.</p>
+        <div class="text-center py-5">
+            <div style="width:56px;height:56px;border-radius:16px;background:rgba(6,182,212,0.1);display:flex;align-items:center;justify-content:center;margin:0 auto 1rem;">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="#22d3ee" viewBox="0 0 16 16">
+                    <path d="M5.5 13v1.25c0 .138.112.25.25.25h4.5a.25.25 0 0 0 .25-.25V13h.5a.5.5 0 0 0 .5-.5v-2A2.5 2.5 0 0 0 9 8.063V5H7v3.063A2.5 2.5 0 0 0 4.5 10.5v2a.5.5 0 0 0 .5.5zM8 1a3 3 0 0 0-3 3v.5a.5.5 0 0 0 1 0V4a2 2 0 1 1 4 0v.5a.5.5 0 0 0 1 0V4a3 3 0 0 0-3-3"/>
+                </svg>
+            </div>
+            <p style="color:var(--text-secondary);" class="mb-2">No crypto assets yet</p>
+            <a href="{% url 'crypto_add' %}" class="btn btn-accent btn-sm">Add your first transaction</a>
+        </div>
         {% endif %}
     </div>
 </div>

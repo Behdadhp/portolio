@@ -1,61 +1,90 @@
 {% extends "base.html" %}
 
-{% block title %}Create Account{% endblock %}
+{% block title %}Create Account — Folio{% endblock %}
+
+{% block extra_css %}
+<style>
+    body { display: flex; flex-direction: column; min-height: 100vh; }
+    .register-wrapper {
+        flex: 1; display: flex;
+        align-items: center; justify-content: center;
+        padding: 2rem 0;
+    }
+    .register-card {
+        background: var(--bg-card);
+        border: 1px solid var(--border-color);
+        border-radius: 20px;
+        padding: 2.5rem;
+        width: 100%; max-width: 480px;
+        box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+    }
+    .register-card h2 { font-weight: 800; letter-spacing: -0.5px; margin-bottom: 0.3rem; }
+    .register-logo { font-size: 1.8rem; font-weight: 800; text-align: center; margin-bottom: 2rem; }
+    .register-logo span { color: var(--accent-light); }
+    .register-divider {
+        display: flex; align-items: center; gap: 1rem;
+        margin: 1.5rem 0; color: var(--text-muted); font-size: 0.85rem;
+    }
+    .register-divider::before, .register-divider::after {
+        content: ''; flex: 1; height: 1px; background: var(--border-color);
+    }
+</style>
+{% endblock %}
 
 {% block content %}
-<div class="row justify-content-center mt-5">
-    <div class="col-md-6">
-        <div class="card shadow">
-            <div class="card-body p-4">
-                <h3 class="text-center mb-4">Create Account</h3>
+<div class="register-wrapper">
+    <div class="register-card">
+        <div class="register-logo">Folio<span>.</span></div>
+        <h2 class="text-center">Create your account</h2>
+        <p class="text-center text-muted mb-4">Start tracking your portfolio today</p>
 
-                {% if form.errors %}
-                <div class="alert alert-danger">
-                    {% for field, errors in form.errors.items %}
-                        {% for error in errors %}
-                        <p class="mb-0">{{ error }}</p>
-                        {% endfor %}
-                    {% endfor %}
-                </div>
-                {% endif %}
-
-                <form method="post">
-                    {% csrf_token %}
-                    <div class="row mb-3">
-                        <div class="col">
-                            <label for="id_first_name" class="form-label">First Name</label>
-                            {{ form.first_name }}
-                        </div>
-                        <div class="col">
-                            <label for="id_last_name" class="form-label">Last Name</label>
-                            {{ form.last_name }}
-                        </div>
-                    </div>
-                    <div class="mb-3">
-                        <label for="id_email" class="form-label">Email</label>
-                        {{ form.email }}
-                    </div>
-                    <div class="mb-3">
-                        <label for="id_birthdate" class="form-label">Birth Date</label>
-                        {{ form.birthdate }}
-                    </div>
-                    <div class="mb-3">
-                        <label for="id_password" class="form-label">Password</label>
-                        {{ form.password }}
-                    </div>
-                    <div class="mb-3">
-                        <label for="id_confirm_password" class="form-label">Confirm Password</label>
-                        {{ form.confirm_password }}
-                    </div>
-                    <button type="submit" class="btn btn-primary w-100">Create Account</button>
-                </form>
-
-                <hr>
-                <p class="text-center mb-0">
-                    Already have an account? <a href="{% url 'login' %}">Login</a>
-                </p>
-            </div>
+        {% if form.errors %}
+        <div class="alert alert-danger">
+            {% for field, errors in form.errors.items %}
+                {% for error in errors %}
+                <p class="mb-0">{{ error }}</p>
+                {% endfor %}
+            {% endfor %}
         </div>
+        {% endif %}
+
+        <form method="post">
+            {% csrf_token %}
+            <div class="row mb-3">
+                <div class="col">
+                    <label for="id_first_name" class="form-label">First Name</label>
+                    {{ form.first_name }}
+                </div>
+                <div class="col">
+                    <label for="id_last_name" class="form-label">Last Name</label>
+                    {{ form.last_name }}
+                </div>
+            </div>
+            <div class="mb-3">
+                <label for="id_email" class="form-label">Email</label>
+                {{ form.email }}
+            </div>
+            <div class="mb-3">
+                <label for="id_birthdate" class="form-label">Birth Date</label>
+                {{ form.birthdate }}
+            </div>
+            <div class="mb-3">
+                <label for="id_password" class="form-label">Password</label>
+                {{ form.password }}
+            </div>
+            <div class="mb-4">
+                <label for="id_confirm_password" class="form-label">Confirm Password</label>
+                {{ form.confirm_password }}
+            </div>
+            <button type="submit" class="btn btn-accent w-100 py-2">Create Account</button>
+        </form>
+
+        <div class="register-divider">or</div>
+
+        <p class="text-center mb-0" style="color:var(--text-secondary);">
+            Already have an account?
+            <a href="{% url 'login' %}" class="fw-semibold">Sign In</a>
+        </p>
     </div>
 </div>
 {% endblock %}

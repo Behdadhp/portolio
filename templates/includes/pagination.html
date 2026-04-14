@@ -4,19 +4,19 @@ Reusable pagination + per-page selector.
 Preserves all current query params (filters, sort, etc).
 {% endcomment %}
 
-<div class="d-flex justify-content-between align-items-center mt-3">
+<div class="d-flex justify-content-between align-items-center p-3" style="border-top:1px solid var(--border-color);">
     <!-- Per-page selector -->
     <div class="d-flex align-items-center gap-2">
-        <span class="text-muted small">Show:</span>
+        <span class="small" style="color:var(--text-muted);">Show:</span>
         <a href="{% query_string per_page=20 page=1 %}"
-           class="btn btn-sm {% if per_page == 20 %}btn-primary{% else %}btn-outline-secondary{% endif %}">
+           class="btn btn-sm {% if per_page == 20 %}btn-accent{% else %}btn-ghost{% endif %}" style="font-size:0.8rem; padding:0.25rem 0.6rem;">
             20
         </a>
         <a href="{% query_string per_page=40 page=1 %}"
-           class="btn btn-sm {% if per_page == 40 %}btn-primary{% else %}btn-outline-secondary{% endif %}">
+           class="btn btn-sm {% if per_page == 40 %}btn-accent{% else %}btn-ghost{% endif %}" style="font-size:0.8rem; padding:0.25rem 0.6rem;">
             40
         </a>
-        <span class="text-muted small">per page</span>
+        <span class="small" style="color:var(--text-muted);">per page</span>
     </div>
 
     <!-- Page navigation -->

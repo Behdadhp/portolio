@@ -1,37 +1,82 @@
 {% extends "base.html" %}
 
-{% block title %}Login{% endblock %}
+{% block title %}Login — Folio{% endblock %}
+
+{% block extra_css %}
+<style>
+    body {
+        display: flex; flex-direction: column;
+        min-height: 100vh;
+    }
+    .login-wrapper {
+        flex: 1; display: flex;
+        align-items: center; justify-content: center;
+        padding: 2rem 0;
+    }
+    .login-card {
+        background: var(--bg-card);
+        border: 1px solid var(--border-color);
+        border-radius: 20px;
+        padding: 2.5rem;
+        width: 100%;
+        max-width: 420px;
+        box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+    }
+    .login-card h2 {
+        font-weight: 800;
+        letter-spacing: -0.5px;
+        margin-bottom: 0.3rem;
+    }
+    .login-logo {
+        font-size: 1.8rem;
+        font-weight: 800;
+        text-align: center;
+        margin-bottom: 2rem;
+    }
+    .login-logo span { color: var(--accent-light); }
+    .login-divider {
+        display: flex; align-items: center; gap: 1rem;
+        margin: 1.5rem 0;
+        color: var(--text-muted);
+        font-size: 0.85rem;
+    }
+    .login-divider::before, .login-divider::after {
+        content: ''; flex: 1;
+        height: 1px; background: var(--border-color);
+    }
+</style>
+{% endblock %}
 
 {% block content %}
-<div class="row justify-content-center mt-5">
-    <div class="col-md-5">
-        <div class="card shadow">
-            <div class="card-body p-4">
-                <h3 class="text-center mb-4">Login</h3>
+<div class="login-wrapper">
+    <div class="login-card">
+        <div class="login-logo">Folio<span>.</span></div>
+        <h2 class="text-center">Welcome back</h2>
+        <p class="text-center text-muted mb-4">Sign in to your account</p>
 
-                {% if error %}
-                <div class="alert alert-danger">{{ error }}</div>
-                {% endif %}
+        {% if error %}
+        <div class="alert alert-danger">{{ error }}</div>
+        {% endif %}
 
-                <form method="post">
-                    {% csrf_token %}
-                    <div class="mb-3">
-                        <label for="id_email" class="form-label">Email</label>
-                        {{ form.email }}
-                    </div>
-                    <div class="mb-3">
-                        <label for="id_password" class="form-label">Password</label>
-                        {{ form.password }}
-                    </div>
-                    <button type="submit" class="btn btn-primary w-100">Login</button>
-                </form>
-
-                <hr>
-                <p class="text-center mb-0">
-                    Don't have an account? <a href="{% url 'register' %}">Create Account</a>
-                </p>
+        <form method="post">
+            {% csrf_token %}
+            <div class="mb-3">
+                <label for="id_email" class="form-label">Email</label>
+                {{ form.email }}
             </div>
-        </div>
+            <div class="mb-4">
+                <label for="id_password" class="form-label">Password</label>
+                {{ form.password }}
+            </div>
+            <button type="submit" class="btn btn-accent w-100 py-2">Sign In</button>
+        </form>
+
+        <div class="login-divider">or</div>
+
+        <p class="text-center mb-0" style="color:var(--text-secondary);">
+            Don't have an account?
+            <a href="{% url 'register' %}" class="fw-semibold">Create Account</a>
+        </p>
     </div>
 </div>
 {% endblock %}

@@ -1,21 +1,21 @@
 {% extends "base.html" %}
 
-{% block title %}Add Crypto Transaction{% endblock %}
+{% block title %}Add Crypto Transaction — Folio{% endblock %}
 
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-3 mt-3">
+<div class="page-header">
     <h3>Add Crypto Transaction</h3>
     {% if crypto %}
-    <a href="{% url 'crypto_detail' crypto.symbol %}" class="btn btn-outline-secondary btn-sm">Cancel</a>
+    <a href="{% url 'crypto_detail' crypto.symbol %}" class="btn btn-ghost btn-sm">Cancel</a>
     {% else %}
-    <a href="{% url 'crypto' %}" class="btn btn-outline-secondary btn-sm">Cancel</a>
+    <a href="{% url 'crypto' %}" class="btn btn-ghost btn-sm">Cancel</a>
     {% endif %}
 </div>
 
 <div class="row">
     <div class="col-md-6">
-        <div class="card shadow-sm">
-            <div class="card-body">
+        <div class="card">
+            <div class="card-body p-4">
                 {% if form.errors %}
                 <div class="alert alert-danger">
                     {% for field, errors in form.errors.items %}
@@ -32,23 +32,27 @@
                         <label for="id_crypto" class="form-label">Crypto</label>
                         {{ form.crypto }}
                     </div>
-                    <div class="mb-3">
-                        <label for="id_price" class="form-label">Price ($)</label>
-                        {{ form.price }}
+                    <div class="row mb-3">
+                        <div class="col">
+                            <label for="id_price" class="form-label">Price ($)</label>
+                            {{ form.price }}
+                        </div>
+                        <div class="col">
+                            <label for="id_amount" class="form-label">Amount</label>
+                            {{ form.amount }}
+                        </div>
                     </div>
-                    <div class="mb-3">
-                        <label for="id_amount" class="form-label">Amount</label>
-                        {{ form.amount }}
+                    <div class="row mb-4">
+                        <div class="col">
+                            <label for="id_date" class="form-label">Date</label>
+                            {{ form.date }}
+                        </div>
+                        <div class="col">
+                            <label for="id_status" class="form-label">Status</label>
+                            {{ form.status }}
+                        </div>
                     </div>
-                    <div class="mb-3">
-                        <label for="id_date" class="form-label">Date</label>
-                        {{ form.date }}
-                    </div>
-                    <div class="mb-3">
-                        <label for="id_status" class="form-label">Status</label>
-                        {{ form.status }}
-                    </div>
-                    <button type="submit" class="btn btn-primary">Add Transaction</button>
+                    <button type="submit" class="btn btn-accent w-100">Add Transaction</button>
                 </form>
             </div>
         </div>

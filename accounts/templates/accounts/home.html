@@ -1,0 +1,525 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Folio — Smart Portfolio Tracker</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --accent: #4f46e5;
+            --accent-light: #818cf8;
+            --dark: #0f172a;
+            --dark-card: #1e293b;
+        }
+
+        /* ── Reset & base ── */
+        body { font-family: system-ui, -apple-system, sans-serif; color: #e2e8f0; }
+        a { text-decoration: none; }
+
+        /* ── Navbar ── */
+        .nav-landing {
+            position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+            padding: 1rem 0;
+            transition: background 0.3s, box-shadow 0.3s;
+        }
+        .nav-landing.scrolled {
+            background: rgba(15, 23, 42, 0.95);
+            backdrop-filter: blur(12px);
+            box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+        }
+        .nav-logo {
+            font-size: 1.5rem; font-weight: 800; color: #fff;
+            letter-spacing: -0.5px;
+        }
+        .nav-logo span { color: var(--accent-light); }
+
+        /* ── Hero ── */
+        .hero {
+            min-height: 100vh;
+            background: var(--dark);
+            background-image:
+                radial-gradient(ellipse 80% 60% at 50% 0%, rgba(79,70,229,0.15), transparent),
+                radial-gradient(ellipse 60% 50% at 80% 100%, rgba(6,182,212,0.08), transparent);
+            display: flex; align-items: center;
+            position: relative; overflow: hidden;
+        }
+        .hero::before {
+            content: '';
+            position: absolute; inset: 0;
+            background: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%234f46e5' fill-opacity='0.03'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+            opacity: 0.5;
+        }
+        .hero-title {
+            font-size: clamp(2.5rem, 6vw, 4.5rem);
+            font-weight: 800; line-height: 1.1;
+            letter-spacing: -1.5px;
+        }
+        .hero-title .gradient-text {
+            background: linear-gradient(135deg, var(--accent-light), #06b6d4);
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .hero-sub {
+            font-size: 1.2rem; color: #94a3b8;
+            max-width: 500px; line-height: 1.7;
+        }
+        .btn-glow {
+            background: var(--accent); color: #fff; border: none;
+            padding: 0.85rem 2.2rem; border-radius: 12px;
+            font-weight: 600; font-size: 1.05rem;
+            transition: transform 0.2s, box-shadow 0.2s;
+            box-shadow: 0 0 20px rgba(79,70,229,0.3);
+        }
+        .btn-glow:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 0 30px rgba(79,70,229,0.5);
+            color: #fff;
+        }
+        .btn-ghost {
+            color: #94a3b8; border: 1px solid #334155;
+            padding: 0.85rem 2.2rem; border-radius: 12px;
+            font-weight: 600; font-size: 1.05rem;
+            transition: border-color 0.2s, color 0.2s;
+        }
+        .btn-ghost:hover { border-color: var(--accent-light); color: #fff; }
+
+        /* ── Floating mockup card ── */
+        .mock-card {
+            background: var(--dark-card);
+            border: 1px solid #334155;
+            border-radius: 16px;
+            padding: 1.5rem;
+            box-shadow: 0 25px 60px rgba(0,0,0,0.4);
+            animation: float 6s ease-in-out infinite;
+            max-width: 380px;
+        }
+        @keyframes float {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-12px); }
+        }
+        .mock-row {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 0.6rem 0;
+            border-bottom: 1px solid #334155;
+        }
+        .mock-row:last-child { border-bottom: none; }
+        .mock-symbol {
+            font-weight: 700; font-size: 0.95rem;
+        }
+        .mock-price { font-family: 'SF Mono', monospace; font-size: 0.9rem; }
+        .mock-change {
+            font-size: 0.8rem; font-weight: 600;
+            padding: 2px 8px; border-radius: 6px;
+        }
+        .mock-up { color: #34d399; background: rgba(52,211,153,0.1); }
+        .mock-down { color: #f87171; background: rgba(248,113,113,0.1); }
+
+        /* ── Features ── */
+        .section-dark { background: var(--dark); }
+        .section-darker { background: #0b1120; }
+        .section-label {
+            font-size: 0.8rem; font-weight: 700;
+            letter-spacing: 2px; text-transform: uppercase;
+            color: var(--accent-light);
+        }
+        .section-heading {
+            font-size: clamp(1.8rem, 4vw, 2.8rem);
+            font-weight: 800; letter-spacing: -1px;
+            color: #f1f5f9;
+        }
+        .feature-card {
+            background: var(--dark-card);
+            border: 1px solid #334155;
+            border-radius: 16px;
+            padding: 2rem;
+            height: 100%;
+            transition: transform 0.25s, border-color 0.25s;
+        }
+        .feature-card:hover {
+            transform: translateY(-4px);
+            border-color: var(--accent);
+        }
+        .feature-icon {
+            width: 48px; height: 48px;
+            border-radius: 12px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 1.4rem;
+            margin-bottom: 1.2rem;
+        }
+        .fi-purple { background: rgba(79,70,229,0.15); color: var(--accent-light); }
+        .fi-cyan { background: rgba(6,182,212,0.15); color: #22d3ee; }
+        .fi-green { background: rgba(52,211,153,0.15); color: #34d399; }
+        .fi-amber { background: rgba(251,191,36,0.15); color: #fbbf24; }
+        .fi-rose { background: rgba(251,113,133,0.15); color: #fb7185; }
+        .fi-blue { background: rgba(59,130,246,0.15); color: #60a5fa; }
+        .feature-card h5 { font-weight: 700; color: #f1f5f9; margin-bottom: 0.6rem; }
+        .feature-card p { color: #94a3b8; font-size: 0.95rem; margin-bottom: 0; line-height: 1.6; }
+
+        /* ── How it works ── */
+        .step-number {
+            width: 40px; height: 40px;
+            border-radius: 50%;
+            background: var(--accent);
+            color: #fff;
+            display: flex; align-items: center; justify-content: center;
+            font-weight: 800; font-size: 1.1rem;
+            flex-shrink: 0;
+        }
+        .step-line {
+            width: 2px; height: 40px;
+            background: #334155;
+            margin-left: 19px;
+        }
+
+        /* ── Stats bar ── */
+        .stat-value {
+            font-size: 2.5rem; font-weight: 800;
+            background: linear-gradient(135deg, var(--accent-light), #06b6d4);
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .stat-label { color: #64748b; font-size: 0.9rem; font-weight: 500; }
+
+        /* ── CTA ── */
+        .cta-section {
+            background: linear-gradient(135deg, var(--accent), #7c3aed);
+            border-radius: 24px;
+            position: relative; overflow: hidden;
+        }
+        .cta-section::before {
+            content: '';
+            position: absolute; inset: 0;
+            background: radial-gradient(circle at 80% 20%, rgba(255,255,255,0.1), transparent 50%);
+        }
+
+        /* ── Footer ── */
+        .footer { background: #0b1120; border-top: 1px solid #1e293b; }
+        .footer a { color: #64748b; transition: color 0.2s; }
+        .footer a:hover { color: var(--accent-light); }
+
+        /* ── Scroll animations ── */
+        .reveal {
+            opacity: 0; transform: translateY(30px);
+            transition: opacity 0.7s ease, transform 0.7s ease;
+        }
+        .reveal.visible { opacity: 1; transform: translateY(0); }
+    </style>
+</head>
+<body>
+
+<!-- ── Navbar ── -->
+<nav class="nav-landing" id="navbar">
+    <div class="container d-flex justify-content-between align-items-center">
+        <a href="#" class="nav-logo">Folio<span>.</span></a>
+        <div class="d-flex gap-3">
+            <a href="{% url 'login' %}" class="btn btn-ghost btn-sm px-3 py-2">Log in</a>
+            <a href="{% url 'register' %}" class="btn btn-glow btn-sm px-3 py-2">Get Started</a>
+        </div>
+    </div>
+</nav>
+
+<!-- ── Hero ── -->
+<section class="hero" id="hero">
+    <div class="container position-relative">
+        <div class="row align-items-center g-5">
+            <div class="col-lg-6">
+                <h1 class="hero-title mb-4">
+                    Track your<br>portfolio<br><span class="gradient-text">like a pro.</span>
+                </h1>
+                <p class="hero-sub mb-4">
+                    Real-time prices, smart analytics, and full control over your
+                    stocks and crypto — all in one clean dashboard.
+                </p>
+                <div class="d-flex gap-3 flex-wrap">
+                    <a href="{% url 'register' %}" class="btn btn-glow">Start Free</a>
+                    <a href="#features" class="btn btn-ghost">See Features</a>
+                </div>
+            </div>
+            <div class="col-lg-5 offset-lg-1 d-none d-lg-block">
+                <div class="mock-card">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <span style="font-weight:700; font-size:1.05rem;">Live Prices</span>
+                        <span style="font-size:0.75rem; color:#34d399;">
+                            <span style="display:inline-block; width:6px; height:6px; background:#34d399; border-radius:50; margin-right:4px;"></span>
+                            Connected
+                        </span>
+                    </div>
+                    <div class="mock-row">
+                        <span class="mock-symbol">BTC</span>
+                        <span class="mock-price" id="lp-BTC">—</span>
+                        <span class="mock-change" id="lc-BTC"></span>
+                    </div>
+                    <div class="mock-row">
+                        <span class="mock-symbol">ETH</span>
+                        <span class="mock-price" id="lp-ETH">—</span>
+                        <span class="mock-change" id="lc-ETH"></span>
+                    </div>
+                    <div class="mock-row">
+                        <span class="mock-symbol">AAPL</span>
+                        <span class="mock-price" id="lp-AAPL">—</span>
+                        <span class="mock-change" id="lc-AAPL"></span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ── Stats ── -->
+<section class="section-darker py-5">
+    <div class="container">
+        <div class="row text-center g-4">
+            <div class="col-6 col-md-3">
+                <div class="stat-value" data-count="50">0</div>
+                <div class="stat-label">Assets Supported</div>
+            </div>
+            <div class="col-6 col-md-3">
+                <div class="stat-value">Live</div>
+                <div class="stat-label">WebSocket Prices</div>
+            </div>
+            <div class="col-6 col-md-3">
+                <div class="stat-value">&lt;1s</div>
+                <div class="stat-label">Price Updates</div>
+            </div>
+            <div class="col-6 col-md-3">
+                <div class="stat-value">100%</div>
+                <div class="stat-label">Free to Use</div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ── Features ── -->
+<section class="section-dark py-5" id="features">
+    <div class="container py-5">
+        <div class="text-center mb-5 reveal">
+            <div class="section-label mb-2">Features</div>
+            <h2 class="section-heading">Everything you need to<br>manage your investments</h2>
+        </div>
+        <div class="row g-4">
+            <div class="col-md-6 col-lg-4 reveal">
+                <div class="feature-card">
+                    <div class="feature-icon fi-cyan">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" viewBox="0 0 16 16">
+                            <path d="M11 6.5a.5.5 0 0 1 .5-.5h1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-1a.5.5 0 0 1-.5-.5z"/>
+                            <path d="M2 2a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2zm13 2v5H1V4a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1m-1 9H2a1 1 0 0 1-1-1v-1h14v1a1 1 0 0 1-1 1"/>
+                        </svg>
+                    </div>
+                    <h5>Real-Time Prices</h5>
+                    <p>Live WebSocket connection to Finnhub delivers price updates in under a second, directly to your browser.</p>
+                </div>
+            </div>
+            <div class="col-md-6 col-lg-4 reveal">
+                <div class="feature-card">
+                    <div class="feature-icon fi-purple">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" viewBox="0 0 16 16">
+                            <path d="M4 11H2v3h2zm5-4H7v7h2zm5-5h-2v12h2zm-2-1a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1zM6 7a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v7a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1zm-5 4a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1z"/>
+                        </svg>
+                    </div>
+                    <h5>Portfolio Analytics</h5>
+                    <p>Weighted average cost, unrealized &amp; realized P&L, profit targets, and buy simulators — all computed automatically.</p>
+                </div>
+            </div>
+            <div class="col-md-6 col-lg-4 reveal">
+                <div class="feature-card">
+                    <div class="feature-icon fi-green">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" viewBox="0 0 16 16">
+                            <path d="M0 5a5 5 0 0 0 4.027 4.905 6.5 6.5 0 0 1 .544-2.073C3.695 7.536 3.132 6.864 3 5.91h-.5v-.426h.466V5.05q-.001-.07.004-.135H2.5v-.427h.511C3.236 3.24 4.213 2.5 5.681 2.5c.316 0 .59.031.819.085v.733a3.5 3.5 0 0 0-.765-.071c-.882 0-1.218.6-1.218 1.198v.041h.776v.427h-.776v.434q0 .032.002.064zM8 5a4 4 0 1 0 0 8 4 4 0 0 0 0-8m.076 4.854a.5.5 0 0 1-.638.057l-1.5-1a.5.5 0 1 1 .554-.832l1.1.733 1.854-2.226a.5.5 0 1 1 .769.64z"/>
+                        </svg>
+                    </div>
+                    <h5>Stocks &amp; Crypto</h5>
+                    <p>Manage both asset classes in one place. Track transactions, monitor performance, and compare your holdings side by side.</p>
+                </div>
+            </div>
+            <div class="col-md-6 col-lg-4 reveal">
+                <div class="feature-card">
+                    <div class="feature-icon fi-amber">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" viewBox="0 0 16 16">
+                            <path d="M8 16a2 2 0 0 0 2-2H6a2 2 0 0 0 2 2m.995-14.901a1 1 0 1 0-1.99 0A5 5 0 0 0 3 6c0 1.098-.5 6-2 7h14c-1.5-1-2-5.902-2-7 0-2.42-1.72-4.44-4.005-4.901"/>
+                        </svg>
+                    </div>
+                    <h5>Price Alerts</h5>
+                    <p>Set target prices for your profit goals. Get notified when the market reaches your sell or buy thresholds.</p>
+                </div>
+            </div>
+            <div class="col-md-6 col-lg-4 reveal">
+                <div class="feature-card">
+                    <div class="feature-icon fi-rose">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" viewBox="0 0 16 16">
+                            <path d="M8.186 1.113a.5.5 0 0 0-.372 0L1.846 3.5l2.404.961L10.404 2zm3.564 1.426L5.596 5 8 5.961 14.154 3.5zm3.25 1.7-6.5 2.6v7.922l6.5-2.6V4.24zM7.5 14.762V6.838L1 4.239v7.923zM7.443.184a1.5 1.5 0 0 1 1.114 0l7.129 2.852A.5.5 0 0 1 16 3.5v8.662a1 1 0 0 1-.629.928l-7.185 2.874a.5.5 0 0 1-.372 0L.63 13.09a1 1 0 0 1-.63-.928V3.5a.5.5 0 0 1 .314-.464z"/>
+                        </svg>
+                    </div>
+                    <h5>Transaction History</h5>
+                    <p>Full buy/sell log with filtering, sorting, and pagination. See every move you've made, organized by asset.</p>
+                </div>
+            </div>
+            <div class="col-md-6 col-lg-4 reveal">
+                <div class="feature-card">
+                    <div class="feature-icon fi-blue">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" viewBox="0 0 16 16">
+                            <path d="M1 0 0 1l2.898 3.898A4.5 4.5 0 0 0 7.5 12.5V15h1v-2.5a4.5 4.5 0 0 0 4.602-4.602L16 1l-1-1-3.898 2.898A4.5 4.5 0 0 0 3.898 2.898zM8 7.5a.5.5 0 1 1-1 0 .5.5 0 0 1 1 0"/>
+                        </svg>
+                    </div>
+                    <h5>Market Cap Ranking</h5>
+                    <p>Assets are automatically sorted by market capitalization so you always see the biggest movers first on your dashboard.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ── How it works ── -->
+<section class="section-darker py-5" id="how">
+    <div class="container py-5">
+        <div class="text-center mb-5 reveal">
+            <div class="section-label mb-2">How it works</div>
+            <h2 class="section-heading">Up and running in minutes</h2>
+        </div>
+        <div class="row justify-content-center">
+            <div class="col-lg-6">
+                <div class="reveal">
+                    <div class="d-flex align-items-start gap-3 mb-2">
+                        <div class="step-number">1</div>
+                        <div>
+                            <h5 class="fw-bold text-light mb-1">Create your account</h5>
+                            <p class="text-secondary mb-0">Sign up with your email in seconds. No credit card required.</p>
+                        </div>
+                    </div>
+                    <div class="step-line"></div>
+                </div>
+                <div class="reveal">
+                    <div class="d-flex align-items-start gap-3 mb-2">
+                        <div class="step-number">2</div>
+                        <div>
+                            <h5 class="fw-bold text-light mb-1">Add your assets</h5>
+                            <p class="text-secondary mb-0">Log your stock and crypto transactions — buys, sells, prices, and dates.</p>
+                        </div>
+                    </div>
+                    <div class="step-line"></div>
+                </div>
+                <div class="reveal">
+                    <div class="d-flex align-items-start gap-3 mb-2">
+                        <div class="step-number">3</div>
+                        <div>
+                            <h5 class="fw-bold text-light mb-1">Watch it live</h5>
+                            <p class="text-secondary mb-0">Real-time prices stream to your dashboard. Analytics update as your portfolio grows.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ── CTA ── -->
+<section class="section-dark py-5">
+    <div class="container py-5">
+        <div class="cta-section text-center py-5 px-4 reveal">
+            <div class="position-relative">
+                <h2 class="fw-800 mb-3" style="font-size:clamp(1.8rem,4vw,2.5rem); letter-spacing:-0.5px;">
+                    Ready to take control of your portfolio?
+                </h2>
+                <p class="mb-4" style="color:rgba(255,255,255,0.8); max-width:480px; margin:0 auto;">
+                    Join now and start tracking your investments with real-time data and smart analytics.
+                </p>
+                <a href="{% url 'register' %}" class="btn btn-light px-4 py-3 fw-bold" style="border-radius:12px; font-size:1.05rem;">
+                    Create Free Account
+                </a>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ── Footer ── -->
+<footer class="footer py-4">
+    <div class="container">
+        <div class="d-flex flex-column flex-md-row justify-content-between align-items-center gap-2">
+            <span class="nav-logo" style="font-size:1.2rem;">Folio<span>.</span></span>
+            <div class="d-flex gap-4">
+                <a href="#features">Features</a>
+                <a href="#how">How it works</a>
+                <a href="{% url 'login' %}">Log in</a>
+            </div>
+            <span style="color:#475569; font-size:0.85rem;">Built with Django &amp; Finnhub</span>
+        </div>
+    </div>
+</footer>
+
+<script>
+    /* ── Navbar scroll effect ── */
+    const navbar = document.getElementById("navbar");
+    window.addEventListener("scroll", function () {
+        navbar.classList.toggle("scrolled", window.scrollY > 40);
+    });
+
+    /* ── Scroll reveal ── */
+    const reveals = document.querySelectorAll(".reveal");
+    const observer = new IntersectionObserver(function (entries) {
+        entries.forEach(function (entry) {
+            if (entry.isIntersecting) {
+                entry.target.classList.add("visible");
+                observer.unobserve(entry.target);
+            }
+        });
+    }, { threshold: 0.15 });
+    reveals.forEach(function (el) { observer.observe(el); });
+
+    /* ── Animated counter ── */
+    document.querySelectorAll("[data-count]").forEach(function (el) {
+        const target = parseInt(el.dataset.count);
+        let current = 0;
+        const step = Math.ceil(target / 40);
+        const interval = setInterval(function () {
+            current += step;
+            if (current >= target) { current = target; clearInterval(interval); }
+            el.textContent = current;
+        }, 30);
+    });
+
+    /* ── Smooth scroll for anchor links ── */
+    document.querySelectorAll('a[href^="#"]').forEach(function (anchor) {
+        anchor.addEventListener("click", function (e) {
+            e.preventDefault();
+            const target = document.querySelector(this.getAttribute("href"));
+            if (target) target.scrollIntoView({ behavior: "smooth" });
+        });
+    });
+
+    /* ── Live prices in mock card ── */
+    (function () {
+        const prev = {};
+        const ws = new WebSocket(
+            (location.protocol === "https:" ? "wss://" : "ws://") + location.host + "/ws/prices/"
+        );
+        function fmt(v) {
+            return "$" + parseFloat(v).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        }
+        ws.onmessage = function (e) {
+            const data = JSON.parse(e.data);
+            if (!data.prices) return;
+            for (const [sym, price] of Object.entries(data.prices)) {
+                const el = document.getElementById("lp-" + sym);
+                if (!el) continue;
+                const p = parseFloat(price);
+                const old = prev[sym];
+                el.textContent = fmt(p);
+
+                const badge = document.getElementById("lc-" + sym);
+                if (badge && old !== undefined && old !== 0) {
+                    const pct = ((p - old) / old * 100).toFixed(2);
+                    const up = p >= old;
+                    badge.textContent = (up ? "+" : "") + pct + "%";
+                    badge.className = "mock-change " + (up ? "mock-up" : "mock-down");
+                }
+                prev[sym] = p;
+            }
+        };
+        ws.onopen = function () {
+            const dot = document.querySelector(".mock-card .mock-change");
+        };
+    })();
+</script>
+
+</body>
+</html>

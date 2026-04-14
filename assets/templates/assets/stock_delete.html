@@ -1,29 +1,38 @@
 {% extends "base.html" %}
 
-{% block title %}Delete Transaction — {{ stock.name }}{% endblock %}
+{% block title %}Delete Transaction — {{ stock.name }} — Folio{% endblock %}
 
 {% block content %}
-<div class="row justify-content-center mt-5">
-    <div class="col-md-6">
-        <div class="card shadow-sm">
-            <div class="card-body text-center p-4">
-                <h4 class="mb-3">Are you sure?</h4>
-                <p class="text-muted">
-                    You are about to delete this transaction:
+<div class="row justify-content-center" style="padding-top:4rem;">
+    <div class="col-md-5">
+        <div class="card">
+            <div class="card-body text-center p-5">
+                <div style="width:56px;height:56px;border-radius:50%;background:rgba(248,113,113,0.12);display:flex;align-items:center;justify-content:center;margin:0 auto 1.2rem;">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="#f87171" viewBox="0 0 16 16">
+                        <path d="M6.5 1h3a.5.5 0 0 1 .5.5v1H6v-1a.5.5 0 0 1 .5-.5M11 2.5v-1A1.5 1.5 0 0 0 9.5 0h-3A1.5 1.5 0 0 0 5 1.5v1H1.5a.5.5 0 0 0 0 1h.538l.853 10.66A2 2 0 0 0 4.885 16h6.23a2 2 0 0 0 1.994-1.84l.853-10.66h.538a.5.5 0 0 0 0-1zm1.958 1-.846 10.58a1 1 0 0 1-.997.92h-6.23a1 1 0 0 1-.997-.92L3.042 3.5zm-7.487 1a.5.5 0 0 1 .528.47l.5 8.5a.5.5 0 0 1-.998.06L5 5.03a.5.5 0 0 1 .47-.53Zm5.058 0a.5.5 0 0 1 .47.53l-.5 8.5a.5.5 0 1 1-.998-.06l.5-8.5a.5.5 0 0 1 .528-.47M8 4.5a.5.5 0 0 1 .5.5v8.5a.5.5 0 0 1-1 0V5a.5.5 0 0 1 .5-.5"/>
+                    </svg>
+                </div>
+                <h4 class="fw-bold mb-2">Delete Transaction?</h4>
+                <p style="color:var(--text-secondary);font-size:0.9rem;" class="mb-3">
+                    This action cannot be undone.
                 </p>
-                <table class="table table-bordered mx-auto" style="max-width: 400px;">
-                    <tr><th>Stock</th><td>{{ stock.name }} ({{ stock.symbol }})</td></tr>
-                    <tr><th>Date</th><td>{{ transaction.date }}</td></tr>
-                    <tr><th>Price</th><td>${{ transaction.price|floatformat:2 }}</td></tr>
-                    <tr><th>Amount</th><td>{{ transaction.amount|floatformat:2 }}</td></tr>
-                    <tr><th>Status</th><td>{{ transaction.get_status_display }}</td></tr>
-                </table>
-                <p class="text-danger fw-semibold">This action cannot be undone.</p>
 
-                <form method="post" class="d-inline">
+                <table class="table table-sm mb-4" style="text-align:left; max-width:320px; margin:0 auto;">
+                    <tr><td class="text-muted">Stock</td><td class="fw-semibold">{{ stock.name }} ({{ stock.symbol }})</td></tr>
+                    <tr><td class="text-muted">Date</td><td>{{ transaction.date }}</td></tr>
+                    <tr><td class="text-muted">Price</td><td>${{ transaction.price|floatformat:2 }}</td></tr>
+                    <tr><td class="text-muted">Amount</td><td>{{ transaction.amount|floatformat:2 }}</td></tr>
+                    <tr><td class="text-muted">Status</td><td>
+                        <span class="badge {% if transaction.status == 'bought' %}bg-success{% else %}bg-danger{% endif %}">
+                            {{ transaction.get_status_display }}
+                        </span>
+                    </td></tr>
+                </table>
+
+                <form method="post" class="d-flex gap-2 justify-content-center">
                     {% csrf_token %}
-                    <button type="submit" class="btn btn-danger me-2">Yes, Delete</button>
-                    <a href="{% url 'stock_detail' stock.symbol %}" class="btn btn-secondary">Cancel</a>
+                    <button type="submit" class="btn px-4 py-2" style="background:rgba(248,113,113,0.15);color:#f87171;border:1px solid rgba(248,113,113,0.3);border-radius:10px;font-weight:600;">Delete</button>
+                    <a href="{% url 'stock_detail' stock.symbol %}" class="btn btn-ghost px-4 py-2">Cancel</a>
                 </form>
             </div>
         </div>

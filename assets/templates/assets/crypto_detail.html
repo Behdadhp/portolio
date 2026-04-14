@@ -1,32 +1,62 @@
 {% extends "base.html" %}
 {% load query_helpers %}
 
-{% block title %}{{ crypto.name }} ({{ crypto.symbol }}) — Crypto Detail{% endblock %}
+{% block title %}{{ crypto.name }} ({{ crypto.symbol }}) — Folio{% endblock %}
+
+{% block extra_css %}
+<style>
+    .detail-stat {
+        display: flex; align-items: center; gap: 0.5rem;
+        padding: 0.5rem 1rem;
+        background: var(--bg-card);
+        border: 1px solid var(--border-color);
+        border-radius: 12px;
+    }
+    .detail-stat .label { color: var(--text-muted); font-size: 0.8rem; }
+    .detail-stat .value { font-weight: 700; font-size: 1.1rem; }
+    .sort-link {
+        text-decoration: none;
+        color: var(--text-secondary);
+        transition: color 0.2s;
+    }
+    .sort-link:hover { color: var(--text-primary); }
+</style>
+{% endblock %}
 
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-3 mt-3">
-    <h3>{{ crypto.name }} <small class="text-muted">({{ crypto.symbol }})</small></h3>
-    <div class="d-flex align-items-center gap-3">
-        <span class="fs-5 fw-semibold {% if total >= 0 %}text-success{% else %}text-danger{% endif %}">
-            Total Amount: {{ total|floatformat:2 }}
-        </span>
-        <a href="{% url 'crypto_add_for' crypto.symbol %}" class="btn btn-primary btn-sm">Add Transaction</a>
-        <a href="{% url 'crypto' %}" class="btn btn-outline-secondary btn-sm">Back to Crypto</a>
+<div class="page-header">
+    <div>
+        <div class="d-flex align-items-center gap-2 mb-1">
+            <h3>{{ crypto.name }}</h3>
+            <span style="background:rgba(6,182,212,0.12);color:#22d3ee;padding:3px 10px;border-radius:8px;font-weight:700;font-size:0.9rem;">
+                {{ crypto.symbol }}
+            </span>
+        </div>
+        <div class="detail-stat d-inline-flex">
+            <span class="label">Net Holdings</span>
+            <span class="value {% if total >= 0 %}text-success{% else %}text-danger{% endif %}">{{ total|floatformat:2 }}</span>
+        </div>
+    </div>
+    <div class="d-flex gap-2">
+        <a href="{% url 'crypto_add_for' crypto.symbol %}" class="btn btn-accent btn-sm">+ Add Transaction</a>
+        <a href="{% url 'crypto' %}" class="btn btn-ghost btn-sm">Back to Crypto</a>
     </div>
 </div>
 
+{% include "includes/analytics.html" %}
+
 {% include "includes/filters.html" %}
 
-<div class="card shadow-sm">
-    <div class="card-body">
+<div class="card">
+    <div class="card-body p-0">
         {% if page_obj %}
         <table class="table table-striped mb-0">
             <thead>
                 <tr>
                     {% for col_field, col_label in columns %}
-                    <th>
+                    <th {% if forloop.first %}style="padding-left:1.25rem;"{% endif %}>
                         <a href="{% if current_sort == col_field and current_order == 'asc' %}{% query_string sort=col_field order='desc' page=1 %}{% else %}{% query_string sort=col_field order='asc' page=1 %}{% endif %}"
-                           class="text-decoration-none text-dark">
+                           class="sort-link">
                             {{ col_label }}
                             {% if current_sort == col_field %}
                                 {% if current_order == "asc" %}&#9650;{% else %}&#9660;{% endif %}
@@ -34,23 +64,23 @@
                         </a>
                     </th>
                     {% endfor %}
-                    <th class="text-end">Actions</th>
+                    <th class="text-end" style="padding-right:1.25rem;">Actions</th>
                 </tr>
             </thead>
             <tbody>
                 {% for tx in page_obj %}
                 <tr>
-                    <td>{{ tx.date }}</td>
-                    <td>${{ tx.price|floatformat:2 }}</td>
+                    <td style="padding-left:1.25rem;">{{ tx.date }}</td>
+                    <td style="font-family:'SF Mono','Fira Code',monospace;font-size:0.9rem;">${{ tx.price|floatformat:2 }}</td>
                     <td>{{ tx.amount|floatformat:2 }}</td>
                     <td>
                         <span class="badge {% if tx.status == 'bought' %}bg-success{% else %}bg-danger{% endif %}">
                             {{ tx.get_status_display }}
                         </span>
                     </td>
-                    <td class="text-end">
-                        <a href="{% url 'crypto_edit' tx.pk %}" class="btn btn-outline-primary btn-sm">Edit</a>
-                        <a href="{% url 'crypto_delete' tx.pk %}" class="btn btn-outline-danger btn-sm">Delete</a>
+                    <td class="text-end" style="padding-right:1.25rem;">
+                        <a href="{% url 'crypto_edit' tx.pk %}" class="btn btn-ghost btn-sm py-1 px-2" style="font-size:0.8rem;">Edit</a>
+                        <a href="{% url 'crypto_delete' tx.pk %}" class="btn btn-ghost btn-sm py-1 px-2" style="font-size:0.8rem;border-color:rgba(248,113,113,0.3);color:#f87171;">Delete</a>
                     </td>
                 </tr>
                 {% endfor %}
