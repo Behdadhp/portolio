@@ -28,14 +28,18 @@
                             <tr>
                                 <th>Symbol</th>
                                 <th class="text-end">Price ($)</th>
+                                <th class="text-end">Market Cap</th>
                             </tr>
                         </thead>
-                        <tbody>
+                        <tbody id="stock-table">
                             {% for item in stock_prices %}
-                            <tr>
+                            <tr data-symbol="{{ item.short }}">
                                 <td class="fw-semibold">{{ item.short }}</td>
                                 <td class="text-end" id="price-{{ item.short }}">
                                     {% if item.price %}{{ item.price|floatformat:2 }}{% else %}<span class="text-muted">—</span>{% endif %}
+                                </td>
+                                <td class="text-end" id="mcap-{{ item.short }}">
+                                    <span class="text-muted">—</span>
                                 </td>
                             </tr>
                             {% endfor %}
@@ -57,14 +61,18 @@
                             <tr>
                                 <th>Symbol</th>
                                 <th class="text-end">Price ($)</th>
+                                <th class="text-end">Market Cap</th>
                             </tr>
                         </thead>
-                        <tbody>
+                        <tbody id="crypto-table">
                             {% for item in crypto_prices %}
-                            <tr>
+                            <tr data-symbol="{{ item.short }}">
                                 <td class="fw-semibold">{{ item.short }}</td>
                                 <td class="text-end" id="price-{{ item.short }}">
                                     {% if item.price %}{{ item.price|floatformat:2 }}{% else %}<span class="text-muted">—</span>{% endif %}
+                                </td>
+                                <td class="text-end" id="mcap-{{ item.short }}">
+                                    <span class="text-muted">—</span>
                                 </td>
                             </tr>
                             {% endfor %}
@@ -91,11 +99,45 @@
 
 <script>
     const prevPrices = {};
+    const marketCaps = {};
+
+    function formatMarketCap(v) {
+        if (v >= 1e12) return "$" + (v / 1e12).toFixed(2) + "T";
+        if (v >= 1e9)  return "$" + (v / 1e9).toFixed(2) + "B";
+        if (v >= 1e6)  return "$" + (v / 1e6).toFixed(2) + "M";
+        return "$" + v.toFixed(0);
+    }
+
+    function sortTableByMarketCap(tbodyId) {
+        const tbody = document.getElementById(tbodyId);
+        if (!tbody) return;
+        const rows = Array.from(tbody.querySelectorAll("tr"));
+        rows.sort(function(a, b) {
+            const capA = marketCaps[a.dataset.symbol] || 0;
+            const capB = marketCaps[b.dataset.symbol] || 0;
+            return capB - capA;
+        });
+        rows.forEach(function(row) { tbody.appendChild(row); });
+    }
+
     const ws = new WebSocket(
         (location.protocol === "https:" ? "wss://" : "ws://") + location.host + "/ws/prices/"
     );
     ws.onmessage = function(event) {
         const data = JSON.parse(event.data);
+
+        if (data.market_caps) {
+            for (const [symbol, mcap] of Object.entries(data.market_caps)) {
+                marketCaps[symbol] = mcap;
+                const mcapCell = document.getElementById("mcap-" + symbol);
+                if (mcapCell) {
+                    mcapCell.textContent = formatMarketCap(mcap);
+                }
+            }
+            sortTableByMarketCap("stock-table");
+            sortTableByMarketCap("crypto-table");
+        }
+
         if (data.prices) {
             for (const [symbol, price] of Object.entries(data.prices)) {
                 const cell = document.getElementById("price-" + symbol);
@@ -107,7 +149,6 @@
 
                 if (oldPrice !== undefined && newPrice !== oldPrice) {
                     cell.classList.remove("price-up", "price-down");
-                    // Force reflow so the animation restarts
                     void cell.offsetWidth;
                     cell.classList.add(newPrice > oldPrice ? "price-up" : "price-down");
                 }
