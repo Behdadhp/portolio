@@ -156,3 +156,15 @@ CHANNEL_LAYERS = {
 
 # Finnhub
 FINNHUB_API_KEY = os.getenv("FINNHUB_API_KEY", "")
+FINNHUB_WS_URL = os.getenv("FINNHUB_WS_URL", "wss://ws.finnhub.io?token={}")
+FINNHUB_REST_URL = os.getenv("FINNHUB_REST_URL", "https://finnhub.io/api/v1")
+
+# CoinGecko
+COINGECKO_MARKETS_URL = os.getenv("COINGECKO_MARKETS_URL", "https://api.coingecko.com/api/v3/coins/markets")
+
+# Streaming
+BROADCAST_INTERVAL = int(os.getenv("BROADCAST_INTERVAL", "1"))
+BACKOFF_INITIAL = int(os.getenv("BACKOFF_INITIAL", "1"))
+BACKOFF_MAX = int(os.getenv("BACKOFF_MAX", "60"))
+SYNC_INTERVAL = int(os.getenv("SYNC_INTERVAL", "5"))
+MARKET_CAP_REFRESH = int(os.getenv("MARKET_CAP_REFRESH", "900"))
