@@ -85,3 +85,45 @@ class StockAsset(models.Model):
 
     def __str__(self):
         return f"{self.stock.name} - {self.user.email}"
+
+
+class PriceAlert(models.Model):
+    class Direction(models.TextChoices):
+        ABOVE = "above", "Above (Sell)"
+        BELOW = "below", "Below (Buy)"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="price_alerts"
+    )
+    stock = models.ForeignKey(
+        Stock, on_delete=models.CASCADE, null=True, blank=True, related_name="alerts"
+    )
+    crypto = models.ForeignKey(
+        Crypto, on_delete=models.CASCADE, null=True, blank=True, related_name="alerts"
+    )
+    target_price = models.DecimalField(max_digits=18, decimal_places=2)
+    direction = models.CharField(
+        max_length=5, choices=Direction.choices, default=Direction.ABOVE
+    )
+    email_sent = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    @property
+    def symbol(self):
+        if self.stock_id:
+            return self.stock.symbol
+        return self.crypto.symbol
+
+    @property
+    def asset_name(self):
+        if self.stock_id:
+            return self.stock.name
+        return self.crypto.name
+
+    def __str__(self):
+        direction = "above" if self.direction == "above" else "below"
+        return f"{self.symbol} {direction} ${self.target_price} ({self.user.email})"
