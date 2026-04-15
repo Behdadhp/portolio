@@ -1,0 +1,304 @@
+<!-- Reusable Donut Chart Component — pure Canvas, no dependencies -->
+<style>
+    .donut-wrap {
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+    }
+    .donut-wrap canvas { cursor: pointer; }
+
+    .donut-center {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        text-align: center;
+        pointer-events: none;
+        transition: opacity 0.2s;
+    }
+    .donut-center .donut-total-label {
+        font-size: 0.7rem;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        color: var(--text-muted);
+        font-weight: 600;
+    }
+    .donut-center .donut-total-value {
+        font-size: 1.15rem;
+        font-weight: 800;
+        color: var(--text-primary);
+        font-family: system-ui, -apple-system, sans-serif;
+    }
+
+    .donut-legend {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem 1.2rem;
+        justify-content: center;
+        margin-top: 1rem;
+        max-width: 100%;
+    }
+    .donut-legend-item {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 0.78rem;
+        color: var(--text-secondary);
+        white-space: nowrap;
+    }
+    .donut-legend-dot {
+        width: 10px; height: 10px;
+        border-radius: 3px;
+        flex-shrink: 0;
+    }
+    .donut-legend-pct {
+        color: var(--text-muted);
+        font-size: 0.72rem;
+        font-weight: 600;
+    }
+
+    /* Tooltip */
+    .donut-tooltip {
+        position: fixed;
+        pointer-events: none;
+        padding: 8px 14px;
+        background: rgba(15, 23, 42, 0.95);
+        border: 1px solid var(--border-color);
+        border-radius: 10px;
+        font-size: 0.82rem;
+        color: var(--text-primary);
+        z-index: 1000;
+        opacity: 0;
+        transition: opacity 0.15s;
+        backdrop-filter: blur(8px);
+        box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+    }
+    .donut-tooltip.visible { opacity: 1; }
+</style>
+
+<div class="donut-tooltip" id="donutTooltip"></div>
+
+<script>
+/**
+ * Draw a donut chart on a <canvas> element.
+ *
+ * @param {string}   canvasId   - id of the <canvas>
+ * @param {Array}    data       - [{label, value, color?}]
+ * @param {Object}   opts       - {centerLabel, prefix, legendId, animate}
+ */
+function drawDonutChart(canvasId, data, opts) {
+    opts = opts || {};
+    const prefix   = opts.prefix   || "$";
+    const centerLbl= opts.centerLabel || "Total";
+    const legendId = opts.legendId || null;
+    const animate  = opts.animate !== false;
+
+    const COLORS = [
+        "#818cf8", "#06b6d4", "#34d399", "#fbbf24", "#f87171",
+        "#a78bfa", "#22d3ee", "#4ade80", "#fb923c", "#f472b6",
+        "#60a5fa", "#2dd4bf", "#a3e635", "#e879f9", "#38bdf8",
+    ];
+
+    const canvas = document.getElementById(canvasId);
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    const dpr = window.devicePixelRatio || 1;
+    const size = canvas.parentElement.clientWidth
+        ? Math.min(canvas.parentElement.clientWidth, 260)
+        : 260;
+
+    canvas.width  = size * dpr;
+    canvas.height = size * dpr;
+    canvas.style.width  = size + "px";
+    canvas.style.height = size + "px";
+    ctx.scale(dpr, dpr);
+
+    // Filter out zero/negative values
+    const filtered = data.filter(function(d) { return d.value > 0; });
+    if (filtered.length === 0) {
+        ctx.clearRect(0, 0, size, size);
+        ctx.fillStyle = "var(--text-muted)";
+        ctx.font = "13px system-ui, sans-serif";
+        ctx.textAlign = "center";
+        ctx.fillText("No data", size / 2, size / 2);
+        return;
+    }
+
+    const total = filtered.reduce(function(s, d) { return s + d.value; }, 0);
+
+    // Assign colors
+    filtered.forEach(function(d, i) {
+        if (!d.color) d.color = COLORS[i % COLORS.length];
+        d.pct = (d.value / total * 100);
+    });
+
+    const cx = size / 2, cy = size / 2;
+    const outerR = size / 2 - 6;
+    const innerR = outerR * 0.62;
+    const hoverR = outerR + 4;
+
+    // Segments with angles
+    let startAngle = -Math.PI / 2;
+    const segments = filtered.map(function(d) {
+        const sweep = (d.value / total) * Math.PI * 2;
+        const seg = { data: d, start: startAngle, end: startAngle + sweep };
+        startAngle += sweep;
+        return seg;
+    });
+
+    let hoveredIdx = -1;
+
+    function render(progress) {
+        progress = progress || 1;
+        ctx.clearRect(0, 0, size, size);
+
+        segments.forEach(function(seg, i) {
+            const endAngle = seg.start + (seg.end - seg.start) * progress;
+            const r = (i === hoveredIdx) ? hoverR : outerR;
+
+            ctx.beginPath();
+            ctx.arc(cx, cy, r, seg.start, endAngle);
+            ctx.arc(cx, cy, innerR, endAngle, seg.start, true);
+            ctx.closePath();
+            ctx.fillStyle = seg.data.color;
+            if (i === hoveredIdx) {
+                ctx.shadowColor = seg.data.color;
+                ctx.shadowBlur = 16;
+            }
+            ctx.fill();
+            ctx.shadowColor = "transparent";
+            ctx.shadowBlur = 0;
+
+            // Thin gap line
+            ctx.beginPath();
+            ctx.arc(cx, cy, r, seg.start, endAngle);
+            ctx.arc(cx, cy, innerR, endAngle, seg.start, true);
+            ctx.closePath();
+            ctx.strokeStyle = "rgba(15,23,42,0.6)";
+            ctx.lineWidth = 2;
+            ctx.stroke();
+        });
+    }
+
+    // Animate
+    if (animate && segments.length > 0) {
+        let frame = 0;
+        const totalFrames = 40;
+        (function step() {
+            frame++;
+            const t = 1 - Math.pow(1 - frame / totalFrames, 3); // ease-out cubic
+            render(t);
+            if (frame < totalFrames) requestAnimationFrame(step);
+        })();
+    } else {
+        render(1);
+    }
+
+    // Center text
+    const centerEl = canvas.parentElement.querySelector(".donut-center");
+    if (centerEl) {
+        centerEl.querySelector(".donut-total-label").textContent = centerLbl;
+        centerEl.querySelector(".donut-total-value").textContent =
+            prefix + total.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    // Legend
+    if (legendId) {
+        const legend = document.getElementById(legendId);
+        if (legend) {
+            legend.innerHTML = filtered.map(function(d) {
+                return '<div class="donut-legend-item">' +
+                    '<span class="donut-legend-dot" style="background:' + d.color + ';"></span>' +
+                    '<span>' + d.label + '</span>' +
+                    '<span class="donut-legend-pct">' + d.pct.toFixed(1) + '%</span>' +
+                    '</div>';
+            }).join("");
+        }
+    }
+
+    // Tooltip + hover
+    const tooltip = document.getElementById("donutTooltip");
+
+    canvas.addEventListener("mousemove", function(e) {
+        const rect = canvas.getBoundingClientRect();
+        const mx = e.clientX - rect.left;
+        const my = e.clientY - rect.top;
+        const dx = mx - cx, dy = my - cy;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+
+        if (dist < innerR || dist > hoverR + 2) {
+            if (hoveredIdx !== -1) { hoveredIdx = -1; render(1); }
+            tooltip.classList.remove("visible");
+            return;
+        }
+
+        let angle = Math.atan2(dy, dx);
+        if (angle < -Math.PI / 2) angle += Math.PI * 2;
+
+        let found = -1;
+        for (let i = 0; i < segments.length; i++) {
+            let s = segments[i].start, en = segments[i].end;
+            if (angle >= s && angle < en) { found = i; break; }
+        }
+
+        if (found !== hoveredIdx) {
+            hoveredIdx = found;
+            render(1);
+        }
+
+        if (found >= 0) {
+            const d = segments[found].data;
+            tooltip.innerHTML =
+                '<div style="display:flex;align-items:center;gap:6px;margin-bottom:2px;">' +
+                '<span style="width:8px;height:8px;border-radius:2px;background:' + d.color + ';display:inline-block;"></span>' +
+                '<strong>' + d.label + '</strong></div>' +
+                '<div style="color:var(--text-secondary);font-size:0.78rem;">' +
+                prefix + d.value.toLocaleString("en-US", {minimumFractionDigits:2, maximumFractionDigits:2}) +
+                ' &nbsp;<span style="color:' + d.color + ';">' + d.pct.toFixed(1) + '%</span></div>';
+            tooltip.style.left = (e.clientX + 14) + "px";
+            tooltip.style.top  = (e.clientY - 10) + "px";
+            tooltip.classList.add("visible");
+        } else {
+            tooltip.classList.remove("visible");
+        }
+    });
+
+    canvas.addEventListener("mouseleave", function() {
+        hoveredIdx = -1;
+        render(1);
+        tooltip.classList.remove("visible");
+    });
+
+    // Return an updater function for real-time use
+    return function updateChart(newData) {
+        data = newData;
+        var f2 = data.filter(function(d){ return d.value > 0; });
+        if (f2.length === 0) return;
+        var t2 = f2.reduce(function(s,d){ return s + d.value; }, 0);
+        f2.forEach(function(d,i){ if (!d.color) d.color = COLORS[i % COLORS.length]; d.pct = d.value / t2 * 100; });
+        var sa = -Math.PI / 2;
+        segments.length = 0;
+        filtered.length = 0;
+        f2.forEach(function(d){
+            filtered.push(d);
+            var sw = (d.value / t2) * Math.PI * 2;
+            segments.push({data: d, start: sa, end: sa + sw});
+            sa += sw;
+        });
+        render(1);
+        if (centerEl) {
+            centerEl.querySelector(".donut-total-value").textContent =
+                prefix + t2.toLocaleString("en-US", {minimumFractionDigits:2, maximumFractionDigits:2});
+        }
+        if (legendId) {
+            var lg = document.getElementById(legendId);
+            if (lg) {
+                lg.innerHTML = filtered.map(function(d){
+                    return '<div class="donut-legend-item"><span class="donut-legend-dot" style="background:'+d.color+';"></span><span>'+d.label+'</span><span class="donut-legend-pct">'+d.pct.toFixed(1)+'%</span></div>';
+                }).join("");
+            }
+        }
+    };
+}
+</script>

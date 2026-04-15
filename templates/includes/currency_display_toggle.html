@@ -1,0 +1,143 @@
+<!-- Shared currency display toggle logic for Analytics & Tax sections -->
+<script>
+(function() {
+    /*
+     * Each toggle button has:
+     *   data-rate      = EUR/USD exchange rate (e.g. 1.1372 means 1 EUR = 1.1372 USD)
+     *   data-section   = "analytics" | "tax" | "cryptoTax"
+     *   data-currency  = current state "USD" | "EUR"
+     *
+     * Convertible elements use data attributes:
+     *   data-fmt-number="$"    (analytics)
+     *   data-tax-fmt="$"       (stock tax)
+     *   data-ctax-fmt          (crypto tax)
+     *   data-fmt-pnl           (analytics unrealized P&L)
+     *
+     * Each convertible element stores its original USD value in data-usd-raw
+     * on first encounter, so we can toggle back and forth losslessly.
+     */
+
+    function fmtUSD(val) {
+        return "$" + Math.abs(val).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    function fmtEUR(val) {
+        return "\u20AC" + Math.abs(val).toLocaleString("de-DE", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    function parseRaw(text) {
+        /* Strip currency symbols and thousand separators, keep digits/dot/minus */
+        return parseFloat(text.replace(/[^0-9.\-]/g, ""));
+    }
+
+    /* Map section → which data-attribute selector to target */
+    var sectionSelectors = {
+        analytics: "[data-fmt-number]",
+        tax:       "[data-tax-fmt]",
+        cryptoTax: "[data-ctax-fmt]",
+    };
+
+    /* Map section → container id */
+    var sectionContainers = {
+        analytics: "analyticsBody",
+        tax:       "taxBody",
+        cryptoTax: "cryptoTaxBody",
+    };
+
+    document.querySelectorAll(".currency-display-toggle").forEach(function(btn) {
+        var rate = parseFloat(btn.dataset.rate);
+        if (!rate || rate <= 0) { btn.style.display = "none"; return; }
+
+        var section = btn.dataset.section;
+        var containerId = sectionContainers[section];
+        var selector = sectionSelectors[section];
+
+        btn.addEventListener("click", function(e) {
+            e.stopPropagation();
+            var curr = btn.dataset.currency;
+            var newCurr = (curr === "USD") ? "EUR" : "USD";
+            btn.dataset.currency = newCurr;
+            btn.textContent = newCurr;
+
+            if (newCurr === "EUR") {
+                btn.style.background = "rgba(6,182,212,0.12)";
+                btn.style.color = "#22d3ee";
+                btn.style.borderColor = "rgba(6,182,212,0.25)";
+            } else {
+                btn.style.background = "rgba(79,70,229,0.1)";
+                btn.style.color = "var(--accent-light)";
+                btn.style.borderColor = "rgba(79,70,229,0.2)";
+            }
+
+            /* Show/hide disclaimer */
+            var disc = document.querySelector('.currency-disclaimer[data-section="' + section + '"]');
+            if (disc) disc.style.display = (newCurr === "EUR") ? "block" : "none";
+
+            /* Convert values */
+            var container = document.getElementById(containerId);
+            if (!container) return;
+
+            container.querySelectorAll(selector).forEach(function(el) {
+                /* Store original USD value on first click */
+                if (!el.dataset.usdRaw) {
+                    var raw = parseRaw(el.textContent);
+                    if (isNaN(raw)) return;
+                    el.dataset.usdRaw = raw;
+                }
+
+                var usdVal = parseFloat(el.dataset.usdRaw);
+                if (isNaN(usdVal)) return;
+
+                if (newCurr === "EUR") {
+                    var eurVal = usdVal / rate;
+                    el.textContent = (usdVal < 0 ? "-" : "") + fmtEUR(eurVal);
+                } else {
+                    el.textContent = (usdVal < 0 ? "-" : "") + fmtUSD(usdVal);
+                }
+            });
+
+            /* Handle the special PnL format in analytics */
+            if (section === "analytics") {
+                container.querySelectorAll("[data-fmt-pnl]").forEach(function(el) {
+                    if (!el.dataset.usdPnlRaw) {
+                        var parts = el.dataset.fmtPnl.split("|");
+                        el.dataset.usdPnlRaw = parseFloat(parts[0].replace(/[^0-9.\-]/g, ""));
+                        el.dataset.pctRaw = parseFloat(parts[1]);
+                    }
+
+                    var pnlUsd = parseFloat(el.dataset.usdPnlRaw);
+                    var pct = parseFloat(el.dataset.pctRaw);
+                    if (isNaN(pnlUsd) || isNaN(pct)) return;
+
+                    var pctStr = Math.abs(pct).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+                    if (newCurr === "EUR") {
+                        var pnlEur = pnlUsd / rate;
+                        el.innerHTML = (pnlUsd < 0 ? "-" : "") + fmtEUR(pnlEur) + ' <small>(' + (pct < 0 ? "-" : "") + pctStr + '%)</small>';
+                    } else {
+                        el.innerHTML = (pnlUsd < 0 ? "-" : "") + fmtUSD(pnlUsd) + ' <small>(' + (pct < 0 ? "-" : "") + pctStr + '%)</small>';
+                    }
+                });
+
+                /* Update custom sell/buy simulator results */
+                var sellResult = document.getElementById("customSellResult");
+                var buyResult = document.getElementById("customBuyResult");
+                [sellResult, buyResult].forEach(function(el) {
+                    if (!el) return;
+                    var span = el.querySelector("span[class]");
+                    if (!span) return;
+                    var raw = parseRaw(span.textContent);
+                    if (isNaN(raw)) return;
+                    if (!span.dataset.usdRaw) span.dataset.usdRaw = raw;
+                    var usd = parseFloat(span.dataset.usdRaw);
+                    if (newCurr === "EUR") {
+                        span.textContent = fmtEUR(usd / rate);
+                    } else {
+                        span.textContent = fmtUSD(usd);
+                    }
+                });
+            }
+        });
+    });
+})();
+</script>

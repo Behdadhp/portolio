@@ -1,0 +1,53 @@
+<!-- EUR/USD currency toggle for price input forms -->
+<script>
+(function() {
+    var btn = document.getElementById("currencyToggle");
+    var priceInput = document.getElementById("id_price");
+    var hint = document.getElementById("currencyHint");
+    if (!btn || !priceInput) return;
+
+    var rate = parseFloat(btn.dataset.rate);
+    var currency = "USD";
+
+    if (!rate || rate <= 0) {
+        /* No rate available — hide the toggle */
+        btn.style.display = "none";
+        return;
+    }
+
+    function fmtRate(v) {
+        return v.toLocaleString("en-US", { minimumFractionDigits: 4, maximumFractionDigits: 4 });
+    }
+
+    btn.addEventListener("click", function() {
+        if (currency === "USD") {
+            currency = "EUR";
+            btn.textContent = "EUR";
+            btn.classList.remove("btn-outline-secondary");
+            btn.classList.add("btn-outline-info");
+            hint.style.display = "block";
+            hint.textContent = "1 EUR = " + fmtRate(rate) + " USD — price will be auto-converted to USD on save";
+        } else {
+            currency = "USD";
+            btn.textContent = "USD";
+            btn.classList.remove("btn-outline-info");
+            btn.classList.add("btn-outline-secondary");
+            hint.style.display = "none";
+        }
+        btn.dataset.currency = currency;
+    });
+
+    /* On form submit, convert EUR → USD if needed */
+    var form = priceInput.closest("form");
+    if (form) {
+        form.addEventListener("submit", function() {
+            if (btn.dataset.currency === "EUR") {
+                var eurVal = parseFloat(priceInput.value);
+                if (!isNaN(eurVal) && eurVal > 0) {
+                    priceInput.value = (eurVal * rate).toFixed(2);
+                }
+            }
+        });
+    }
+})();
+</script>

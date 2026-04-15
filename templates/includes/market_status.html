@@ -1,0 +1,100 @@
+<!-- US Stock Market Status Indicator -->
+<span class="market-status-el"></span>
+
+<style>
+    .market-status-el {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        padding: 3px 10px;
+        border-radius: 8px;
+        letter-spacing: 0.3px;
+        white-space: nowrap;
+    }
+    .market-status-el.open {
+        background: rgba(52, 211, 153, 0.1);
+        color: #34d399;
+    }
+    .market-status-el.closed {
+        background: rgba(248, 113, 113, 0.1);
+        color: #f87171;
+    }
+    .market-status-el .status-dot {
+        width: 6px; height: 6px;
+        border-radius: 50%;
+        flex-shrink: 0;
+    }
+    .market-status-el.open .status-dot {
+        background: #34d399;
+        animation: ms-pulse-dot 2s ease-in-out infinite;
+    }
+    @keyframes ms-pulse-dot {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.4; }
+    }
+    .market-status-el.closed .status-dot {
+        background: #f87171;
+    }
+    .market-status-note {
+        font-size: 0.72rem;
+        color: var(--text-muted);
+        margin-top: 2px;
+    }
+</style>
+
+<script>
+(function() {
+    function checkMarket() {
+        var now = new Date();
+        var et = new Date(now.toLocaleString("en-US", { timeZone: "America/New_York" }));
+        var day = et.getDay();
+        var h = et.getHours();
+        var m = et.getMinutes();
+        var mins = h * 60 + m;
+
+        var isWeekday = day >= 1 && day <= 5;
+        var inHours  = mins >= 570 && mins < 960;
+        var isOpen   = isWeekday && inHours;
+
+        var note = "";
+        if (isOpen) {
+            var closeMin = 960 - mins;
+            var ch = Math.floor(closeMin / 60);
+            var cm = closeMin % 60;
+            note = "Closes in " + (ch > 0 ? ch + "h " : "") + cm + "m";
+        } else {
+            var target = new Date(et);
+            if (!isWeekday || mins >= 960) {
+                do { target.setDate(target.getDate() + 1); }
+                while (target.getDay() === 0 || target.getDay() === 6);
+            }
+            target.setHours(9, 30, 0, 0);
+            var diff = Math.max(0, Math.round((target - et) / 60000));
+            var dh = Math.floor(diff / 60);
+            var dm = diff % 60;
+            if (dh >= 24) {
+                var dd = Math.floor(dh / 24);
+                dh = dh % 24;
+                note = "Opens in " + dd + "d " + dh + "h";
+            } else {
+                note = "Opens in " + (dh > 0 ? dh + "h " : "") + dm + "m";
+            }
+        }
+
+        var html =
+            '<span class="status-dot"></span>' +
+            (isOpen ? "NYSE Open" : "NYSE Closed") +
+            '<span class="market-status-note" style="margin-left:4px;">(' + note + ')</span>';
+
+        document.querySelectorAll(".market-status-el").forEach(function(el) {
+            el.className = "market-status-el " + (isOpen ? "open" : "closed");
+            el.innerHTML = html;
+        });
+    }
+
+    checkMarket();
+    setInterval(checkMarket, 60000);
+})();
+</script>

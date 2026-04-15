@@ -1,0 +1,190 @@
+{% if tax %}
+<div class="card shadow-sm mb-4">
+    <div class="card-header d-flex align-items-center" role="button"
+         id="taxHeader" aria-expanded="false" aria-controls="taxBody"
+         style="cursor: pointer;">
+        <h5 class="mb-0 me-2">Tax Estimate ({{ tax.year }})</h5>
+        <svg id="taxChevron" xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="currentColor"
+             class="text-muted" viewBox="0 0 16 16" style="transition: transform 0.3s;">
+            <path fill-rule="evenodd" d="M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z"/>
+        </svg>
+        <div class="ms-auto d-flex align-items-center gap-2">
+            {% if eur_usd_rate %}
+            <button type="button" class="btn btn-sm currency-display-toggle" id="taxCurrToggle"
+                    data-rate="{{ eur_usd_rate }}" data-section="tax" data-currency="USD"
+                    style="font-size:0.72rem;font-weight:700;padding:2px 10px;border-radius:6px;
+                           background:rgba(79,70,229,0.1);color:var(--accent-light);border:1px solid rgba(79,70,229,0.2);">
+                USD
+            </button>
+            {% endif %}
+            <span class="badge" style="background:rgba(251,191,36,0.12);color:#fbbf24;font-size:0.75rem;">DE Tax Rules</span>
+        </div>
+    </div>
+    <div class="collapse" id="taxBody">
+    <div class="card-body">
+        <div class="currency-disclaimer" data-section="tax" style="display:none;background:rgba(6,182,212,0.06);border:1px solid rgba(6,182,212,0.15);border-radius:10px;padding:0.65rem 1rem;margin-bottom:1rem;font-size:0.75rem;color:var(--text-secondary);">
+            Values converted to EUR using today's ECB rate. This is an <strong>estimate</strong> — actual EUR amounts may differ since exchange rates fluctuate between transaction dates.
+        </div>
+        <div class="row g-4">
+
+            <!-- This Stock -->
+            <div class="col-md-6 col-lg-4">
+                <h6 class="text-muted text-uppercase small fw-bold mb-3">This Stock ({{ tax.year }})</h6>
+                <table class="table table-sm table-borderless mb-0">
+                    <tbody>
+                        <tr>
+                            <td class="text-muted">Realized Gains</td>
+                            <td class="text-end fw-semibold text-success" data-tax-fmt="$">{{ tax.current_stock_gains }}</td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted">Realized Losses</td>
+                            <td class="text-end fw-semibold text-danger" data-tax-fmt="$">{{ tax.current_stock_losses }}</td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted">Net P&L</td>
+                            <td class="text-end fw-semibold {% if tax.current_stock_net >= 0 %}text-success{% else %}text-danger{% endif %}" data-tax-fmt="$">{{ tax.current_stock_net }}</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- All Stocks Combined -->
+            <div class="col-md-6 col-lg-4">
+                <h6 class="text-muted text-uppercase small fw-bold mb-3">All Stocks ({{ tax.year }})</h6>
+                <table class="table table-sm table-borderless mb-0">
+                    <tbody>
+                        <tr>
+                            <td class="text-muted">Total Gains</td>
+                            <td class="text-end fw-semibold text-success" data-tax-fmt="$">{{ tax.total_gains }}</td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted">Total Losses
+                                <div class="text-muted small fst-italic" style="font-size:.7rem;">Offsets gains before tax</div>
+                            </td>
+                            <td class="text-end fw-semibold text-danger" data-tax-fmt="$">{{ tax.total_losses }}</td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted">Net Gain</td>
+                            <td class="text-end fw-semibold {% if tax.net_gain >= 0 %}text-success{% else %}text-danger{% endif %}" data-tax-fmt="$">{{ tax.net_gain }}</td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted">Sells This Year</td>
+                            <td class="text-end fw-semibold">{{ tax.sell_count }}</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Tax Calculation -->
+            <div class="col-md-6 col-lg-4">
+                <h6 class="text-muted text-uppercase small fw-bold mb-3">Tax Calculation</h6>
+                <table class="table table-sm table-borderless mb-0">
+                    <tbody>
+                        <tr>
+                            <td class="text-muted">Freibetrag
+                                <div class="text-muted small fst-italic" style="font-size:.7rem;">Tax-free allowance per year</div>
+                            </td>
+                            <td class="text-end fw-semibold" data-tax-fmt="$">{{ tax.freibetrag }}</td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted">Used</td>
+                            <td class="text-end fw-semibold" style="color:#fbbf24;" data-tax-fmt="$">{{ tax.freibetrag_used }}</td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted">Remaining</td>
+                            <td class="text-end fw-semibold {% if tax.freibetrag_remaining > 0 %}text-success{% else %}text-danger{% endif %}" data-tax-fmt="$">{{ tax.freibetrag_remaining }}</td>
+                        </tr>
+
+                        {% if tax.gain_until_taxed > 0 %}
+                        <tr>
+                            <td colspan="2"><hr class="my-1"></td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted">Tax-free room left
+                                <div class="text-muted small fst-italic" style="font-size:.7rem;">Gains you can still realize tax-free</div>
+                            </td>
+                            <td class="text-end fw-semibold text-success" data-tax-fmt="$">{{ tax.gain_until_taxed }}</td>
+                        </tr>
+                        {% endif %}
+
+                        <tr>
+                            <td colspan="2"><hr class="my-1"></td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted">Taxable Amount</td>
+                            <td class="text-end fw-semibold" data-tax-fmt="$">{{ tax.taxable }}</td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted">Tax Rate
+                                <div class="text-muted small fst-italic" style="font-size:.7rem;">25% + 5.5% Soli (no Kirchensteuer)</div>
+                            </td>
+                            <td class="text-end fw-semibold">{{ tax.tax_rate_pct }}%</td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted fw-semibold" style="color:var(--text-primary);">Estimated Tax</td>
+                            <td class="text-end fw-bold" style="color:#f87171;font-size:1.05rem;" data-tax-fmt="$">{{ tax.tax_owed }}</td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted">Net After Tax</td>
+                            <td class="text-end fw-semibold {% if tax.net_after_tax >= 0 %}text-success{% else %}text-danger{% endif %}" data-tax-fmt="$">{{ tax.net_after_tax }}</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Freibetrag progress bar -->
+            <div class="col-12">
+                <div class="d-flex justify-content-between align-items-center mb-1">
+                    <span class="small" style="color:var(--text-muted);">Freibetrag Usage ({{ tax.year }})</span>
+                    <span class="small fw-semibold" style="color:var(--text-secondary);">
+                        <span data-tax-fmt="$">{{ tax.freibetrag_used }}</span> / <span data-tax-fmt="$">{{ tax.freibetrag }}</span>
+                    </span>
+                </div>
+                <div style="height:8px;background:var(--border-color);border-radius:4px;overflow:hidden;">
+                    {% widthratio tax.freibetrag_used tax.freibetrag 100 as pct %}
+                    <div style="height:100%;width:{% widthratio tax.freibetrag_used tax.freibetrag 100 %}%;
+                         background:{% if tax.freibetrag_remaining > 0 %}linear-gradient(90deg, #34d399, #06b6d4){% else %}linear-gradient(90deg, #f87171, #fb923c){% endif %};
+                         border-radius:4px;transition:width 0.5s;"></div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    /* Chevron toggle + manual collapse */
+    const chevron = document.getElementById("taxChevron");
+    const collapse = document.getElementById("taxBody");
+    const header = document.getElementById("taxHeader");
+    if (chevron && collapse && header) {
+        const bsCollapse = new bootstrap.Collapse(collapse, { toggle: false });
+        header.addEventListener("click", function (e) {
+            if (e.target.closest(".currency-display-toggle")) return;
+            bsCollapse.toggle();
+        });
+        collapse.addEventListener("show.bs.collapse", function () {
+            chevron.style.transform = "rotate(180deg)";
+        });
+        collapse.addEventListener("hide.bs.collapse", function () {
+            chevron.style.transform = "rotate(0deg)";
+        });
+    }
+
+    /* Format USD values (stored in USD, toggle converts to EUR) */
+    document.querySelectorAll("[data-tax-fmt]").forEach(function (el) {
+        const raw = el.textContent.replace(/[^0-9.\-]/g, "");
+        const val = parseFloat(raw);
+        if (!isNaN(val)) {
+            el.textContent = "$" + Math.abs(val).toLocaleString("en-US", {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+            });
+            if (val < 0) el.textContent = "-" + el.textContent;
+        }
+    });
+});
+</script>
+{% endif %}
