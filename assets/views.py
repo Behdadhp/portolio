@@ -1,9 +1,13 @@
+import json
+
 from django.contrib.auth.decorators import login_required
 from django.core.cache import cache
+from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.views.decorators.http import require_POST
 
 from .forms import CryptoAssetForm, StockAssetForm
-from .models import Crypto, CryptoAsset, Stock, StockAsset
+from .models import Crypto, CryptoAsset, PriceAlert, Stock, StockAsset
 from .services import (
     DETAIL_COLUMNS,
     apply_filters,
@@ -22,8 +26,6 @@ from .services import (
 def _list_view(
     request, transaction_model, name_field, symbol_field, template, context_key
 ):
-    import json
-
     summary = get_asset_summary(
         transaction_model.objects.filter(user=request.user),
         name_field,
@@ -82,6 +84,10 @@ def _detail_view(
         request, transactions
     )
 
+    # Active price alerts for this asset
+    alert_filter = {"user": request.user, fk_field: master}
+    active_alerts = PriceAlert.objects.filter(**alert_filter).select_related("stock", "crypto")
+
     context = {
         "page_obj": page_obj,
         fk_field: master,
@@ -94,6 +100,7 @@ def _detail_view(
         "filters": filters,
         "columns": DETAIL_COLUMNS,
         "eur_usd_rate": get_eur_usd_rate(),
+        "active_alerts": active_alerts,
         **ranges,
     }
     if extra_context:
@@ -311,3 +318,141 @@ def crypto_delete_view(request, pk):
         "crypto",
         "crypto_detail",
     )
+
+
+# ── Price Alert API ─────────────────────────────────────────
+
+ALERT_PROXIMITY_PCT = 1.0  # alerts within 1% are considered duplicates
+
+
+def _sync_alerts_to_cache():
+    """Rebuild the Redis alert cache from the database."""
+    alerts = PriceAlert.objects.filter(email_sent=False).select_related("stock", "crypto")
+    alert_data = {}
+    for a in alerts:
+        sym = a.symbol
+        alert_data.setdefault(sym, []).append({
+            "id": str(a.id),
+            "user_id": str(a.user_id),
+            "target_price": float(a.target_price),
+            "direction": a.direction,
+        })
+    cache.set("price_alerts_active", alert_data, timeout=None)
+
+
+@login_required
+@require_POST
+def alert_create(request):
+    """Create a price alert. Returns JSON."""
+    try:
+        data = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({"error": "Invalid JSON"}, status=400)
+
+    symbol = data.get("symbol", "").strip()
+    target_price = data.get("target_price")
+    direction = data.get("direction", "above")
+
+    if not symbol or target_price is None:
+        return JsonResponse({"error": "symbol and target_price required"}, status=400)
+
+    try:
+        target_price = float(target_price)
+    except (ValueError, TypeError):
+        return JsonResponse({"error": "Invalid target_price"}, status=400)
+
+    if target_price <= 0:
+        return JsonResponse({"error": "target_price must be positive"}, status=400)
+
+    if direction not in ("above", "below"):
+        return JsonResponse({"error": "direction must be 'above' or 'below'"}, status=400)
+
+    # Find the asset
+    stock = Stock.objects.filter(symbol=symbol).first()
+    crypto = Crypto.objects.filter(symbol=symbol).first() if not stock else None
+
+    if not stock and not crypto:
+        return JsonResponse({"error": f"No asset found for symbol '{symbol}'"}, status=404)
+
+    # Proximity check: any active alert within 1% of this price?
+    existing = PriceAlert.objects.filter(
+        user=request.user,
+        stock=stock,
+        crypto=crypto,
+        direction=direction,
+        email_sent=False,
+    )
+    for alert in existing:
+        pct_diff = abs(float(alert.target_price) - target_price) / target_price * 100
+        if pct_diff < ALERT_PROXIMITY_PCT:
+            return JsonResponse({
+                "error": "duplicate",
+                "message": f"An alert already exists at ${float(alert.target_price):,.2f} (within 1% of ${target_price:,.2f}).",
+                "existing_id": str(alert.id),
+                "existing_price": float(alert.target_price),
+            }, status=409)
+
+    alert = PriceAlert.objects.create(
+        user=request.user,
+        stock=stock,
+        crypto=crypto,
+        target_price=target_price,
+        direction=direction,
+    )
+    _sync_alerts_to_cache()
+
+    return JsonResponse({
+        "id": str(alert.id),
+        "target_price": float(alert.target_price),
+        "direction": alert.direction,
+        "email_sent": alert.email_sent,
+        "created_at": alert.created_at.strftime("%Y-%m-%d %H:%M"),
+    }, status=201)
+
+
+@login_required
+@require_POST
+def alert_update(request, pk):
+    """Update target_price and/or direction of an alert."""
+    alert = get_object_or_404(PriceAlert, pk=pk, user=request.user)
+
+    try:
+        data = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({"error": "Invalid JSON"}, status=400)
+
+    new_price = data.get("target_price")
+    new_direction = data.get("direction")
+
+    if new_price is not None:
+        try:
+            new_price = float(new_price)
+        except (ValueError, TypeError):
+            return JsonResponse({"error": "Invalid target_price"}, status=400)
+        if new_price <= 0:
+            return JsonResponse({"error": "target_price must be positive"}, status=400)
+        alert.target_price = new_price
+
+    if new_direction in ("above", "below"):
+        alert.direction = new_direction
+
+    alert.email_sent = False  # re-arm if updated
+    alert.save()
+    _sync_alerts_to_cache()
+
+    return JsonResponse({
+        "id": str(alert.id),
+        "target_price": float(alert.target_price),
+        "direction": alert.direction,
+        "email_sent": alert.email_sent,
+    })
+
+
+@login_required
+@require_POST
+def alert_delete(request, pk):
+    """Delete a price alert."""
+    alert = get_object_or_404(PriceAlert, pk=pk, user=request.user)
+    alert.delete()
+    _sync_alerts_to_cache()
+    return JsonResponse({"deleted": True})
