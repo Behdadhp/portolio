@@ -16,10 +16,12 @@ from .services import (
     sort_and_paginate,
 )
 
-
 # ── Generic CRUD helpers ─────────────────────────────────────
 
-def _list_view(request, transaction_model, name_field, symbol_field, template, context_key):
+
+def _list_view(
+    request, transaction_model, name_field, symbol_field, template, context_key
+):
     import json
 
     summary = get_asset_summary(
@@ -32,19 +34,40 @@ def _list_view(request, transaction_model, name_field, symbol_field, template, c
     for row in summary:
         price = cache.get(f"finnhub_{row['symbol']}")
         row["price"] = price
-        row["worth"] = round(float(row["total"]) * float(price), 2) if price is not None else None
+        row["worth"] = (
+            round(float(row["total"]) * float(price), 2) if price is not None else None
+        )
         enriched.append(row)
-        worth = round(float(row["total"]) * float(price), 2) if price is not None and row["total"] > 0 else 0
-        allocation.append({"label": row["name"], "symbol": row["symbol"], "value": worth})
+        worth = (
+            round(float(row["total"]) * float(price), 2)
+            if price is not None and row["total"] > 0
+            else 0
+        )
+        allocation.append(
+            {"label": row["name"], "symbol": row["symbol"], "value": worth}
+        )
 
-    return render(request, template, {
-        context_key: enriched,
-        "allocation_json": json.dumps(allocation),
-    })
+    return render(
+        request,
+        template,
+        {
+            context_key: enriched,
+            "allocation_json": json.dumps(allocation),
+        },
+    )
 
 
-def _detail_view(request, symbol, master_model, transaction_model, fk_field,
-                 name_field, symbol_field, template, extra_context=None):
+def _detail_view(
+    request,
+    symbol,
+    master_model,
+    transaction_model,
+    fk_field,
+    name_field,
+    symbol_field,
+    template,
+    extra_context=None,
+):
     master = get_object_or_404(master_model, symbol=symbol)
     base_qs = transaction_model.objects.filter(user=request.user, **{fk_field: master})
 
@@ -55,7 +78,9 @@ def _detail_view(request, symbol, master_model, transaction_model, fk_field,
 
     ranges = get_filter_ranges(base_qs)
     transactions, filters = apply_filters(request, base_qs.order_by("-date"))
-    page_obj, current_sort, current_order, per_page = sort_and_paginate(request, transactions)
+    page_obj, current_sort, current_order, per_page = sort_and_paginate(
+        request, transactions
+    )
 
     context = {
         "page_obj": page_obj,
@@ -76,7 +101,9 @@ def _detail_view(request, symbol, master_model, transaction_model, fk_field,
     return render(request, template, context)
 
 
-def _add_view(request, form_class, master_model, fk_field, template, detail_url, symbol=None):
+def _add_view(
+    request, form_class, master_model, fk_field, template, detail_url, symbol=None
+):
     initial = {}
     master = None
     if symbol:
@@ -93,12 +120,20 @@ def _add_view(request, form_class, master_model, fk_field, template, detail_url,
             transaction.save()
             return redirect(detail_url, symbol=getattr(transaction, fk_field).symbol)
 
-    return render(request, template, {
-        "form": form, fk_field: master, "eur_usd_rate": get_eur_usd_rate(),
-    })
+    return render(
+        request,
+        template,
+        {
+            "form": form,
+            fk_field: master,
+            "eur_usd_rate": get_eur_usd_rate(),
+        },
+    )
 
 
-def _edit_view(request, pk, form_class, transaction_model, fk_field, template, detail_url):
+def _edit_view(
+    request, pk, form_class, transaction_model, fk_field, template, detail_url
+):
     transaction = get_object_or_404(transaction_model, pk=pk, user=request.user)
     form = form_class(instance=transaction)
 
@@ -109,19 +144,29 @@ def _edit_view(request, pk, form_class, transaction_model, fk_field, template, d
             return redirect(detail_url, symbol=getattr(transaction, fk_field).symbol)
 
     master = getattr(transaction, fk_field)
-    return render(request, template, {
-        "form": form, "transaction": transaction, fk_field: master,
-        "eur_usd_rate": get_eur_usd_rate(),
-    })
+    return render(
+        request,
+        template,
+        {
+            "form": form,
+            "transaction": transaction,
+            fk_field: master,
+            "eur_usd_rate": get_eur_usd_rate(),
+        },
+    )
 
 
-def _delete_view(request, pk, transaction_model, fk_field, template, list_url, detail_url):
+def _delete_view(
+    request, pk, transaction_model, fk_field, template, list_url, detail_url
+):
     transaction = get_object_or_404(transaction_model, pk=pk, user=request.user)
     master = getattr(transaction, fk_field)
 
     if request.method == "POST":
         transaction.delete()
-        if not transaction_model.objects.filter(user=request.user, **{fk_field: master}).exists():
+        if not transaction_model.objects.filter(
+            user=request.user, **{fk_field: master}
+        ).exists():
             return redirect(list_url)
         return redirect(detail_url, symbol=master.symbol)
 
@@ -130,11 +175,16 @@ def _delete_view(request, pk, transaction_model, fk_field, template, list_url, d
 
 # ── Stock views ──────────────────────────────────────────────
 
+
 @login_required
 def stock_list_view(request):
     return _list_view(
-        request, StockAsset, "stock__name", "stock__symbol",
-        "assets/stock_list.html", "stocks",
+        request,
+        StockAsset,
+        "stock__name",
+        "stock__symbol",
+        "assets/stock_list.html",
+        "stocks",
     )
 
 
@@ -142,8 +192,14 @@ def stock_list_view(request):
 def stock_detail_view(request, symbol):
     tax = compute_stock_tax(request.user, current_symbol=symbol)
     return _detail_view(
-        request, symbol, Stock, StockAsset, "stock",
-        "stock__name", "stock__symbol", "assets/stock_detail.html",
+        request,
+        symbol,
+        Stock,
+        StockAsset,
+        "stock",
+        "stock__name",
+        "stock__symbol",
+        "assets/stock_detail.html",
         extra_context={"tax": tax},
     )
 
@@ -151,34 +207,54 @@ def stock_detail_view(request, symbol):
 @login_required
 def stock_add_view(request, symbol=None):
     return _add_view(
-        request, StockAssetForm, Stock, "stock",
-        "assets/stock_add.html", "stock_detail", symbol,
+        request,
+        StockAssetForm,
+        Stock,
+        "stock",
+        "assets/stock_add.html",
+        "stock_detail",
+        symbol,
     )
 
 
 @login_required
 def stock_edit_view(request, pk):
     return _edit_view(
-        request, pk, StockAssetForm, StockAsset, "stock",
-        "assets/stock_edit.html", "stock_detail",
+        request,
+        pk,
+        StockAssetForm,
+        StockAsset,
+        "stock",
+        "assets/stock_edit.html",
+        "stock_detail",
     )
 
 
 @login_required
 def stock_delete_view(request, pk):
     return _delete_view(
-        request, pk, StockAsset, "stock",
-        "assets/stock_delete.html", "stocks", "stock_detail",
+        request,
+        pk,
+        StockAsset,
+        "stock",
+        "assets/stock_delete.html",
+        "stocks",
+        "stock_detail",
     )
 
 
 # ── Crypto views ─────────────────────────────────────────────
 
+
 @login_required
 def crypto_list_view(request):
     return _list_view(
-        request, CryptoAsset, "crypto__name", "crypto__symbol",
-        "assets/crypto_list.html", "cryptos",
+        request,
+        CryptoAsset,
+        "crypto__name",
+        "crypto__symbol",
+        "assets/crypto_list.html",
+        "cryptos",
     )
 
 
@@ -186,8 +262,14 @@ def crypto_list_view(request):
 def crypto_detail_view(request, symbol):
     crypto_tax = compute_crypto_tax(request.user, current_symbol=symbol)
     return _detail_view(
-        request, symbol, Crypto, CryptoAsset, "crypto",
-        "crypto__name", "crypto__symbol", "assets/crypto_detail.html",
+        request,
+        symbol,
+        Crypto,
+        CryptoAsset,
+        "crypto",
+        "crypto__name",
+        "crypto__symbol",
+        "assets/crypto_detail.html",
         extra_context={"crypto_tax": crypto_tax},
     )
 
@@ -195,22 +277,37 @@ def crypto_detail_view(request, symbol):
 @login_required
 def crypto_add_view(request, symbol=None):
     return _add_view(
-        request, CryptoAssetForm, Crypto, "crypto",
-        "assets/crypto_add.html", "crypto_detail", symbol,
+        request,
+        CryptoAssetForm,
+        Crypto,
+        "crypto",
+        "assets/crypto_add.html",
+        "crypto_detail",
+        symbol,
     )
 
 
 @login_required
 def crypto_edit_view(request, pk):
     return _edit_view(
-        request, pk, CryptoAssetForm, CryptoAsset, "crypto",
-        "assets/crypto_edit.html", "crypto_detail",
+        request,
+        pk,
+        CryptoAssetForm,
+        CryptoAsset,
+        "crypto",
+        "assets/crypto_edit.html",
+        "crypto_detail",
     )
 
 
 @login_required
 def crypto_delete_view(request, pk):
     return _delete_view(
-        request, pk, CryptoAsset, "crypto",
-        "assets/crypto_delete.html", "crypto", "crypto_detail",
+        request,
+        pk,
+        CryptoAsset,
+        "crypto",
+        "assets/crypto_delete.html",
+        "crypto",
+        "crypto_detail",
     )

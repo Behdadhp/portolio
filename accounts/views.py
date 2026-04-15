@@ -64,12 +64,18 @@ def dashboard_view(request):
     from assets.models import Crypto, CryptoAsset, Stock, StockAsset
     from assets.services import get_asset_summary, load_live_prices
 
-    stock_summary = list(get_asset_summary(
-        StockAsset.objects.filter(user=request.user), "stock__name", "stock__symbol"
-    ))
-    crypto_summary = list(get_asset_summary(
-        CryptoAsset.objects.filter(user=request.user), "crypto__name", "crypto__symbol"
-    ))
+    stock_summary = list(
+        get_asset_summary(
+            StockAsset.objects.filter(user=request.user), "stock__name", "stock__symbol"
+        )
+    )
+    crypto_summary = list(
+        get_asset_summary(
+            CryptoAsset.objects.filter(user=request.user),
+            "crypto__name",
+            "crypto__symbol",
+        )
+    )
 
     holdings = {}
     allocation = []  # [{label, symbol, value, type}]
@@ -79,31 +85,39 @@ def dashboard_view(request):
         holdings[row["symbol"]] = amt
         price = cache.get(f"finnhub_{row['symbol']}")
         worth = round(amt * float(price), 2) if price is not None and amt > 0 else 0
-        allocation.append({
-            "label": row["name"],
-            "symbol": row["symbol"],
-            "value": worth,
-            "type": "stock",
-        })
+        allocation.append(
+            {
+                "label": row["name"],
+                "symbol": row["symbol"],
+                "value": worth,
+                "type": "stock",
+            }
+        )
 
     for row in crypto_summary:
         amt = float(row["total"])
         holdings[row["symbol"]] = amt
         price = cache.get(f"finnhub_{row['symbol']}")
         worth = round(amt * float(price), 2) if price is not None and amt > 0 else 0
-        allocation.append({
-            "label": row["name"],
-            "symbol": row["symbol"],
-            "value": worth,
-            "type": "crypto",
-        })
+        allocation.append(
+            {
+                "label": row["name"],
+                "symbol": row["symbol"],
+                "value": worth,
+                "type": "crypto",
+            }
+        )
 
-    return render(request, "accounts/dashboard.html", {
-        "stock_prices": load_live_prices(Stock),
-        "crypto_prices": load_live_prices(Crypto),
-        "holdings_json": json.dumps(holdings),
-        "allocation_json": json.dumps(allocation),
-    })
+    return render(
+        request,
+        "accounts/dashboard.html",
+        {
+            "stock_prices": load_live_prices(Stock),
+            "crypto_prices": load_live_prices(Crypto),
+            "holdings_json": json.dumps(holdings),
+            "allocation_json": json.dumps(allocation),
+        },
+    )
 
 
 @login_required

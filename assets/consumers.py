@@ -14,11 +14,15 @@ class PriceConsumer(AsyncWebsocketConsumer):
 
         data = await self._get_cached_data()
         if data["prices"]:
-            await self.send(text_data=json.dumps({
-                "type": "price_update",
-                "prices": data["prices"],
-                "market_caps": data["market_caps"],
-            }))
+            await self.send(
+                text_data=json.dumps(
+                    {
+                        "type": "price_update",
+                        "prices": data["prices"],
+                        "market_caps": data["market_caps"],
+                    }
+                )
+            )
 
     async def disconnect(self, close_code):
         await self.channel_layer.group_discard(self.GROUP_NAME, self.channel_name)
@@ -33,7 +37,9 @@ class PriceConsumer(AsyncWebsocketConsumer):
         prices = {}
         market_caps = {}
         for model in (Crypto, Stock):
-            for symbol in model.objects.exclude(finnhub_symbol="").values_list("symbol", flat=True):
+            for symbol in model.objects.exclude(finnhub_symbol="").values_list(
+                "symbol", flat=True
+            ):
                 price = cache.get(f"finnhub_{symbol}")
                 mcap = cache.get(f"finnhub_{symbol}_mcap")
                 if price is not None:

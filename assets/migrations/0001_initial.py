@@ -16,50 +16,124 @@ class Migration(migrations.Migration):
 
     operations = [
         migrations.CreateModel(
-            name='Crypto',
+            name="Crypto",
             fields=[
-                ('id', models.UUIDField(default=uuid.uuid4, editable=False, primary_key=True, serialize=False)),
-                ('name', models.CharField(max_length=100, unique=True)),
-                ('symbol', models.CharField(max_length=20, unique=True)),
+                (
+                    "id",
+                    models.UUIDField(
+                        default=uuid.uuid4,
+                        editable=False,
+                        primary_key=True,
+                        serialize=False,
+                    ),
+                ),
+                ("name", models.CharField(max_length=100, unique=True)),
+                ("symbol", models.CharField(max_length=20, unique=True)),
             ],
             options={
-                'verbose_name_plural': 'Cryptos',
-                'ordering': ['name'],
+                "verbose_name_plural": "Cryptos",
+                "ordering": ["name"],
             },
         ),
         migrations.CreateModel(
-            name='Stock',
+            name="Stock",
             fields=[
-                ('id', models.UUIDField(default=uuid.uuid4, editable=False, primary_key=True, serialize=False)),
-                ('name', models.CharField(max_length=100, unique=True)),
-                ('symbol', models.CharField(max_length=20, unique=True)),
+                (
+                    "id",
+                    models.UUIDField(
+                        default=uuid.uuid4,
+                        editable=False,
+                        primary_key=True,
+                        serialize=False,
+                    ),
+                ),
+                ("name", models.CharField(max_length=100, unique=True)),
+                ("symbol", models.CharField(max_length=20, unique=True)),
             ],
             options={
-                'ordering': ['name'],
+                "ordering": ["name"],
             },
         ),
         migrations.CreateModel(
-            name='CryptoAsset',
+            name="CryptoAsset",
             fields=[
-                ('id', models.UUIDField(default=uuid.uuid4, editable=False, primary_key=True, serialize=False)),
-                ('price', models.DecimalField(decimal_places=2, max_digits=18)),
-                ('amount', models.FloatField(default=0.0)),
-                ('date', models.DateField()),
-                ('status', models.CharField(choices=[('bought', 'Bought'), ('sold', 'Sold')], default='bought', max_length=10)),
-                ('crypto', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='transactions', to='assets.crypto')),
-                ('user', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='crypto_assets', to=settings.AUTH_USER_MODEL)),
+                (
+                    "id",
+                    models.UUIDField(
+                        default=uuid.uuid4,
+                        editable=False,
+                        primary_key=True,
+                        serialize=False,
+                    ),
+                ),
+                ("price", models.DecimalField(decimal_places=2, max_digits=18)),
+                ("amount", models.FloatField(default=0.0)),
+                ("date", models.DateField()),
+                (
+                    "status",
+                    models.CharField(
+                        choices=[("bought", "Bought"), ("sold", "Sold")],
+                        default="bought",
+                        max_length=10,
+                    ),
+                ),
+                (
+                    "crypto",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="transactions",
+                        to="assets.crypto",
+                    ),
+                ),
+                (
+                    "user",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="crypto_assets",
+                        to=settings.AUTH_USER_MODEL,
+                    ),
+                ),
             ],
         ),
         migrations.CreateModel(
-            name='StockAsset',
+            name="StockAsset",
             fields=[
-                ('id', models.UUIDField(default=uuid.uuid4, editable=False, primary_key=True, serialize=False)),
-                ('price', models.DecimalField(decimal_places=2, max_digits=18)),
-                ('amount', models.FloatField(default=0.0)),
-                ('date', models.DateField()),
-                ('status', models.CharField(choices=[('bought', 'Bought'), ('sold', 'Sold')], default='bought', max_length=10)),
-                ('stock', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='transactions', to='assets.stock')),
-                ('user', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='stock_assets', to=settings.AUTH_USER_MODEL)),
+                (
+                    "id",
+                    models.UUIDField(
+                        default=uuid.uuid4,
+                        editable=False,
+                        primary_key=True,
+                        serialize=False,
+                    ),
+                ),
+                ("price", models.DecimalField(decimal_places=2, max_digits=18)),
+                ("amount", models.FloatField(default=0.0)),
+                ("date", models.DateField()),
+                (
+                    "status",
+                    models.CharField(
+                        choices=[("bought", "Bought"), ("sold", "Sold")],
+                        default="bought",
+                        max_length=10,
+                    ),
+                ),
+                (
+                    "stock",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="transactions",
+                        to="assets.stock",
+                    ),
+                ),
+                (
+                    "user",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="stock_assets",
+                        to=settings.AUTH_USER_MODEL,
+                    ),
+                ),
             ],
         ),
     ]

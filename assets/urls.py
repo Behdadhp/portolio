@@ -8,7 +8,6 @@ urlpatterns = [
     path("stocks/edit/<uuid:pk>/", views.stock_edit_view, name="stock_edit"),
     path("stocks/delete/<uuid:pk>/", views.stock_delete_view, name="stock_delete"),
     path("stocks/<str:symbol>/", views.stock_detail_view, name="stock_detail"),
-
     path("crypto/", views.crypto_list_view, name="crypto"),
     path("crypto/add/", views.crypto_add_view, name="crypto_add"),
     path("crypto/add/<str:symbol>/", views.crypto_add_view, name="crypto_add_for"),

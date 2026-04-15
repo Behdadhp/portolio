@@ -19,9 +19,13 @@ def _build_symbol_map():
     from assets.models import Crypto, Stock
 
     symbol_map = {}
-    for finnhub, short in Crypto.objects.exclude(finnhub_symbol="").values_list("finnhub_symbol", "symbol"):
+    for finnhub, short in Crypto.objects.exclude(finnhub_symbol="").values_list(
+        "finnhub_symbol", "symbol"
+    ):
         symbol_map[finnhub] = short
-    for finnhub, short in Stock.objects.exclude(finnhub_symbol="").values_list("finnhub_symbol", "symbol"):
+    for finnhub, short in Stock.objects.exclude(finnhub_symbol="").values_list(
+        "finnhub_symbol", "symbol"
+    ):
         symbol_map[finnhub] = short
     return symbol_map
 
@@ -33,7 +37,9 @@ def _fetch_market_caps():
     api_key = settings.FINNHUB_API_KEY
 
     # Stocks — Finnhub /stock/profile2
-    for finnhub_sym, short in Stock.objects.exclude(finnhub_symbol="").values_list("finnhub_symbol", "symbol"):
+    for finnhub_sym, short in Stock.objects.exclude(finnhub_symbol="").values_list(
+        "finnhub_symbol", "symbol"
+    ):
         try:
             resp = requests.get(
                 f"{settings.FINNHUB_REST_URL}/stock/profile2",
@@ -85,7 +91,9 @@ def _poll_stock_quotes():
     from assets.models import Stock
 
     api_key = settings.FINNHUB_API_KEY
-    for finnhub_sym, short in Stock.objects.exclude(finnhub_symbol="").values_list("finnhub_symbol", "symbol"):
+    for finnhub_sym, short in Stock.objects.exclude(finnhub_symbol="").values_list(
+        "finnhub_symbol", "symbol"
+    ):
         try:
             resp = requests.get(
                 f"{settings.FINNHUB_REST_URL}/quote",
@@ -189,7 +197,9 @@ def stream_prices():
             short = updated_map[finnhub_symbol]
             symbol_map[finnhub_symbol] = short
             ws.send(json.dumps({"type": "subscribe", "symbol": finnhub_symbol}))
-            logger.info("New symbol detected — subscribed to %s (%s)", finnhub_symbol, short)
+            logger.info(
+                "New symbol detected — subscribed to %s (%s)", finnhub_symbol, short
+            )
 
         # Refresh market caps to include new symbols
         if new_symbols:

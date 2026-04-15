@@ -89,8 +89,7 @@ def sort_and_paginate(request, queryset, allowed_sort_fields=None):
 def get_asset_summary(queryset, name_field, symbol_field):
     """Group assets by name and calculate net total amount (bought=+, sold=-)."""
     return (
-        queryset
-        .values(name=F(name_field), symbol=F(symbol_field))
+        queryset.values(name=F(name_field), symbol=F(symbol_field))
         .annotate(
             total=Coalesce(
                 Sum(
@@ -146,7 +145,16 @@ def compute_analytics(transactions, symbol):
             "units": round(units, 6),
             "total_invested": round(total_invested, 2),
             "total_sold_value": round(total_sold_value, 2),
-            "realized_pnl": round(total_sold_value - total_sold_units * (total_invested / max(total_sold_units + units, 0.0001)), 2) if total_sold_units > 0 else 0.0,
+            "realized_pnl": (
+                round(
+                    total_sold_value
+                    - total_sold_units
+                    * (total_invested / max(total_sold_units + units, 0.0001)),
+                    2,
+                )
+                if total_sold_units > 0
+                else 0.0
+            ),
         }
 
     avg_price = cost_basis / units
@@ -158,7 +166,11 @@ def compute_analytics(transactions, symbol):
         "cost_basis": round(cost_basis, 2),
         "total_invested": round(total_invested, 2),
         "total_sold_value": round(total_sold_value, 2),
-        "realized_pnl": round(total_sold_value - total_sold_units * avg_price, 2) if total_sold_units > 0 else 0.0,
+        "realized_pnl": (
+            round(total_sold_value - total_sold_units * avg_price, 2)
+            if total_sold_units > 0
+            else 0.0
+        ),
         "current_price": None,
         "current_value": None,
         "unrealized_pnl": None,
@@ -173,7 +185,9 @@ def compute_analytics(transactions, symbol):
         cp = float(current_price)
         current_value = units * cp
         unrealized_pnl = current_value - cost_basis
-        unrealized_pnl_pct = (unrealized_pnl / cost_basis * 100) if cost_basis > 0 else 0.0
+        unrealized_pnl_pct = (
+            (unrealized_pnl / cost_basis * 100) if cost_basis > 0 else 0.0
+        )
 
         analytics["current_price"] = round(cp, 2)
         analytics["current_value"] = round(current_value, 2)
@@ -190,8 +204,9 @@ def compute_analytics(transactions, symbol):
         # buy_price = avg_price * 0.9 * (units + 1) - cost_basis
         target_avg = avg_price * 0.90
         buy_price_for_minus_10 = target_avg * (units + 1) - cost_basis
-        analytics["buy_avg_minus_10"] = round(buy_price_for_minus_10, 2) if buy_price_for_minus_10 > 0 else 0.0
-
+        analytics["buy_avg_minus_10"] = (
+            round(buy_price_for_minus_10, 2) if buy_price_for_minus_10 > 0 else 0.0
+        )
 
     return analytics
 
@@ -228,7 +243,11 @@ def compute_stock_tax(user, current_symbol=None):
     sell_count = 0
 
     for stock_id in stock_ids:
-        txs = all_stocks_qs.filter(stock_id=stock_id).select_related("stock").order_by("date", "status", "pk")
+        txs = (
+            all_stocks_qs.filter(stock_id=stock_id)
+            .select_related("stock")
+            .order_by("date", "status", "pk")
+        )
         stock_symbol = None
         cost_basis = 0.0
         units = 0.0
@@ -327,7 +346,11 @@ def compute_crypto_tax(user, current_symbol=None):
     holding_lots = []
 
     for crypto_id in crypto_ids:
-        txs = all_crypto_qs.filter(crypto_id=crypto_id).select_related("crypto").order_by("date", "status", "pk")
+        txs = (
+            all_crypto_qs.filter(crypto_id=crypto_id)
+            .select_related("crypto")
+            .order_by("date", "status", "pk")
+        )
         crypto_symbol = None
         # FIFO lot queue: list of {date, amount, price}
         lots = []
@@ -375,14 +398,16 @@ def compute_crypto_tax(user, current_symbol=None):
                 if lot["amount"] > 0.0001:
                     tax_free_date = lot["date"] + timedelta(days=366)
                     days_left = (tax_free_date - today).days
-                    holding_lots.append({
-                        "buy_date": lot["date"],
-                        "amount": round(lot["amount"], 8),
-                        "price": round(lot["price"], 2),
-                        "tax_free_date": tax_free_date,
-                        "days_left": max(days_left, 0),
-                        "is_tax_free": days_left <= 0,
-                    })
+                    holding_lots.append(
+                        {
+                            "buy_date": lot["date"],
+                            "amount": round(lot["amount"], 8),
+                            "price": round(lot["price"], 2),
+                            "tax_free_date": tax_free_date,
+                            "days_left": max(days_left, 0),
+                            "is_tax_free": days_left <= 0,
+                        }
+                    )
 
     net_short_term = total_short_term_gains - total_short_term_losses
     current_net = current_crypto_short_gains - current_crypto_short_losses
@@ -390,7 +415,9 @@ def compute_crypto_tax(user, current_symbol=None):
     # Freigrenze: if net short-term gains < 1000, all tax-free
     # If >= 1000, the ENTIRE amount is taxable (not just the excess)
     exceeds_freigrenze = net_short_term >= FREIGRENZE
-    room_to_freigrenze = max(0.0, FREIGRENZE - net_short_term) if not exceeds_freigrenze else 0.0
+    room_to_freigrenze = (
+        max(0.0, FREIGRENZE - net_short_term) if not exceeds_freigrenze else 0.0
+    )
 
     return {
         "year": current_year,
@@ -411,7 +438,9 @@ def compute_crypto_tax(user, current_symbol=None):
 def load_live_prices(model):
     """Load cached live prices and market caps for tracked symbols of a model."""
     result = []
-    for symbol in model.objects.exclude(finnhub_symbol="").values_list("symbol", flat=True):
+    for symbol in model.objects.exclude(finnhub_symbol="").values_list(
+        "symbol", flat=True
+    ):
         price = cache.get(f"finnhub_{symbol}")
         mcap = cache.get(f"finnhub_{symbol}_mcap")
         result.append({"short": symbol, "price": price, "market_cap": mcap or 0})

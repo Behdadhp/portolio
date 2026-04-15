@@ -69,38 +69,53 @@ class StockModelTest(TestCase):
 class CryptoAssetModelTest(TestCase):
     def setUp(self):
         self.user = User.objects.create_user(
-            email="test@example.com", password="Test1234",
-            first_name="Test", last_name="User", birthdate="1990-01-01",
+            email="test@example.com",
+            password="Test1234",
+            first_name="Test",
+            last_name="User",
+            birthdate="1990-01-01",
         )
         self.crypto = Crypto.objects.create(name="Bitcoin", symbol="BTC")
 
     def test_create_crypto_asset(self):
         asset = CryptoAsset.objects.create(
-            user=self.user, crypto=self.crypto,
-            price=Decimal("50000.00"), amount=1.5,
-            date=date(2024, 1, 15), status="bought",
+            user=self.user,
+            crypto=self.crypto,
+            price=Decimal("50000.00"),
+            amount=1.5,
+            date=date(2024, 1, 15),
+            status="bought",
         )
         self.assertEqual(str(asset), "Bitcoin - test@example.com")
 
     def test_default_status_is_bought(self):
         asset = CryptoAsset.objects.create(
-            user=self.user, crypto=self.crypto,
-            price=Decimal("100.00"), amount=1.0, date=date(2024, 1, 1),
+            user=self.user,
+            crypto=self.crypto,
+            price=Decimal("100.00"),
+            amount=1.0,
+            date=date(2024, 1, 1),
         )
         self.assertEqual(asset.status, "bought")
 
     def test_cascade_delete_user(self):
         CryptoAsset.objects.create(
-            user=self.user, crypto=self.crypto,
-            price=Decimal("100.00"), amount=1.0, date=date(2024, 1, 1),
+            user=self.user,
+            crypto=self.crypto,
+            price=Decimal("100.00"),
+            amount=1.0,
+            date=date(2024, 1, 1),
         )
         self.user.delete()
         self.assertEqual(CryptoAsset.objects.count(), 0)
 
     def test_cascade_delete_crypto(self):
         CryptoAsset.objects.create(
-            user=self.user, crypto=self.crypto,
-            price=Decimal("100.00"), amount=1.0, date=date(2024, 1, 1),
+            user=self.user,
+            crypto=self.crypto,
+            price=Decimal("100.00"),
+            amount=1.0,
+            date=date(2024, 1, 1),
         )
         self.crypto.delete()
         self.assertEqual(CryptoAsset.objects.count(), 0)
@@ -109,16 +124,22 @@ class CryptoAssetModelTest(TestCase):
 class StockAssetModelTest(TestCase):
     def setUp(self):
         self.user = User.objects.create_user(
-            email="test@example.com", password="Test1234",
-            first_name="Test", last_name="User", birthdate="1990-01-01",
+            email="test@example.com",
+            password="Test1234",
+            first_name="Test",
+            last_name="User",
+            birthdate="1990-01-01",
         )
         self.stock = Stock.objects.create(name="Apple", symbol="AAPL")
 
     def test_create_stock_asset(self):
         asset = StockAsset.objects.create(
-            user=self.user, stock=self.stock,
-            price=Decimal("150.00"), amount=10.0,
-            date=date(2024, 3, 1), status="bought",
+            user=self.user,
+            stock=self.stock,
+            price=Decimal("150.00"),
+            amount=10.0,
+            date=date(2024, 3, 1),
+            status="bought",
         )
         self.assertEqual(str(asset), "Apple - test@example.com")
 
@@ -131,27 +152,37 @@ class StockAssetFormTest(TestCase):
         self.stock = Stock.objects.create(name="Apple", symbol="AAPL")
 
     def test_valid_form(self):
-        form = StockAssetForm(data={
-            "stock": self.stock.pk,
-            "price": "150.00",
-            "amount": "10.0",
-            "date": "2024-03-01",
-            "status": "bought",
-        })
+        form = StockAssetForm(
+            data={
+                "stock": self.stock.pk,
+                "price": "150.00",
+                "amount": "10.0",
+                "date": "2024-03-01",
+                "status": "bought",
+            }
+        )
         self.assertTrue(form.is_valid())
 
     def test_missing_stock(self):
-        form = StockAssetForm(data={
-            "price": "150.00", "amount": "10.0",
-            "date": "2024-03-01", "status": "bought",
-        })
+        form = StockAssetForm(
+            data={
+                "price": "150.00",
+                "amount": "10.0",
+                "date": "2024-03-01",
+                "status": "bought",
+            }
+        )
         self.assertFalse(form.is_valid())
 
     def test_missing_date(self):
-        form = StockAssetForm(data={
-            "stock": self.stock.pk, "price": "150.00",
-            "amount": "10.0", "status": "bought",
-        })
+        form = StockAssetForm(
+            data={
+                "stock": self.stock.pk,
+                "price": "150.00",
+                "amount": "10.0",
+                "status": "bought",
+            }
+        )
         self.assertFalse(form.is_valid())
 
 
@@ -160,23 +191,27 @@ class CryptoAssetFormTest(TestCase):
         self.crypto = Crypto.objects.create(name="Bitcoin", symbol="BTC")
 
     def test_valid_form(self):
-        form = CryptoAssetForm(data={
-            "crypto": self.crypto.pk,
-            "price": "50000.00",
-            "amount": "0.5",
-            "date": "2024-01-15",
-            "status": "bought",
-        })
+        form = CryptoAssetForm(
+            data={
+                "crypto": self.crypto.pk,
+                "price": "50000.00",
+                "amount": "0.5",
+                "date": "2024-01-15",
+                "status": "bought",
+            }
+        )
         self.assertTrue(form.is_valid())
 
     def test_invalid_status(self):
-        form = CryptoAssetForm(data={
-            "crypto": self.crypto.pk,
-            "price": "50000.00",
-            "amount": "0.5",
-            "date": "2024-01-15",
-            "status": "invalid",
-        })
+        form = CryptoAssetForm(
+            data={
+                "crypto": self.crypto.pk,
+                "price": "50000.00",
+                "amount": "0.5",
+                "date": "2024-01-15",
+                "status": "invalid",
+            }
+        )
         self.assertFalse(form.is_valid())
 
 
@@ -196,14 +231,20 @@ class StockListViewTest(TestDataMixin, TestCase):
 
     def test_shows_unique_stocks_with_totals(self):
         StockAsset.objects.create(
-            user=self.user, stock=self.stock,
-            price=Decimal("100.00"), amount=10.0,
-            date=date(2024, 1, 1), status="bought",
+            user=self.user,
+            stock=self.stock,
+            price=Decimal("100.00"),
+            amount=10.0,
+            date=date(2024, 1, 1),
+            status="bought",
         )
         StockAsset.objects.create(
-            user=self.user, stock=self.stock,
-            price=Decimal("110.00"), amount=3.0,
-            date=date(2024, 2, 1), status="sold",
+            user=self.user,
+            stock=self.stock,
+            price=Decimal("110.00"),
+            amount=3.0,
+            date=date(2024, 2, 1),
+            status="sold",
         )
         response = self.client.get(reverse("stocks"))
         self.assertContains(response, "AAPL")
@@ -211,9 +252,12 @@ class StockListViewTest(TestDataMixin, TestCase):
 
     def test_does_not_show_other_users_assets(self):
         StockAsset.objects.create(
-            user=self.other_user, stock=self.stock,
-            price=Decimal("100.00"), amount=5.0,
-            date=date(2024, 1, 1), status="bought",
+            user=self.other_user,
+            stock=self.stock,
+            price=Decimal("100.00"),
+            amount=5.0,
+            date=date(2024, 1, 1),
+            status="bought",
         )
         response = self.client.get(reverse("stocks"))
         self.assertContains(response, "You have no stock assets yet.")
@@ -223,14 +267,20 @@ class StockDetailViewTest(TestDataMixin, TestCase):
     def setUp(self):
         super().setUp()
         self.tx1 = StockAsset.objects.create(
-            user=self.user, stock=self.stock,
-            price=Decimal("150.00"), amount=10.0,
-            date=date(2024, 1, 15), status="bought",
+            user=self.user,
+            stock=self.stock,
+            price=Decimal("150.00"),
+            amount=10.0,
+            date=date(2024, 1, 15),
+            status="bought",
         )
         self.tx2 = StockAsset.objects.create(
-            user=self.user, stock=self.stock,
-            price=Decimal("160.00"), amount=5.0,
-            date=date(2024, 3, 1), status="sold",
+            user=self.user,
+            stock=self.stock,
+            price=Decimal("160.00"),
+            amount=5.0,
+            date=date(2024, 3, 1),
+            status="sold",
         )
 
     def test_renders(self):
@@ -288,7 +338,8 @@ class StockDetailViewTest(TestDataMixin, TestCase):
 
     def test_filter_by_date_range(self):
         response = self.client.get(
-            reverse("stock_detail", args=["AAPL"]) + "?date_from=2024-02-01&date_to=2024-12-31"
+            reverse("stock_detail", args=["AAPL"])
+            + "?date_from=2024-02-01&date_to=2024-12-31"
         )
         page_obj = response.context["page_obj"]
         self.assertEqual(len(page_obj), 1)
@@ -318,24 +369,30 @@ class StockAddViewTest(TestDataMixin, TestCase):
         self.assertEqual(response.status_code, 200)
 
     def test_add_transaction(self):
-        response = self.client.post(reverse("stock_add"), {
-            "stock": self.stock.pk,
-            "price": "150.00",
-            "amount": "10.0",
-            "date": "2024-03-01",
-            "status": "bought",
-        })
+        response = self.client.post(
+            reverse("stock_add"),
+            {
+                "stock": self.stock.pk,
+                "price": "150.00",
+                "amount": "10.0",
+                "date": "2024-03-01",
+                "status": "bought",
+            },
+        )
         self.assertEqual(response.status_code, 302)
         self.assertEqual(StockAsset.objects.filter(user=self.user).count(), 1)
 
     def test_add_assigns_current_user(self):
-        self.client.post(reverse("stock_add"), {
-            "stock": self.stock.pk,
-            "price": "150.00",
-            "amount": "10.0",
-            "date": "2024-03-01",
-            "status": "bought",
-        })
+        self.client.post(
+            reverse("stock_add"),
+            {
+                "stock": self.stock.pk,
+                "price": "150.00",
+                "amount": "10.0",
+                "date": "2024-03-01",
+                "status": "bought",
+            },
+        )
         asset = StockAsset.objects.first()
         self.assertEqual(asset.user, self.user)
 
@@ -349,9 +406,12 @@ class StockEditViewTest(TestDataMixin, TestCase):
     def setUp(self):
         super().setUp()
         self.tx = StockAsset.objects.create(
-            user=self.user, stock=self.stock,
-            price=Decimal("150.00"), amount=10.0,
-            date=date(2024, 1, 15), status="bought",
+            user=self.user,
+            stock=self.stock,
+            price=Decimal("150.00"),
+            amount=10.0,
+            date=date(2024, 1, 15),
+            status="bought",
         )
 
     def test_edit_page_renders(self):
@@ -359,13 +419,16 @@ class StockEditViewTest(TestDataMixin, TestCase):
         self.assertEqual(response.status_code, 200)
 
     def test_edit_transaction(self):
-        response = self.client.post(reverse("stock_edit", args=[self.tx.pk]), {
-            "stock": self.stock.pk,
-            "price": "200.00",
-            "amount": "15.0",
-            "date": "2024-02-01",
-            "status": "sold",
-        })
+        response = self.client.post(
+            reverse("stock_edit", args=[self.tx.pk]),
+            {
+                "stock": self.stock.pk,
+                "price": "200.00",
+                "amount": "15.0",
+                "date": "2024-02-01",
+                "status": "sold",
+            },
+        )
         self.assertEqual(response.status_code, 302)
         self.tx.refresh_from_db()
         self.assertEqual(self.tx.price, Decimal("200.00"))
@@ -374,9 +437,12 @@ class StockEditViewTest(TestDataMixin, TestCase):
 
     def test_cannot_edit_other_users_transaction(self):
         other_tx = StockAsset.objects.create(
-            user=self.other_user, stock=self.stock,
-            price=Decimal("100.00"), amount=5.0,
-            date=date(2024, 1, 1), status="bought",
+            user=self.other_user,
+            stock=self.stock,
+            price=Decimal("100.00"),
+            amount=5.0,
+            date=date(2024, 1, 1),
+            status="bought",
         )
         response = self.client.get(reverse("stock_edit", args=[other_tx.pk]))
         self.assertEqual(response.status_code, 404)
@@ -386,9 +452,12 @@ class StockDeleteViewTest(TestDataMixin, TestCase):
     def setUp(self):
         super().setUp()
         self.tx = StockAsset.objects.create(
-            user=self.user, stock=self.stock,
-            price=Decimal("150.00"), amount=10.0,
-            date=date(2024, 1, 15), status="bought",
+            user=self.user,
+            stock=self.stock,
+            price=Decimal("150.00"),
+            amount=10.0,
+            date=date(2024, 1, 15),
+            status="bought",
         )
 
     def test_delete_confirmation_page_renders(self):
@@ -407,18 +476,24 @@ class StockDeleteViewTest(TestDataMixin, TestCase):
 
     def test_delete_keeps_remaining_redirects_to_detail(self):
         StockAsset.objects.create(
-            user=self.user, stock=self.stock,
-            price=Decimal("200.00"), amount=5.0,
-            date=date(2024, 2, 1), status="sold",
+            user=self.user,
+            stock=self.stock,
+            price=Decimal("200.00"),
+            amount=5.0,
+            date=date(2024, 2, 1),
+            status="sold",
         )
         response = self.client.post(reverse("stock_delete", args=[self.tx.pk]))
         self.assertRedirects(response, reverse("stock_detail", args=["AAPL"]))
 
     def test_cannot_delete_other_users_transaction(self):
         other_tx = StockAsset.objects.create(
-            user=self.other_user, stock=self.stock,
-            price=Decimal("100.00"), amount=5.0,
-            date=date(2024, 1, 1), status="bought",
+            user=self.other_user,
+            stock=self.stock,
+            price=Decimal("100.00"),
+            amount=5.0,
+            date=date(2024, 1, 1),
+            status="bought",
         )
         response = self.client.post(reverse("stock_delete", args=[other_tx.pk]))
         self.assertEqual(response.status_code, 404)
@@ -440,14 +515,20 @@ class CryptoListViewTest(TestDataMixin, TestCase):
 
     def test_shows_unique_cryptos_with_totals(self):
         CryptoAsset.objects.create(
-            user=self.user, crypto=self.crypto,
-            price=Decimal("50000.00"), amount=2.0,
-            date=date(2024, 1, 1), status="bought",
+            user=self.user,
+            crypto=self.crypto,
+            price=Decimal("50000.00"),
+            amount=2.0,
+            date=date(2024, 1, 1),
+            status="bought",
         )
         CryptoAsset.objects.create(
-            user=self.user, crypto=self.crypto,
-            price=Decimal("55000.00"), amount=0.5,
-            date=date(2024, 2, 1), status="sold",
+            user=self.user,
+            crypto=self.crypto,
+            price=Decimal("55000.00"),
+            amount=0.5,
+            date=date(2024, 2, 1),
+            status="sold",
         )
         response = self.client.get(reverse("crypto"))
         self.assertContains(response, "BTC")
@@ -455,9 +536,12 @@ class CryptoListViewTest(TestDataMixin, TestCase):
 
     def test_does_not_show_other_users_assets(self):
         CryptoAsset.objects.create(
-            user=self.other_user, crypto=self.crypto,
-            price=Decimal("50000.00"), amount=1.0,
-            date=date(2024, 1, 1), status="bought",
+            user=self.other_user,
+            crypto=self.crypto,
+            price=Decimal("50000.00"),
+            amount=1.0,
+            date=date(2024, 1, 1),
+            status="bought",
         )
         response = self.client.get(reverse("crypto"))
         self.assertContains(response, "You have no crypto assets yet.")
@@ -467,14 +551,20 @@ class CryptoDetailViewTest(TestDataMixin, TestCase):
     def setUp(self):
         super().setUp()
         self.tx1 = CryptoAsset.objects.create(
-            user=self.user, crypto=self.crypto,
-            price=Decimal("50000.00"), amount=2.0,
-            date=date(2024, 1, 15), status="bought",
+            user=self.user,
+            crypto=self.crypto,
+            price=Decimal("50000.00"),
+            amount=2.0,
+            date=date(2024, 1, 15),
+            status="bought",
         )
         self.tx2 = CryptoAsset.objects.create(
-            user=self.user, crypto=self.crypto,
-            price=Decimal("55000.00"), amount=0.5,
-            date=date(2024, 3, 1), status="sold",
+            user=self.user,
+            crypto=self.crypto,
+            price=Decimal("55000.00"),
+            amount=0.5,
+            date=date(2024, 3, 1),
+            status="sold",
         )
 
     def test_renders(self):
@@ -521,24 +611,30 @@ class CryptoAddViewTest(TestDataMixin, TestCase):
         self.assertEqual(response.status_code, 200)
 
     def test_add_transaction(self):
-        response = self.client.post(reverse("crypto_add"), {
-            "crypto": self.crypto.pk,
-            "price": "50000.00",
-            "amount": "1.5",
-            "date": "2024-01-15",
-            "status": "bought",
-        })
+        response = self.client.post(
+            reverse("crypto_add"),
+            {
+                "crypto": self.crypto.pk,
+                "price": "50000.00",
+                "amount": "1.5",
+                "date": "2024-01-15",
+                "status": "bought",
+            },
+        )
         self.assertEqual(response.status_code, 302)
         self.assertEqual(CryptoAsset.objects.filter(user=self.user).count(), 1)
 
     def test_add_assigns_current_user(self):
-        self.client.post(reverse("crypto_add"), {
-            "crypto": self.crypto.pk,
-            "price": "50000.00",
-            "amount": "1.5",
-            "date": "2024-01-15",
-            "status": "bought",
-        })
+        self.client.post(
+            reverse("crypto_add"),
+            {
+                "crypto": self.crypto.pk,
+                "price": "50000.00",
+                "amount": "1.5",
+                "date": "2024-01-15",
+                "status": "bought",
+            },
+        )
         asset = CryptoAsset.objects.first()
         self.assertEqual(asset.user, self.user)
 
@@ -547,9 +643,12 @@ class CryptoEditViewTest(TestDataMixin, TestCase):
     def setUp(self):
         super().setUp()
         self.tx = CryptoAsset.objects.create(
-            user=self.user, crypto=self.crypto,
-            price=Decimal("50000.00"), amount=1.0,
-            date=date(2024, 1, 15), status="bought",
+            user=self.user,
+            crypto=self.crypto,
+            price=Decimal("50000.00"),
+            amount=1.0,
+            date=date(2024, 1, 15),
+            status="bought",
         )
 
     def test_edit_page_renders(self):
@@ -557,13 +656,16 @@ class CryptoEditViewTest(TestDataMixin, TestCase):
         self.assertEqual(response.status_code, 200)
 
     def test_edit_transaction(self):
-        response = self.client.post(reverse("crypto_edit", args=[self.tx.pk]), {
-            "crypto": self.crypto.pk,
-            "price": "60000.00",
-            "amount": "2.0",
-            "date": "2024-02-01",
-            "status": "sold",
-        })
+        response = self.client.post(
+            reverse("crypto_edit", args=[self.tx.pk]),
+            {
+                "crypto": self.crypto.pk,
+                "price": "60000.00",
+                "amount": "2.0",
+                "date": "2024-02-01",
+                "status": "sold",
+            },
+        )
         self.assertEqual(response.status_code, 302)
         self.tx.refresh_from_db()
         self.assertEqual(self.tx.price, Decimal("60000.00"))
@@ -571,9 +673,12 @@ class CryptoEditViewTest(TestDataMixin, TestCase):
 
     def test_cannot_edit_other_users_transaction(self):
         other_tx = CryptoAsset.objects.create(
-            user=self.other_user, crypto=self.crypto,
-            price=Decimal("50000.00"), amount=1.0,
-            date=date(2024, 1, 1), status="bought",
+            user=self.other_user,
+            crypto=self.crypto,
+            price=Decimal("50000.00"),
+            amount=1.0,
+            date=date(2024, 1, 1),
+            status="bought",
         )
         response = self.client.get(reverse("crypto_edit", args=[other_tx.pk]))
         self.assertEqual(response.status_code, 404)
@@ -583,9 +688,12 @@ class CryptoDeleteViewTest(TestDataMixin, TestCase):
     def setUp(self):
         super().setUp()
         self.tx = CryptoAsset.objects.create(
-            user=self.user, crypto=self.crypto,
-            price=Decimal("50000.00"), amount=1.0,
-            date=date(2024, 1, 15), status="bought",
+            user=self.user,
+            crypto=self.crypto,
+            price=Decimal("50000.00"),
+            amount=1.0,
+            date=date(2024, 1, 15),
+            status="bought",
         )
 
     def test_delete_confirmation_page_renders(self):
@@ -604,18 +712,24 @@ class CryptoDeleteViewTest(TestDataMixin, TestCase):
 
     def test_delete_keeps_remaining_redirects_to_detail(self):
         CryptoAsset.objects.create(
-            user=self.user, crypto=self.crypto,
-            price=Decimal("55000.00"), amount=0.5,
-            date=date(2024, 2, 1), status="sold",
+            user=self.user,
+            crypto=self.crypto,
+            price=Decimal("55000.00"),
+            amount=0.5,
+            date=date(2024, 2, 1),
+            status="sold",
         )
         response = self.client.post(reverse("crypto_delete", args=[self.tx.pk]))
         self.assertRedirects(response, reverse("crypto_detail", args=["BTC"]))
 
     def test_cannot_delete_other_users_transaction(self):
         other_tx = CryptoAsset.objects.create(
-            user=self.other_user, crypto=self.crypto,
-            price=Decimal("50000.00"), amount=1.0,
-            date=date(2024, 1, 1), status="bought",
+            user=self.other_user,
+            crypto=self.crypto,
+            price=Decimal("50000.00"),
+            amount=1.0,
+            date=date(2024, 1, 1),
+            status="bought",
         )
         response = self.client.post(reverse("crypto_delete", args=[other_tx.pk]))
         self.assertEqual(response.status_code, 404)

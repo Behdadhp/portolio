@@ -40,7 +40,9 @@ class RegisterForm(forms.ModelForm):
             "first_name": forms.TextInput(attrs={"class": "form-control"}),
             "last_name": forms.TextInput(attrs={"class": "form-control"}),
             "email": forms.EmailInput(attrs={"class": "form-control"}),
-            "birthdate": forms.DateInput(attrs={"class": "form-control", "type": "date"}),
+            "birthdate": forms.DateInput(
+                attrs={"class": "form-control", "type": "date"}
+            ),
         }
 
     def clean_password(self):
@@ -61,7 +63,9 @@ class RegisterForm(forms.ModelForm):
 
 class LoginForm(forms.Form):
     email = forms.EmailField(widget=forms.EmailInput(attrs={"class": "form-control"}))
-    password = forms.CharField(widget=forms.PasswordInput(attrs={"class": "form-control"}))
+    password = forms.CharField(
+        widget=forms.PasswordInput(attrs={"class": "form-control"})
+    )
 
 
 class EditProfileForm(forms.ModelForm):
@@ -72,7 +76,9 @@ class EditProfileForm(forms.ModelForm):
             "first_name": forms.TextInput(attrs={"class": "form-control"}),
             "last_name": forms.TextInput(attrs={"class": "form-control"}),
             "email": forms.EmailInput(attrs={"class": "form-control"}),
-            "birthdate": forms.DateInput(attrs={"class": "form-control", "type": "date"}),
+            "birthdate": forms.DateInput(
+                attrs={"class": "form-control", "type": "date"}
+            ),
         }
 
 
@@ -109,6 +115,10 @@ class ChangePasswordForm(forms.Form):
         cleaned_data = super().clean()
         new_password = cleaned_data.get("new_password")
         confirm_new_password = cleaned_data.get("confirm_new_password")
-        if new_password and confirm_new_password and new_password != confirm_new_password:
+        if (
+            new_password
+            and confirm_new_password
+            and new_password != confirm_new_password
+        ):
             raise forms.ValidationError("New passwords do not match.")
         return cleaned_data

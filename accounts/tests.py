@@ -10,7 +10,6 @@ from .forms import (
 )
 from .models import User
 
-
 # ── Model tests ──────────────────────────────────────────────
 
 
@@ -123,7 +122,9 @@ class RegisterFormTest(TestCase):
         self.assertFalse(form.is_valid())
 
     def test_weak_password_rejected(self):
-        form = RegisterForm(data=self._form_data(password="weak", confirm_password="weak"))
+        form = RegisterForm(
+            data=self._form_data(password="weak", confirm_password="weak")
+        )
         self.assertFalse(form.is_valid())
 
     def test_missing_email(self):
@@ -143,12 +144,14 @@ class LoginFormTest(TestCase):
 
 class EditProfileFormTest(TestCase):
     def test_valid_form(self):
-        form = EditProfileForm(data={
-            "first_name": "Alice",
-            "last_name": "Smith",
-            "email": "alice@example.com",
-            "birthdate": "1990-05-20",
-        })
+        form = EditProfileForm(
+            data={
+                "first_name": "Alice",
+                "last_name": "Smith",
+                "email": "alice@example.com",
+                "birthdate": "1990-05-20",
+            }
+        )
         self.assertTrue(form.is_valid())
 
 
@@ -345,7 +348,9 @@ class DashboardViewTest(TestCase):
 
     def test_dashboard_requires_login(self):
         response = self.client.get(reverse("dashboard"))
-        self.assertRedirects(response, f"{reverse('login')}?next={reverse('dashboard')}")
+        self.assertRedirects(
+            response, f"{reverse('login')}?next={reverse('dashboard')}"
+        )
 
     def test_dashboard_shows_user_info(self):
         self.client.login(username="test@example.com", password="Test1234")
