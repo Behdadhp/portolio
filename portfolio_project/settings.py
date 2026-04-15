@@ -162,9 +162,13 @@ FINNHUB_REST_URL = os.getenv("FINNHUB_REST_URL", "https://finnhub.io/api/v1")
 # CoinGecko
 COINGECKO_MARKETS_URL = os.getenv("COINGECKO_MARKETS_URL", "https://api.coingecko.com/api/v3/coins/markets")
 
+# Frankfurter (ECB exchange rates — free, no key)
+FRANKFURTER_API_URL = os.getenv("FRANKFURTER_API_URL", "https://api.frankfurter.dev/v1/latest")
+
 # Streaming
 BROADCAST_INTERVAL = int(os.getenv("BROADCAST_INTERVAL", "1"))
 BACKOFF_INITIAL = int(os.getenv("BACKOFF_INITIAL", "1"))
 BACKOFF_MAX = int(os.getenv("BACKOFF_MAX", "60"))
 SYNC_INTERVAL = int(os.getenv("SYNC_INTERVAL", "5"))
 MARKET_CAP_REFRESH = int(os.getenv("MARKET_CAP_REFRESH", "900"))
+STOCK_QUOTE_INTERVAL = int(os.getenv("STOCK_QUOTE_INTERVAL", "15"))  # seconds between REST polls for stock prices
