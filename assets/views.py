@@ -8,7 +8,10 @@ from .services import (
     DETAIL_COLUMNS,
     apply_filters,
     compute_analytics,
+    compute_crypto_tax,
+    compute_stock_tax,
     get_asset_summary,
+    get_eur_usd_rate,
     get_filter_ranges,
     sort_and_paginate,
 )
@@ -17,22 +20,31 @@ from .services import (
 # ── Generic CRUD helpers ─────────────────────────────────────
 
 def _list_view(request, transaction_model, name_field, symbol_field, template, context_key):
+    import json
+
     summary = get_asset_summary(
         transaction_model.objects.filter(user=request.user),
         name_field,
         symbol_field,
     )
     enriched = []
+    allocation = []
     for row in summary:
         price = cache.get(f"finnhub_{row['symbol']}")
         row["price"] = price
-        row["worth"] = round(row["total"] * price, 2) if price is not None else None
+        row["worth"] = round(float(row["total"]) * float(price), 2) if price is not None else None
         enriched.append(row)
-    return render(request, template, {context_key: enriched})
+        worth = round(float(row["total"]) * float(price), 2) if price is not None and row["total"] > 0 else 0
+        allocation.append({"label": row["name"], "symbol": row["symbol"], "value": worth})
+
+    return render(request, template, {
+        context_key: enriched,
+        "allocation_json": json.dumps(allocation),
+    })
 
 
 def _detail_view(request, symbol, master_model, transaction_model, fk_field,
-                 name_field, symbol_field, template):
+                 name_field, symbol_field, template, extra_context=None):
     master = get_object_or_404(master_model, symbol=symbol)
     base_qs = transaction_model.objects.filter(user=request.user, **{fk_field: master})
 
@@ -45,7 +57,7 @@ def _detail_view(request, symbol, master_model, transaction_model, fk_field,
     transactions, filters = apply_filters(request, base_qs.order_by("-date"))
     page_obj, current_sort, current_order, per_page = sort_and_paginate(request, transactions)
 
-    return render(request, template, {
+    context = {
         "page_obj": page_obj,
         fk_field: master,
         "total": total,
@@ -56,8 +68,12 @@ def _detail_view(request, symbol, master_model, transaction_model, fk_field,
         "per_page": per_page,
         "filters": filters,
         "columns": DETAIL_COLUMNS,
+        "eur_usd_rate": get_eur_usd_rate(),
         **ranges,
-    })
+    }
+    if extra_context:
+        context.update(extra_context)
+    return render(request, template, context)
 
 
 def _add_view(request, form_class, master_model, fk_field, template, detail_url, symbol=None):
@@ -77,7 +93,9 @@ def _add_view(request, form_class, master_model, fk_field, template, detail_url,
             transaction.save()
             return redirect(detail_url, symbol=getattr(transaction, fk_field).symbol)
 
-    return render(request, template, {"form": form, fk_field: master})
+    return render(request, template, {
+        "form": form, fk_field: master, "eur_usd_rate": get_eur_usd_rate(),
+    })
 
 
 def _edit_view(request, pk, form_class, transaction_model, fk_field, template, detail_url):
@@ -91,7 +109,10 @@ def _edit_view(request, pk, form_class, transaction_model, fk_field, template, d
             return redirect(detail_url, symbol=getattr(transaction, fk_field).symbol)
 
     master = getattr(transaction, fk_field)
-    return render(request, template, {"form": form, "transaction": transaction, fk_field: master})
+    return render(request, template, {
+        "form": form, "transaction": transaction, fk_field: master,
+        "eur_usd_rate": get_eur_usd_rate(),
+    })
 
 
 def _delete_view(request, pk, transaction_model, fk_field, template, list_url, detail_url):
@@ -119,9 +140,11 @@ def stock_list_view(request):
 
 @login_required
 def stock_detail_view(request, symbol):
+    tax = compute_stock_tax(request.user, current_symbol=symbol)
     return _detail_view(
         request, symbol, Stock, StockAsset, "stock",
         "stock__name", "stock__symbol", "assets/stock_detail.html",
+        extra_context={"tax": tax},
     )
 
 
@@ -161,9 +184,11 @@ def crypto_list_view(request):
 
 @login_required
 def crypto_detail_view(request, symbol):
+    crypto_tax = compute_crypto_tax(request.user, current_symbol=symbol)
     return _detail_view(
         request, symbol, Crypto, CryptoAsset, "crypto",
         "crypto__name", "crypto__symbol", "assets/crypto_detail.html",
+        extra_context={"crypto_tax": crypto_tax},
     )
 
 
