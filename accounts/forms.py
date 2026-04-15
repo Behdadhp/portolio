@@ -5,8 +5,8 @@ from .models import User
 
 PASSWORD_RULES_TEXT = (
     "Password must be at least 8 characters, "
-    "contain at least one capital letter, "
-    "and a mixture of letters and numbers."
+    "contain at least one uppercase letter, one lowercase letter, "
+    "and at least one number."
 )
 
 
