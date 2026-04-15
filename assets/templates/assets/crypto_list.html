@@ -14,6 +14,39 @@
     </div>
 </div>
 
+{% if cryptos %}
+<!-- Crypto Allocation Chart -->
+<div class="card shadow-sm mb-4">
+    <div class="card-header d-flex align-items-center" role="button"
+         data-bs-toggle="collapse" data-bs-target="#cryptoAllocBody" aria-expanded="true" aria-controls="cryptoAllocBody"
+         style="cursor: pointer;">
+        <h5 class="mb-0 me-2">Crypto Allocation</h5>
+        <svg id="cryptoAllocChevron" xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="currentColor"
+             class="text-muted" viewBox="0 0 16 16" style="transition: transform 0.3s; transform: rotate(180deg);">
+            <path fill-rule="evenodd" d="M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z"/>
+        </svg>
+    </div>
+    <div class="collapse show" id="cryptoAllocBody">
+        <div class="card-body">
+            <div class="row g-4 align-items-center">
+                <div class="col-sm-5 col-md-4">
+                    <div class="donut-wrap">
+                        <canvas id="cryptoAllocChart"></canvas>
+                        <div class="donut-center">
+                            <div class="donut-total-label">Total</div>
+                            <div class="donut-total-value">—</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-sm-7 col-md-8">
+                    <div id="cryptoAllocLegend" class="donut-legend"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
 <div class="card">
     <div class="card-body p-0">
         {% if cryptos %}
@@ -62,4 +95,28 @@
         {% endif %}
     </div>
 </div>
+
+{% include "includes/donut_chart.html" %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function() {
+    var data = {{ allocation_json|safe }};
+    if (data && data.length > 0) {
+        drawDonutChart("cryptoAllocChart", data, {
+            centerLabel: "Crypto",
+            prefix: "$",
+            legendId: "cryptoAllocLegend",
+        });
+
+        var ch = document.getElementById("cryptoAllocChevron");
+        var co = document.getElementById("cryptoAllocBody");
+        if (ch && co) {
+            co.addEventListener("show.bs.collapse", function(){ ch.style.transform = "rotate(180deg)"; });
+            co.addEventListener("hide.bs.collapse", function(){ ch.style.transform = "rotate(0deg)"; });
+        }
+    }
+})();
+</script>
 {% endblock %}

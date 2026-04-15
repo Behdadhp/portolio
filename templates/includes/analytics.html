@@ -1,16 +1,79 @@
 {% if analytics %}
 <div class="card shadow-sm mb-4">
     <div class="card-header d-flex align-items-center" role="button"
-         data-bs-toggle="collapse" data-bs-target="#analyticsBody" aria-expanded="false" aria-controls="analyticsBody"
+         id="analyticsHeader" aria-expanded="false" aria-controls="analyticsBody"
          style="cursor: pointer;">
         <h5 class="mb-0 me-2">Analytics</h5>
         <svg id="analyticsChevron" xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="currentColor"
              class="text-muted transition-transform" viewBox="0 0 16 16" style="transition: transform 0.3s;">
             <path fill-rule="evenodd" d="M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z"/>
         </svg>
+        {% if eur_usd_rate %}
+        <button type="button" class="btn btn-sm ms-auto currency-display-toggle" id="analyticsCurrToggle"
+                data-rate="{{ eur_usd_rate }}" data-section="analytics" data-currency="USD"
+                style="font-size:0.72rem;font-weight:700;padding:2px 10px;border-radius:6px;
+                       background:rgba(79,70,229,0.1);color:var(--accent-light);border:1px solid rgba(79,70,229,0.2);">
+            USD
+        </button>
+        {% endif %}
     </div>
     <div class="collapse" id="analyticsBody">
     <div class="card-body">
+        <div class="currency-disclaimer" data-section="analytics" style="display:none;background:rgba(6,182,212,0.06);border:1px solid rgba(6,182,212,0.15);border-radius:10px;padding:0.65rem 1rem;margin-bottom:1rem;font-size:0.75rem;color:var(--text-secondary);">
+            Values converted to EUR using today's ECB rate. This is an <strong>estimate</strong> — actual EUR amounts may differ since exchange rates fluctuate over time.
+        </div>
+
+        {% if analytics.warning %}
+        <div style="background:rgba(251,191,36,0.08);border:1px solid rgba(251,191,36,0.25);border-radius:12px;padding:1rem 1.25rem;margin-bottom:1rem;">
+            <div class="d-flex align-items-start gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="#fbbf24" viewBox="0 0 16 16" style="flex-shrink:0;margin-top:2px;">
+                    <path d="M8.982 1.566a1.13 1.13 0 0 0-1.96 0L.165 13.233c-.457.778.091 1.767.98 1.767h13.713c.889 0 1.438-.99.98-1.767zM8 5c.535 0 .954.462.9.995l-.35 3.507a.552.552 0 0 1-1.1 0L7.1 5.995A.905.905 0 0 1 8 5m.002 6a1 1 0 1 1 0 2 1 1 0 0 1 0-2"/>
+                </svg>
+                <div>
+                    <div class="fw-semibold" style="color:#fbbf24;font-size:0.9rem;">
+                        {% if analytics.warning == "sold_more_than_bought" %}
+                        You've sold more units than you bought
+                        {% else %}
+                        No current holdings
+                        {% endif %}
+                    </div>
+                    <div style="color:var(--text-secondary);font-size:0.82rem;margin-top:2px;">
+                        {% if analytics.warning == "sold_more_than_bought" %}
+                        Your sell transactions exceed your buy transactions by {{ analytics.units|floatformat:6 }} units. This may indicate missing buy records. Analytics below are limited.
+                        {% else %}
+                        All units have been sold. Add a buy transaction to see full analytics.
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row g-4">
+            <div class="col-md-6">
+                <table class="table table-sm table-borderless mb-0">
+                    <tbody>
+                        <tr>
+                            <td class="text-muted">Holdings</td>
+                            <td class="text-end fw-semibold text-danger">{{ analytics.units|floatformat:6 }}</td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted">Total Invested</td>
+                            <td class="text-end fw-semibold" data-fmt-number="$">{{ analytics.total_invested|floatformat:2 }}</td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted">Total Sold Value</td>
+                            <td class="text-end fw-semibold" data-fmt-number="$">{{ analytics.total_sold_value|floatformat:2 }}</td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted">Realized P&L</td>
+                            <td class="text-end fw-semibold {% if analytics.realized_pnl >= 0 %}text-success{% else %}text-danger{% endif %}" data-fmt-number="$">{{ analytics.realized_pnl|floatformat:2 }}</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        {% else %}
         <div class="row g-4">
 
             <!-- Position Overview -->
@@ -91,6 +154,24 @@
                        data-units="{{ analytics.units }}"
                        data-avg-price="{{ analytics.avg_price }}">
                     <tbody>
+                        {% if analytics.sell_5 != None %}
+                        <tr data-alert-key="sell_5" data-alert-price="{{ analytics.sell_5 }}">
+                            <td class="text-muted">Sell @ +5%</td>
+                            <td class="text-end fw-semibold text-success">
+                                <span data-fmt-number="$">{{ analytics.sell_5|floatformat:2 }}</span>
+                            </td>
+                            <td class="text-end alert-btn-cell"></td>
+                        </tr>
+                        {% endif %}
+                        {% if analytics.sell_10 != None %}
+                        <tr data-alert-key="sell_10" data-alert-price="{{ analytics.sell_10 }}">
+                            <td class="text-muted">Sell @ +10%</td>
+                            <td class="text-end fw-semibold text-success">
+                                <span data-fmt-number="$">{{ analytics.sell_10|floatformat:2 }}</span>
+                            </td>
+                            <td class="text-end alert-btn-cell"></td>
+                        </tr>
+                        {% endif %}
                         {% if analytics.sell_25 != None %}
                         <tr data-alert-key="sell_25" data-alert-price="{{ analytics.sell_25 }}">
                             <td class="text-muted">Sell @ +25%</td>
@@ -100,29 +181,11 @@
                             <td class="text-end alert-btn-cell"></td>
                         </tr>
                         {% endif %}
-                        {% if analytics.sell_50 != None %}
-                        <tr data-alert-key="sell_50" data-alert-price="{{ analytics.sell_50 }}">
-                            <td class="text-muted">Sell @ +50%</td>
-                            <td class="text-end fw-semibold text-success">
-                                <span data-fmt-number="$">{{ analytics.sell_50|floatformat:2 }}</span>
-                            </td>
-                            <td class="text-end alert-btn-cell"></td>
-                        </tr>
-                        {% endif %}
-                        {% if analytics.sell_75 != None %}
-                        <tr data-alert-key="sell_75" data-alert-price="{{ analytics.sell_75 }}">
-                            <td class="text-muted">Sell @ +75%</td>
-                            <td class="text-end fw-semibold text-success">
-                                <span data-fmt-number="$">{{ analytics.sell_75|floatformat:2 }}</span>
-                            </td>
-                            <td class="text-end alert-btn-cell"></td>
-                        </tr>
-                        {% endif %}
-                        {% if analytics.buy_avg_minus_20 != None %}
-                        <tr data-alert-key="buy_avg20" data-alert-price="{{ analytics.buy_avg_minus_20 }}">
-                            <td class="text-muted">Buy to lower avg by 20%</td>
+                        {% if analytics.buy_avg_minus_10 != None %}
+                        <tr data-alert-key="buy_avg10" data-alert-price="{{ analytics.buy_avg_minus_10 }}">
+                            <td class="text-muted">Buy to lower avg by 10%</td>
                             <td class="text-end fw-semibold text-primary">
-                                <span data-fmt-number="$">{{ analytics.buy_avg_minus_20|floatformat:2 }}</span>
+                                <span data-fmt-number="$">{{ analytics.buy_avg_minus_10|floatformat:2 }}</span>
                             </td>
                             <td class="text-end alert-btn-cell"></td>
                         </tr>
@@ -167,6 +230,7 @@
             </div>
 
         </div>
+        {% endif %}
     </div>
     </div>
 </div>
@@ -210,9 +274,16 @@
 
 <script>
     document.addEventListener("DOMContentLoaded", function () {
-        /* ── Chevron toggle ── */
+        /* ── Chevron toggle + manual collapse (avoid toggling on currency btn click) ── */
         const chevron = document.getElementById("analyticsChevron");
         const collapse = document.getElementById("analyticsBody");
+        const header = document.getElementById("analyticsHeader");
+        const bsCollapse = new bootstrap.Collapse(collapse, { toggle: false });
+
+        header.addEventListener("click", function (e) {
+            if (e.target.closest(".currency-display-toggle")) return;
+            bsCollapse.toggle();
+        });
         collapse.addEventListener("show.bs.collapse", function () {
             chevron.style.transform = "rotate(180deg)";
         });

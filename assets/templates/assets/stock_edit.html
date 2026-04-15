@@ -30,8 +30,16 @@
                     </div>
                     <div class="row mb-3">
                         <div class="col">
-                            <label for="id_price" class="form-label">Price ($)</label>
-                            {{ form.price }}
+                            <label for="id_price" class="form-label">Price</label>
+                            <div class="input-group">
+                                {{ form.price }}
+                                <button type="button" class="btn btn-outline-secondary currency-toggle" id="currencyToggle"
+                                        data-currency="USD" data-rate="{{ eur_usd_rate|default:'0' }}"
+                                        style="min-width:54px;font-weight:700;font-size:0.85rem;">
+                                    USD
+                                </button>
+                            </div>
+                            <div id="currencyHint" class="form-text" style="font-size:0.72rem;color:var(--text-muted);display:none;"></div>
                         </div>
                         <div class="col">
                             <label for="id_amount" class="form-label">Amount</label>
@@ -54,4 +62,8 @@
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+{% include "includes/currency_toggle.html" %}
 {% endblock %}

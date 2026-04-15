@@ -64,6 +64,37 @@
         transition: color 0.2s;
     }
     .card-portfolio-link:hover { color: #a5b4fc; }
+
+    /* ── Wealth card ── */
+    .wealth-card {
+        background: linear-gradient(135deg, var(--bg-card) 0%, rgba(79,70,229,0.08) 100%);
+        border: 1px solid var(--border-color);
+        border-radius: 16px;
+        padding: 1.5rem 2rem;
+        margin-bottom: 1.5rem;
+    }
+    .wealth-label {
+        font-size: 0.8rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        color: var(--text-muted);
+    }
+    .wealth-value {
+        font-size: clamp(2rem, 5vw, 2.8rem);
+        font-weight: 800;
+        letter-spacing: -1px;
+        font-family: system-ui, -apple-system, sans-serif;
+        background: linear-gradient(135deg, #f1f5f9, var(--accent-light));
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        transition: opacity 0.3s;
+    }
+    .wealth-value.loading {
+        -webkit-text-fill-color: var(--text-muted);
+        background: none;
+    }
 </style>
 {% endblock %}
 
@@ -72,6 +103,43 @@
 <div class="greeting pt-4 pb-3">
     <h2>Good {% now "H" as hour %}{% if hour|add:"0" < 12 %}morning{% elif hour|add:"0" < 18 %}afternoon{% else %}evening{% endif %}, <span>{{ user.first_name }}</span></h2>
     <p style="color:var(--text-secondary); margin:0;">Here's your portfolio overview.</p>
+</div>
+
+<!-- Total Wealth -->
+<div class="wealth-card">
+    <div class="wealth-label">Total Portfolio Value</div>
+    <div class="wealth-value loading" id="total-wealth">—</div>
+</div>
+
+<!-- Asset Allocation -->
+<div class="card shadow-sm mb-4">
+    <div class="card-header d-flex align-items-center" role="button"
+         data-bs-toggle="collapse" data-bs-target="#allocationBody" aria-expanded="true" aria-controls="allocationBody"
+         style="cursor: pointer;">
+        <h5 class="mb-0 me-2">Asset Allocation</h5>
+        <svg id="allocChevron" xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="currentColor"
+             class="text-muted" viewBox="0 0 16 16" style="transition: transform 0.3s; transform: rotate(180deg);">
+            <path fill-rule="evenodd" d="M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z"/>
+        </svg>
+    </div>
+    <div class="collapse show" id="allocationBody">
+        <div class="card-body">
+            <div class="row g-4 align-items-center">
+                <div class="col-sm-5 col-md-4">
+                    <div class="donut-wrap">
+                        <canvas id="dashAllocationChart"></canvas>
+                        <div class="donut-center">
+                            <div class="donut-total-label">Total</div>
+                            <div class="donut-total-value">—</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-sm-7 col-md-8">
+                    <div id="dashAllocationLegend" class="donut-legend"></div>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
 
 <div class="row g-4">
@@ -88,7 +156,10 @@
                         </div>
                         <h6 class="mb-0 fw-bold">Stocks</h6>
                     </div>
-                    <a href="{% url 'stocks' %}" class="card-portfolio-link">My Portfolio &rarr;</a>
+                    <div class="d-flex align-items-center gap-2">
+                        {% include "includes/market_status.html" %}
+                        <a href="{% url 'stocks' %}" class="card-portfolio-link">My Portfolio &rarr;</a>
+                    </div>
                 </div>
                 <table class="table price-table mb-0">
                     <thead>
@@ -167,12 +238,67 @@
     <span class="live-dot"></span>
     <span style="color:var(--text-muted); font-size:0.8rem;">Live prices connected</span>
 </div>
+
+{% include "includes/donut_chart.html" %}
+
 {% endblock %}
 
 {% block extra_js %}
 <script>
     const prevPrices = {};
     const marketCaps = {};
+    const currentPrices = {};
+    const holdings = {{ holdings_json|safe }};
+    const allocData = {{ allocation_json|safe }};
+    const wealthEl = document.getElementById("total-wealth");
+
+    /* Allocation chart */
+    var updateAllocationChart = drawDonutChart("dashAllocationChart", allocData, {
+        centerLabel: "Total",
+        prefix: "$",
+        legendId: "dashAllocationLegend",
+    });
+
+    /* Collapse chevron */
+    (function() {
+        var ch = document.getElementById("allocChevron");
+        var co = document.getElementById("allocationBody");
+        if (ch && co) {
+            co.addEventListener("show.bs.collapse", function(){ ch.style.transform = "rotate(180deg)"; });
+            co.addEventListener("hide.bs.collapse", function(){ ch.style.transform = "rotate(0deg)"; });
+        }
+    })();
+
+    function updateWealth() {
+        let total = 0;
+        let hasPrice = false;
+        for (const [symbol, amount] of Object.entries(holdings)) {
+            if (currentPrices[symbol] !== undefined) {
+                total += amount * currentPrices[symbol];
+                hasPrice = true;
+            }
+        }
+        if (hasPrice) {
+            wealthEl.classList.remove("loading");
+            wealthEl.textContent = "$" + total.toLocaleString("en-US", {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+            });
+        }
+
+        /* Update allocation chart with live prices */
+        var updated = allocData.map(function(item) {
+            var p = currentPrices[item.symbol];
+            var amt = holdings[item.symbol] || 0;
+            return {
+                label: item.label,
+                symbol: item.symbol,
+                value: (p !== undefined && amt > 0) ? amt * p : item.value,
+                color: item.color,
+            };
+        });
+        if (updateAllocationChart) updateAllocationChart(updated);
+    }
 
     function formatMarketCap(v) {
         if (v >= 1e12) return "$" + (v / 1e12).toFixed(2) + "T";
@@ -222,7 +348,9 @@
                     cell.classList.add(newPrice > oldPrice ? "price-up" : "price-down");
                 }
                 prevPrices[symbol] = newPrice;
+                currentPrices[symbol] = newPrice;
             }
+            updateWealth();
         }
     };
 
