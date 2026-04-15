@@ -33,21 +33,22 @@ def _fetch_market_caps():
     api_key = settings.FINNHUB_API_KEY
 
     # Stocks — Finnhub /stock/profile2
-    for symbol in Stock.objects.exclude(finnhub_symbol="").values_list("symbol", flat=True):
+    for finnhub_sym, short in Stock.objects.exclude(finnhub_symbol="").values_list("finnhub_symbol", "symbol"):
         try:
             resp = requests.get(
                 f"{settings.FINNHUB_REST_URL}/stock/profile2",
-                params={"symbol": symbol, "token": api_key},
+                params={"symbol": finnhub_sym, "token": api_key},
                 timeout=10,
             )
+            resp.raise_for_status()
             data = resp.json()
             mcap = data.get("marketCapitalization")
             if mcap:
                 # Finnhub returns market cap in millions
-                cache.set(f"finnhub_{symbol}_mcap", mcap * 1_000_000, timeout=None)
-                logger.info("%s market cap: $%.0fM", symbol, mcap)
+                cache.set(f"finnhub_{short}_mcap", mcap * 1_000_000, timeout=None)
+                logger.info("%s market cap: $%.0fM", short, mcap)
         except Exception as e:
-            logger.warning("Failed to fetch market cap for %s: %s", symbol, e)
+            logger.warning("Failed to fetch market cap for %s: %s", short, e)
 
     # Crypto — CoinGecko /coins/markets (free, no key needed)
     crypto_symbols = set(
@@ -67,6 +68,7 @@ def _fetch_market_caps():
             },
             timeout=15,
         )
+        resp.raise_for_status()
         for coin in resp.json():
             coin_symbol = coin.get("symbol", "").upper()
             if coin_symbol in crypto_symbols:
@@ -76,6 +78,41 @@ def _fetch_market_caps():
                     logger.info("%s market cap: $%.0f", coin_symbol, mcap)
     except Exception as e:
         logger.warning("Failed to fetch crypto market caps: %s", e)
+
+
+def _poll_stock_quotes():
+    """Fetch latest stock quotes via REST API (free tier has no real-time WS for US stocks)."""
+    from assets.models import Stock
+
+    api_key = settings.FINNHUB_API_KEY
+    for finnhub_sym, short in Stock.objects.exclude(finnhub_symbol="").values_list("finnhub_symbol", "symbol"):
+        try:
+            resp = requests.get(
+                f"{settings.FINNHUB_REST_URL}/quote",
+                params={"symbol": finnhub_sym, "token": api_key},
+                timeout=10,
+            )
+            resp.raise_for_status()
+            data = resp.json()
+            price = data.get("c")  # current price
+            if price:
+                old_price = cache.get(f"finnhub_{short}")
+                cache.set(f"finnhub_{short}", price, timeout=None)
+                if old_price != price:
+                    _broadcast(short, price)
+                    logger.info("REST poll %s (%s): $%s", short, finnhub_sym, price)
+        except Exception as e:
+            logger.warning("Failed to poll quote for %s: %s", short, e)
+
+
+def _stock_quote_loop():
+    """Background thread that polls stock quotes every 15 seconds."""
+    while True:
+        try:
+            _poll_stock_quotes()
+        except Exception as e:
+            logger.warning("Stock quote poll error: %s", e)
+        time.sleep(settings.STOCK_QUOTE_INTERVAL)
 
 
 def _market_cap_loop():
@@ -122,6 +159,11 @@ def stream_prices():
     _fetch_market_caps()
     mcap_thread = threading.Thread(target=_market_cap_loop, daemon=True)
     mcap_thread.start()
+
+    # Poll stock quotes via REST API (Finnhub free tier has no real-time WS for US stocks)
+    _poll_stock_quotes()
+    stock_poll_thread = threading.Thread(target=_stock_quote_loop, daemon=True)
+    stock_poll_thread.start()
 
     # Clear any stale flag
     cache.delete(SYMBOLS_CHANGED_KEY)
