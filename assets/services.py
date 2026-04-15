@@ -175,10 +175,10 @@ def compute_analytics(transactions, symbol):
         "current_value": None,
         "unrealized_pnl": None,
         "unrealized_pnl_pct": None,
+        "sell_5": None,
+        "sell_10": None,
         "sell_25": None,
-        "sell_50": None,
-        "sell_75": None,
-        "buy_avg_minus_20": None,
+        "buy_avg_minus_10": None,
     }
 
     if current_price is not None:
