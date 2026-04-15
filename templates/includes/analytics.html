@@ -155,7 +155,7 @@
                        data-avg-price="{{ analytics.avg_price }}">
                     <tbody>
                         {% if analytics.sell_5 != None %}
-                        <tr data-alert-key="sell_5" data-alert-price="{{ analytics.sell_5 }}">
+                        <tr data-target-price="{{ analytics.sell_5 }}" data-target-dir="above">
                             <td class="text-muted">Sell @ +5%</td>
                             <td class="text-end fw-semibold text-success">
                                 <span data-fmt-number="$">{{ analytics.sell_5|floatformat:2 }}</span>
@@ -164,7 +164,7 @@
                         </tr>
                         {% endif %}
                         {% if analytics.sell_10 != None %}
-                        <tr data-alert-key="sell_10" data-alert-price="{{ analytics.sell_10 }}">
+                        <tr data-target-price="{{ analytics.sell_10 }}" data-target-dir="above">
                             <td class="text-muted">Sell @ +10%</td>
                             <td class="text-end fw-semibold text-success">
                                 <span data-fmt-number="$">{{ analytics.sell_10|floatformat:2 }}</span>
@@ -173,7 +173,7 @@
                         </tr>
                         {% endif %}
                         {% if analytics.sell_25 != None %}
-                        <tr data-alert-key="sell_25" data-alert-price="{{ analytics.sell_25 }}">
+                        <tr data-target-price="{{ analytics.sell_25 }}" data-target-dir="above">
                             <td class="text-muted">Sell @ +25%</td>
                             <td class="text-end fw-semibold text-success">
                                 <span data-fmt-number="$">{{ analytics.sell_25|floatformat:2 }}</span>
@@ -182,7 +182,7 @@
                         </tr>
                         {% endif %}
                         {% if analytics.buy_avg_minus_10 != None %}
-                        <tr data-alert-key="buy_avg10" data-alert-price="{{ analytics.buy_avg_minus_10 }}">
+                        <tr data-target-price="{{ analytics.buy_avg_minus_10 }}" data-target-dir="below">
                             <td class="text-muted">Buy to lower avg by 10%</td>
                             <td class="text-end fw-semibold text-primary">
                                 <span data-fmt-number="$">{{ analytics.buy_avg_minus_10|floatformat:2 }}</span>
@@ -230,6 +230,57 @@
             </div>
 
         </div>
+
+        <!-- Active Alerts Table -->
+        <div class="mt-4" id="alertsSection">
+            <h6 class="text-muted text-uppercase small fw-bold mb-3">
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16" style="margin-right:4px;">
+                    <path d="M8 16a2 2 0 0 0 2-2H6a2 2 0 0 0 2 2m.995-14.901a1 1 0 1 0-1.99 0A5 5 0 0 0 3 6c0 1.098-.5 6-2 7h14c-1.5-1-2-5.902-2-7 0-2.42-1.72-4.44-4.005-4.901"/>
+                </svg>
+                Price Alerts
+            </h6>
+            <div id="alertMsg" style="display:none;font-size:0.8rem;padding:0.5rem 0.75rem;border-radius:8px;margin-bottom:0.75rem;"></div>
+            <table class="table table-sm mb-0" id="alertsTable">
+                <thead>
+                    <tr>
+                        <th class="text-muted" style="font-size:0.75rem;">Target Price</th>
+                        <th class="text-muted" style="font-size:0.75rem;">Direction</th>
+                        <th class="text-muted" style="font-size:0.75rem;">Status</th>
+                        <th class="text-muted text-end" style="font-size:0.75rem;">Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="alertsBody">
+                    {% for alert in active_alerts %}
+                    <tr data-alert-id="{{ alert.id }}">
+                        <td class="fw-semibold" style="font-family:'SF Mono','Fira Code',monospace;font-size:0.85rem;">
+                            ${{ alert.target_price|floatformat:2 }}
+                        </td>
+                        <td>
+                            <span class="badge {% if alert.direction == 'above' %}bg-success{% else %}bg-primary{% endif %}" style="font-size:0.7rem;">
+                                {{ alert.get_direction_display }}
+                            </span>
+                        </td>
+                        <td>
+                            {% if alert.email_sent %}
+                            <span class="badge" style="background:rgba(251,191,36,0.15);color:#fbbf24;font-size:0.7rem;">Triggered</span>
+                            {% else %}
+                            <span class="badge" style="background:rgba(52,211,153,0.15);color:#34d399;font-size:0.7rem;">Active</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-end">
+                            {% if not alert.email_sent %}
+                            <button class="btn btn-ghost btn-sm py-0 px-1 alert-edit-btn" style="font-size:0.75rem;" title="Edit">Edit</button>
+                            {% endif %}
+                            <button class="btn btn-ghost btn-sm py-0 px-1 alert-delete-btn" style="font-size:0.75rem;color:#f87171;" title="Delete">Delete</button>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr id="alertsEmpty"><td colspan="4" class="text-muted text-center py-2" style="font-size:0.8rem;">No active alerts. Click a bell icon above to create one.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
         {% endif %}
     </div>
     </div>
@@ -238,43 +289,29 @@
 <style>
     .alert-btn-cell { width: 42px; vertical-align: middle; }
     .btn-alert-toggle {
-        border: none;
-        background: none;
-        padding: 4px 6px;
-        border-radius: 6px;
-        cursor: pointer;
-        line-height: 1;
+        border: none; background: none; padding: 4px 6px;
+        border-radius: 6px; cursor: pointer; line-height: 1;
         transition: background-color 0.15s;
     }
     .btn-alert-toggle:hover { background-color: rgba(255,255,255,0.06); }
     .btn-alert-toggle svg { display: block; }
-    .alert-active-badge {
-        display: inline-flex;
-        align-items: center;
-        gap: 6px;
-        font-size: 0.75rem;
-        font-weight: 600;
-        color: var(--accent-light);
-        background: rgba(79,70,229,0.12);
-        border-radius: 20px;
-        padding: 3px 10px 3px 8px;
-        white-space: nowrap;
+    #alertsTable th { border-bottom-color: var(--border-color); }
+    #alertsTable td { border-bottom-color: var(--border-color); vertical-align: middle; }
+    .alert-edit-modal {
+        position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+        background: rgba(0,0,0,0.5); z-index: 1050;
+        display: flex; align-items: center; justify-content: center;
     }
-    .alert-active-badge .alert-disable {
-        border: none;
-        background: none;
-        padding: 0;
-        cursor: pointer;
-        color: var(--text-muted);
-        line-height: 1;
-        transition: color 0.15s;
+    .alert-edit-modal .modal-box {
+        background: var(--bg-card); border: 1px solid var(--border-color);
+        border-radius: 14px; padding: 1.5rem; width: 320px;
+        box-shadow: 0 16px 48px rgba(0,0,0,0.4);
     }
-    .alert-active-badge .alert-disable:hover { color: #f87171; }
 </style>
 
 <script>
     document.addEventListener("DOMContentLoaded", function () {
-        /* ── Chevron toggle + manual collapse (avoid toggling on currency btn click) ── */
+        /* ── Chevron toggle ── */
         const chevron = document.getElementById("analyticsChevron");
         const collapse = document.getElementById("analyticsBody");
         const header = document.getElementById("analyticsHeader");
@@ -284,107 +321,182 @@
             if (e.target.closest(".currency-display-toggle")) return;
             bsCollapse.toggle();
         });
-        collapse.addEventListener("show.bs.collapse", function () {
-            chevron.style.transform = "rotate(180deg)";
-        });
-        collapse.addEventListener("hide.bs.collapse", function () {
-            chevron.style.transform = "rotate(0deg)";
-        });
+        collapse.addEventListener("show.bs.collapse", function () { chevron.style.transform = "rotate(180deg)"; });
+        collapse.addEventListener("hide.bs.collapse", function () { chevron.style.transform = "rotate(0deg)"; });
 
         /* ── Number formatting ── */
         function fmtUSD(val) {
-            return val.toLocaleString("en-US", {
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2,
-            });
+            return val.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         }
 
         document.querySelectorAll("[data-fmt-number]").forEach(function (el) {
             const raw = el.textContent.replace(/[^0-9.\-]/g, "");
             const val = parseFloat(raw);
-            if (!isNaN(val)) {
-                el.textContent = (el.dataset.fmtNumber || "") + fmtUSD(val);
-            }
+            if (!isNaN(val)) el.textContent = (el.dataset.fmtNumber || "") + fmtUSD(val);
         });
 
         document.querySelectorAll("[data-fmt-pnl]").forEach(function (el) {
             const parts = el.dataset.fmtPnl.split("|");
             const pnlRaw = parseFloat(parts[0].replace(/[^0-9.\-]/g, ""));
             const pctRaw = parseFloat(parts[1]);
-            if (!isNaN(pnlRaw) && !isNaN(pctRaw)) {
+            if (!isNaN(pnlRaw) && !isNaN(pctRaw))
                 el.innerHTML = "$" + fmtUSD(pnlRaw) + ' <small>(' + fmtUSD(pctRaw) + '%)</small>';
-            }
         });
 
-        /* ── Price alert toggles ── */
-        const STORAGE_KEY = "price_alerts";
+        /* ── Alert system (DB-backed) ── */
         const table = document.getElementById("targetsTable");
         if (!table) return;
         const symbol = table.dataset.symbol;
+        const csrfToken = document.querySelector("[name=csrfmiddlewaretoken]")?.value
+            || "{{ csrf_token }}";
+        const alertsBody = document.getElementById("alertsBody");
+        const alertMsg = document.getElementById("alertMsg");
 
-        function getAlerts() {
-            try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || {}; }
-            catch { return {}; }
+        function showMsg(text, type) {
+            alertMsg.textContent = text;
+            alertMsg.style.display = "block";
+            alertMsg.style.background = type === "error" ? "rgba(248,113,113,0.1)" : "rgba(52,211,153,0.1)";
+            alertMsg.style.color = type === "error" ? "#f87171" : "#34d399";
+            alertMsg.style.border = type === "error" ? "1px solid rgba(248,113,113,0.2)" : "1px solid rgba(52,211,153,0.2)";
+            setTimeout(function () { alertMsg.style.display = "none"; }, 5000);
         }
 
-        function saveAlerts(alerts) {
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(alerts));
+        function apiCall(url, method, body) {
+            return fetch(url, {
+                method: method,
+                headers: { "Content-Type": "application/json", "X-CSRFToken": csrfToken },
+                body: body ? JSON.stringify(body) : undefined,
+            }).then(function (r) { return r.json().then(function (d) { return { status: r.status, data: d }; }); });
         }
 
-        function alertId(key) {
-            return symbol + ":" + key;
+        function addAlertRow(alert) {
+            const empty = document.getElementById("alertsEmpty");
+            if (empty) empty.remove();
+
+            const tr = document.createElement("tr");
+            tr.dataset.alertId = alert.id;
+            const dirLabel = alert.direction === "above" ? "Above (Sell)" : "Below (Buy)";
+            const dirClass = alert.direction === "above" ? "bg-success" : "bg-primary";
+            const statusBadge = alert.email_sent
+                ? '<span class="badge" style="background:rgba(251,191,36,0.15);color:#fbbf24;font-size:0.7rem;">Triggered</span>'
+                : '<span class="badge" style="background:rgba(52,211,153,0.15);color:#34d399;font-size:0.7rem;">Active</span>';
+            const actions = alert.email_sent
+                ? '<button class="btn btn-ghost btn-sm py-0 px-1 alert-delete-btn" style="font-size:0.75rem;color:#f87171;">Delete</button>'
+                : '<button class="btn btn-ghost btn-sm py-0 px-1 alert-edit-btn" style="font-size:0.75rem;">Edit</button>'
+                + '<button class="btn btn-ghost btn-sm py-0 px-1 alert-delete-btn" style="font-size:0.75rem;color:#f87171;">Delete</button>';
+
+            tr.innerHTML =
+                '<td class="fw-semibold" style="font-family:\'SF Mono\',\'Fira Code\',monospace;font-size:0.85rem;">$' + fmtUSD(alert.target_price) + '</td>'
+                + '<td><span class="badge ' + dirClass + '" style="font-size:0.7rem;">' + dirLabel + '</span></td>'
+                + '<td>' + statusBadge + '</td>'
+                + '<td class="text-end">' + actions + '</td>';
+            alertsBody.appendChild(tr);
+            bindRowActions(tr);
         }
 
-        /* SVG icons */
-        const bellOffSVG = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="#64748b" viewBox="0 0 16 16">'
-            + '<path d="M8 16a2 2 0 0 0 2-2H6a2 2 0 0 0 2 2M8 1.918l-.797.161A4 4 0 0 0 4 6c0 .628-.134 2.197-.459 3.742-.16.767-.376 1.566-.663 2.258h10.244c-.287-.692-.502-1.49-.663-2.258C12.134 8.197 12 6.628 12 6a4 4 0 0 0-3.203-3.92zM14.22 12c.223.447.481.801.78 1H1c.299-.199.557-.553.78-1C2.68 10.2 3 6.88 3 6c0-2.42 1.72-4.44 4.005-4.901a1 1 0 1 1 1.99 0A5 5 0 0 1 13 6c0 .88.32 4.2 1.22 6"/>'
-            + '</svg>';
+        function createAlert(price, direction, updateId) {
+            var url = updateId
+                ? "/api/alerts/" + updateId + "/update/"
+                : "/api/alerts/create/";
+            var body = updateId
+                ? { target_price: price, direction: direction }
+                : { symbol: symbol, target_price: price, direction: direction };
 
-        const bellOnSVG = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="#818cf8" viewBox="0 0 16 16">'
-            + '<path d="M8 16a2 2 0 0 0 2-2H6a2 2 0 0 0 2 2m.995-14.901a1 1 0 1 0-1.99 0A5 5 0 0 0 3 6c0 1.098-.5 6-2 7h14c-1.5-1-2-5.902-2-7 0-2.42-1.72-4.44-4.005-4.901"/>'
-            + '</svg>';
+            apiCall(url, "POST", body).then(function (res) {
+                if (res.status === 409) {
+                    showMsg(res.data.message + " Use the edit button below to update it.", "error");
+                    return;
+                }
+                if (res.status >= 400) {
+                    showMsg(res.data.error || "Failed to create alert", "error");
+                    return;
+                }
+                if (updateId) {
+                    var row = alertsBody.querySelector('[data-alert-id="' + updateId + '"]');
+                    if (row) row.remove();
+                }
+                addAlertRow(res.data);
+                showMsg("Alert " + (updateId ? "updated" : "created") + " at $" + fmtUSD(price), "success");
+            });
+        }
 
-        const xSVG = '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="currentColor" viewBox="0 0 16 16">'
-            + '<path d="M4.646 4.646a.5.5 0 0 1 .708 0L8 7.293l2.646-2.647a.5.5 0 0 1 .708.708L8.707 8l2.647 2.646a.5.5 0 0 1-.708.708L8 8.707l-2.646 2.647a.5.5 0 0 1-.708-.708L7.293 8 4.646 5.354a.5.5 0 0 1 0-.708"/>'
-            + '</svg>';
+        function deleteAlert(id, row) {
+            apiCall("/api/alerts/" + id + "/delete/", "POST").then(function (res) {
+                if (res.data.deleted) {
+                    row.remove();
+                    if (!alertsBody.querySelector("tr[data-alert-id]")) {
+                        alertsBody.innerHTML = '<tr id="alertsEmpty"><td colspan="4" class="text-muted text-center py-2" style="font-size:0.8rem;">No active alerts.</td></tr>';
+                    }
+                    showMsg("Alert deleted", "success");
+                }
+            });
+        }
 
-        function renderRow(row) {
-            const key = row.dataset.alertKey;
-            const price = parseFloat(row.dataset.alertPrice);
-            const cell = row.querySelector(".alert-btn-cell");
-            const alerts = getAlerts();
-            const active = !!alerts[alertId(key)];
+        function showEditModal(alertId, currentPrice, currentDir) {
+            var overlay = document.createElement("div");
+            overlay.className = "alert-edit-modal";
+            overlay.innerHTML =
+                '<div class="modal-box">'
+                + '<h6 class="mb-3 fw-bold">Edit Alert</h6>'
+                + '<div class="mb-2"><label class="form-label small">Target Price ($)</label>'
+                + '<input type="number" class="form-control form-control-sm" id="editAlertPrice" step="0.01" value="' + currentPrice + '"></div>'
+                + '<div class="mb-3"><label class="form-label small">Direction</label>'
+                + '<select class="form-control form-control-sm" id="editAlertDir">'
+                + '<option value="above"' + (currentDir === "above" ? " selected" : "") + '>Above (Sell)</option>'
+                + '<option value="below"' + (currentDir === "below" ? " selected" : "") + '>Below (Buy)</option>'
+                + '</select></div>'
+                + '<div class="d-flex gap-2">'
+                + '<button class="btn btn-accent btn-sm flex-fill" id="editAlertSave">Save</button>'
+                + '<button class="btn btn-ghost btn-sm flex-fill" id="editAlertCancel">Cancel</button>'
+                + '</div></div>';
+            document.body.appendChild(overlay);
 
-            if (active) {
-                cell.innerHTML =
-                    '<span class="alert-active-badge">'
-                    + bellOnSVG
-                    + ' $' + fmtUSD(price)
-                    + '<button class="alert-disable" title="Disable alert">' + xSVG + '</button>'
-                    + '</span>';
-                cell.querySelector(".alert-disable").addEventListener("click", function (e) {
-                    e.stopPropagation();
-                    const a = getAlerts();
-                    delete a[alertId(key)];
-                    saveAlerts(a);
-                    renderRow(row);
+            overlay.querySelector("#editAlertCancel").addEventListener("click", function () { overlay.remove(); });
+            overlay.addEventListener("click", function (e) { if (e.target === overlay) overlay.remove(); });
+            overlay.querySelector("#editAlertSave").addEventListener("click", function () {
+                var newPrice = parseFloat(document.getElementById("editAlertPrice").value);
+                var newDir = document.getElementById("editAlertDir").value;
+                if (isNaN(newPrice) || newPrice <= 0) return;
+                createAlert(newPrice, newDir, alertId);
+                overlay.remove();
+            });
+        }
+
+        function bindRowActions(row) {
+            var id = row.dataset.alertId;
+            var editBtn = row.querySelector(".alert-edit-btn");
+            var deleteBtn = row.querySelector(".alert-delete-btn");
+
+            if (editBtn) {
+                editBtn.addEventListener("click", function () {
+                    var price = parseFloat(row.querySelector("td").textContent.replace(/[^0-9.\-]/g, ""));
+                    var dir = row.querySelector(".bg-success") ? "above" : "below";
+                    showEditModal(id, price, dir);
                 });
-            } else {
-                cell.innerHTML =
-                    '<button class="btn-alert-toggle" title="Notify me at $' + fmtUSD(price) + '">'
-                    + bellOffSVG
-                    + '</button>';
-                cell.querySelector(".btn-alert-toggle").addEventListener("click", function (e) {
-                    e.stopPropagation();
-                    const a = getAlerts();
-                    a[alertId(key)] = { symbol: symbol, price: price, enabled: true };
-                    saveAlerts(a);
-                    renderRow(row);
-                });
+            }
+            if (deleteBtn) {
+                deleteBtn.addEventListener("click", function () { deleteAlert(id, row); });
             }
         }
 
-        table.querySelectorAll("tr[data-alert-key]").forEach(renderRow);
+        /* Bind actions on server-rendered rows */
+        alertsBody.querySelectorAll("tr[data-alert-id]").forEach(bindRowActions);
+
+        /* Bell buttons on target rows */
+        var bellSVG = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="#64748b" viewBox="0 0 16 16">'
+            + '<path d="M8 16a2 2 0 0 0 2-2H6a2 2 0 0 0 2 2M8 1.918l-.797.161A4 4 0 0 0 4 6c0 .628-.134 2.197-.459 3.742-.16.767-.376 1.566-.663 2.258h10.244c-.287-.692-.502-1.49-.663-2.258C12.134 8.197 12 6.628 12 6a4 4 0 0 0-3.203-3.92zM14.22 12c.223.447.481.801.78 1H1c.299-.199.557-.553.78-1C2.68 10.2 3 6.88 3 6c0-2.42 1.72-4.44 4.005-4.901a1 1 0 1 1 1.99 0A5 5 0 0 1 13 6c0 .88.32 4.2 1.22 6"/>'
+            + '</svg>';
+
+        table.querySelectorAll("tr[data-target-price]").forEach(function (row) {
+            var price = parseFloat(row.dataset.targetPrice);
+            var direction = row.dataset.targetDir;
+            var cell = row.querySelector(".alert-btn-cell");
+            cell.innerHTML = '<button class="btn-alert-toggle" title="Set alert at $' + fmtUSD(price) + '">' + bellSVG + '</button>';
+            cell.querySelector("button").addEventListener("click", function (e) {
+                e.stopPropagation();
+                createAlert(price, direction);
+            });
+        });
 
         /* ── Custom sell / buy simulators ── */
         const costBasis = parseFloat(table.dataset.costBasis);
@@ -399,8 +511,7 @@
         function updateSell() {
             const pct = parseFloat(sellPctInput.value);
             if (isNaN(pct) || pct < 0 || isNaN(avgPrice) || avgPrice <= 0) {
-                sellResult.innerHTML = '<span class="text-muted">\u2014</span>';
-                return;
+                sellResult.innerHTML = '<span class="text-muted">\u2014</span>'; return;
             }
             const sellPrice = avgPrice * (1 + pct / 100);
             sellResult.innerHTML = '<span class="text-success">$' + fmtUSD(sellPrice) + '</span>';
@@ -409,16 +520,12 @@
         function updateBuy() {
             const pct = parseFloat(buyPctInput.value);
             if (isNaN(pct) || pct <= 0 || pct >= 100 || isNaN(avgPrice) || avgPrice <= 0) {
-                buyResult.innerHTML = '<span class="text-muted">\u2014</span>';
-                return;
+                buyResult.innerHTML = '<span class="text-muted">\u2014</span>'; return;
             }
-            /* target_avg = avg * (1 - pct/100)
-               buy_price = target_avg * (units + 1) - cost_basis  (for 1 unit) */
             const targetAvg = avgPrice * (1 - pct / 100);
             const buyPrice = targetAvg * (units + 1) - costBasis;
             if (buyPrice <= 0) {
-                buyResult.innerHTML = '<span class="text-muted">Not possible with 1 unit</span>';
-                return;
+                buyResult.innerHTML = '<span class="text-muted">Not possible with 1 unit</span>'; return;
             }
             buyResult.innerHTML = '<span class="text-primary">$' + fmtUSD(buyPrice) + '</span>';
         }
