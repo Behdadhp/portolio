@@ -1,0 +1,13 @@
+Hi {{ first_name }},
+
+Your price alert for {{ asset_name }} ({{ symbol }}) has been triggered.
+
+  Target Price:   ${{ target_price }}
+  Current Price:  ${{ current_price }}
+  Direction:      {% if direction == "above" %}Above (Sell){% else %}Below (Buy){% endif %}
+
+View details: {{ detail_url }}
+
+This is a one-time alert. To set a new alert, visit the asset's detail page.
+
+— Portfolio Tracker

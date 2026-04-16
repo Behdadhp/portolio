@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="margin:0;padding:0;background:#0f111a;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#0f111a;padding:40px 20px;">
+<tr><td align="center">
+<table width="560" cellpadding="0" cellspacing="0" style="background:#1a1d2e;border-radius:16px;border:1px solid rgba(255,255,255,0.06);overflow:hidden;">
+
+    <!-- Header -->
+    <tr><td style="background:{% if direction == 'above' %}rgba(52,211,153,0.1){% else %}rgba(99,102,241,0.1){% endif %};padding:28px 32px 20px;text-align:center;">
+        <div style="font-size:36px;margin-bottom:8px;">
+            {% if direction == "above" %}&#x1F4C8;{% else %}&#x1F4C9;{% endif %}
+        </div>
+        <h1 style="margin:0;color:#f1f5f9;font-size:20px;font-weight:700;">
+            Price Alert Triggered
+        </h1>
+    </td></tr>
+
+    <!-- Body -->
+    <tr><td style="padding:28px 32px;">
+        <p style="color:#94a3b8;font-size:15px;margin:0 0 20px;line-height:1.6;">
+            Hi {{ first_name }},
+        </p>
+        <p style="color:#94a3b8;font-size:15px;margin:0 0 24px;line-height:1.6;">
+            Your price alert for <strong style="color:#f1f5f9;">{{ asset_name }} ({{ symbol }})</strong> has been triggered.
+        </p>
+
+        <!-- Price card -->
+        <table width="100%" cellpadding="0" cellspacing="0" style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);border-radius:12px;margin-bottom:24px;">
+            <tr>
+                <td style="padding:16px 20px;border-bottom:1px solid rgba(255,255,255,0.06);">
+                    <span style="color:#64748b;font-size:13px;">Target Price</span><br>
+                    <span style="color:#f1f5f9;font-size:22px;font-weight:700;font-family:'SF Mono','Fira Code',monospace;">
+                        ${{ target_price }}
+                    </span>
+                </td>
+                <td style="padding:16px 20px;border-bottom:1px solid rgba(255,255,255,0.06);text-align:right;">
+                    <span style="color:#64748b;font-size:13px;">Current Price</span><br>
+                    <span style="color:{% if direction == 'above' %}#34d399{% else %}#818cf8{% endif %};font-size:22px;font-weight:700;font-family:'SF Mono','Fira Code',monospace;">
+                        ${{ current_price }}
+                    </span>
+                </td>
+            </tr>
+            <tr>
+                <td colspan="2" style="padding:12px 20px;">
+                    <span style="color:#64748b;font-size:13px;">Direction</span>&nbsp;&nbsp;
+                    <span style="display:inline-block;padding:3px 10px;border-radius:6px;font-size:12px;font-weight:600;
+                        {% if direction == 'above' %}background:rgba(52,211,153,0.15);color:#34d399;{% else %}background:rgba(99,102,241,0.15);color:#818cf8;{% endif %}">
+                        {% if direction == "above" %}Above (Sell){% else %}Below (Buy){% endif %}
+                    </span>
+                </td>
+            </tr>
+        </table>
+
+        <!-- CTA button -->
+        <table width="100%" cellpadding="0" cellspacing="0">
+        <tr><td align="center" style="padding:4px 0 8px;">
+            <a href="{{ detail_url }}"
+               style="display:inline-block;background:#6366f1;color:#ffffff;text-decoration:none;
+                      padding:12px 32px;border-radius:10px;font-size:14px;font-weight:600;">
+                View {{ symbol }} Details
+            </a>
+        </td></tr>
+        </table>
+
+        <p style="color:#475569;font-size:13px;margin:20px 0 0;line-height:1.5;">
+            This is a one-time alert. To set a new alert, visit the asset's detail page and click a bell icon on any target row.
+        </p>
+    </td></tr>
+
+    <!-- Footer -->
+    <tr><td style="padding:20px 32px;border-top:1px solid rgba(255,255,255,0.06);text-align:center;">
+        <span style="color:#475569;font-size:12px;">Portfolio Tracker</span>
+    </td></tr>
+
+</table>
+</td></tr>
+</table>
+</body>
+</html>
