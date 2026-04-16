@@ -61,8 +61,8 @@ def register_view(request):
 def dashboard_view(request):
     import json
     from django.core.cache import cache
-    from assets.models import Crypto, CryptoAsset, Stock, StockAsset
-    from assets.services import get_asset_summary, load_live_prices
+    from assets.models import CryptoAsset, PriceAlert, StockAsset
+    from assets.services import get_asset_summary
 
     stock_summary = list(
         get_asset_summary(
@@ -79,6 +79,23 @@ def dashboard_view(request):
 
     holdings = {}
     allocation = []  # [{label, symbol, value, type}]
+    cost_bases = {}  # {symbol: cost_basis} for P&L ranking
+
+    # Helper: compute cost basis using weighted average for a set of transactions
+    def _cost_basis_for(txs):
+        cb = 0.0
+        units = 0.0
+        for tx in txs.order_by("date", "status", "pk"):
+            amt = float(tx.amount)
+            px = float(tx.price)
+            if tx.status == "bought":
+                cb += amt * px
+                units += amt
+            elif tx.status == "sold" and units > 0:
+                avg = cb / units
+                cb -= amt * avg
+                units -= amt
+        return round(cb, 2)
 
     for row in stock_summary:
         amt = float(row["total"])
@@ -93,6 +110,10 @@ def dashboard_view(request):
                 "type": "stock",
             }
         )
+        if amt > 0:
+            cost_bases[row["symbol"]] = _cost_basis_for(
+                StockAsset.objects.filter(user=request.user, stock__symbol=row["symbol"])
+            )
 
     for row in crypto_summary:
         amt = float(row["total"])
@@ -107,15 +128,27 @@ def dashboard_view(request):
                 "type": "crypto",
             }
         )
+        if amt > 0:
+            cost_bases[row["symbol"]] = _cost_basis_for(
+                CryptoAsset.objects.filter(
+                    user=request.user, crypto__symbol=row["symbol"]
+                )
+            )
+
+    active_alerts = (
+        PriceAlert.objects.filter(user=request.user)
+        .select_related("stock", "crypto")
+        .order_by("-created_at")
+    )
 
     return render(
         request,
         "accounts/dashboard.html",
         {
-            "stock_prices": load_live_prices(Stock),
-            "crypto_prices": load_live_prices(Crypto),
             "holdings_json": json.dumps(holdings),
             "allocation_json": json.dumps(allocation),
+            "cost_bases_json": json.dumps(cost_bases),
+            "active_alerts": active_alerts,
         },
     )
 
@@ -146,6 +179,21 @@ def edit_profile_view(request):
         request,
         "accounts/edit_profile.html",
         {"profile_form": profile_form, "password_form": password_form},
+    )
+
+
+@login_required
+def market_view(request):
+    from assets.models import Crypto, Stock
+    from assets.services import load_live_prices
+
+    return render(
+        request,
+        "accounts/market.html",
+        {
+            "stock_prices": load_live_prices(Stock),
+            "crypto_prices": load_live_prices(Crypto),
+        },
     )
 
 
