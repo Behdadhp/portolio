@@ -31,7 +31,14 @@ class StockAssetAdmin(admin.ModelAdmin):
 
 @admin.register(PriceAlert)
 class PriceAlertAdmin(admin.ModelAdmin):
-    list_display = ("user", "symbol", "target_price", "direction", "email_sent", "created_at")
+    list_display = (
+        "user",
+        "symbol",
+        "target_price",
+        "direction",
+        "email_sent",
+        "created_at",
+    )
     list_filter = ("direction", "email_sent")
     search_fields = ("user__email", "stock__symbol", "crypto__symbol")
     readonly_fields = ("created_at",)

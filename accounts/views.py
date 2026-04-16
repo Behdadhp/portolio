@@ -112,7 +112,9 @@ def dashboard_view(request):
         )
         if amt > 0:
             cost_bases[row["symbol"]] = _cost_basis_for(
-                StockAsset.objects.filter(user=request.user, stock__symbol=row["symbol"])
+                StockAsset.objects.filter(
+                    user=request.user, stock__symbol=row["symbol"]
+                )
             )
 
     for row in crypto_summary:

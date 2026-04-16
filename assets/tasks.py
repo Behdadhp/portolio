@@ -168,7 +168,9 @@ def _send_alert_email(alert, current_price):
             html_message=html_body,
             fail_silently=False,
         )
-        logger.info("Alert email sent to %s for %s @ $%.2f", user.email, symbol, current_price)
+        logger.info(
+            "Alert email sent to %s for %s @ $%.2f", user.email, symbol, current_price
+        )
     except Exception as e:
         logger.error("Failed to send alert email for alert %s: %s", alert.id, e)
 
@@ -187,22 +189,31 @@ def _check_price_alerts(short, price):
     for alert in alerts_for_symbol:
         target = alert["target_price"]
         direction = alert["direction"]
-        if (direction == "above" and price >= target) or \
-           (direction == "below" and price <= target):
+        if (direction == "above" and price >= target) or (
+            direction == "below" and price <= target
+        ):
             triggered_ids.append(alert["id"])
             logger.info(
                 "ALERT TRIGGERED: %s %s $%.2f (actual: $%.2f) for user %s",
-                short, direction, target, price, alert["user_id"],
+                short,
+                direction,
+                target,
+                price,
+                alert["user_id"],
             )
 
     if triggered_ids:
         # Mark as triggered in the DB
         from assets.models import PriceAlert
+
         triggered_alerts = list(
-            PriceAlert.objects.filter(id__in=triggered_ids, email_sent=False)
-            .select_related("user", "stock", "crypto")
+            PriceAlert.objects.filter(
+                id__in=triggered_ids, email_sent=False
+            ).select_related("user", "stock", "crypto")
         )
-        PriceAlert.objects.filter(id__in=triggered_ids, email_sent=False).update(email_sent=True)
+        PriceAlert.objects.filter(id__in=triggered_ids, email_sent=False).update(
+            email_sent=True
+        )
 
         # Send emails in background threads (don't block price processing)
         for alert in triggered_alerts:
@@ -217,16 +228,21 @@ def _check_price_alerts(short, price):
 def _rebuild_alert_cache():
     """Rebuild the Redis alert cache from the DB."""
     from assets.models import PriceAlert
-    alerts = PriceAlert.objects.filter(email_sent=False).select_related("stock", "crypto")
+
+    alerts = PriceAlert.objects.filter(email_sent=False).select_related(
+        "stock", "crypto"
+    )
     alert_data = {}
     for a in alerts:
         sym = a.symbol
-        alert_data.setdefault(sym, []).append({
-            "id": str(a.id),
-            "user_id": str(a.user_id),
-            "target_price": float(a.target_price),
-            "direction": a.direction,
-        })
+        alert_data.setdefault(sym, []).append(
+            {
+                "id": str(a.id),
+                "user_id": str(a.user_id),
+                "target_price": float(a.target_price),
+                "direction": a.direction,
+            }
+        )
     cache.set("price_alerts_active", alert_data, timeout=None)
 
 
