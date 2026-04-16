@@ -199,11 +199,11 @@ def compute_analytics(transactions, symbol):
         analytics["sell_10"] = round(avg_price * 1.10, 2)
         analytics["sell_25"] = round(avg_price * 1.25, 2)
 
-        # Price to buy 1 unit to decrease average by 10%
-        # New avg = (cost_basis + buy_price) / (units + 1) = avg_price * 0.9
-        # buy_price = avg_price * 0.9 * (units + 1) - cost_basis
+        # Price to buy <units> more to decrease average by 10%
+        # New avg = (cost_basis + units * buy_price) / (units * 2) = avg_price * 0.9
+        # buy_price = (avg_price * 0.9 * units * 2 - cost_basis) / units
         target_avg = avg_price * 0.90
-        buy_price_for_minus_10 = target_avg * (units + 1) - cost_basis
+        buy_price_for_minus_10 = (target_avg * (units * 2) - cost_basis) / units
         analytics["buy_avg_minus_10"] = (
             round(buy_price_for_minus_10, 2) if buy_price_for_minus_10 > 0 else 0.0
         )
