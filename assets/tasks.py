@@ -134,6 +134,45 @@ def _market_cap_loop():
         time.sleep(settings.MARKET_CAP_REFRESH)
 
 
+def _send_alert_email(alert, current_price):
+    """Send price alert email to the user. Runs in a thread to avoid blocking price ticks."""
+    try:
+        from django.core.mail import send_mail
+        from django.template.loader import render_to_string
+
+        user = alert.user
+        is_stock = alert.stock_id is not None
+        symbol = alert.symbol
+        asset_type_path = "stocks" if is_stock else "crypto"
+        detail_url = f"{settings.SITE_URL}/{asset_type_path}/{symbol}/"
+
+        context = {
+            "first_name": user.first_name,
+            "asset_name": alert.asset_name,
+            "symbol": symbol,
+            "target_price": f"{alert.target_price:,.2f}",
+            "current_price": f"{current_price:,.2f}",
+            "direction": alert.direction,
+            "detail_url": detail_url,
+        }
+
+        subject = f"Price Alert: {symbol} {'above' if alert.direction == 'above' else 'below'} ${alert.target_price:,.2f}"
+        html_body = render_to_string("emails/price_alert.html", context)
+        text_body = render_to_string("emails/price_alert.txt", context)
+
+        send_mail(
+            subject=subject,
+            message=text_body,
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            recipient_list=[user.email],
+            html_message=html_body,
+            fail_silently=False,
+        )
+        logger.info("Alert email sent to %s for %s @ $%.2f", user.email, symbol, current_price)
+    except Exception as e:
+        logger.error("Failed to send alert email for alert %s: %s", alert.id, e)
+
+
 def _check_price_alerts(short, price):
     """Check if any active price alerts should trigger for this symbol/price."""
     alert_data = cache.get("price_alerts_active")
@@ -159,7 +198,17 @@ def _check_price_alerts(short, price):
     if triggered_ids:
         # Mark as triggered in the DB
         from assets.models import PriceAlert
+        triggered_alerts = list(
+            PriceAlert.objects.filter(id__in=triggered_ids, email_sent=False)
+            .select_related("user", "stock", "crypto")
+        )
         PriceAlert.objects.filter(id__in=triggered_ids, email_sent=False).update(email_sent=True)
+
+        # Send emails in background threads (don't block price processing)
+        for alert in triggered_alerts:
+            threading.Thread(
+                target=_send_alert_email, args=(alert, price), daemon=True
+            ).start()
 
         # Rebuild cache to remove triggered alerts
         _rebuild_alert_cache()
