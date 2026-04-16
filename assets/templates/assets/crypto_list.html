@@ -70,7 +70,7 @@
                         </span>
                     </td>
                     <td class="text-end {% if crypto.total >= 0 %}text-success{% else %}text-danger{% endif %}">
-                        {{ crypto.total|floatformat:2 }}
+                        {{ crypto.total|floatformat:6 }}
                     </td>
                     <td class="text-end" style="font-family:'SF Mono','Fira Code',monospace;font-size:0.9rem;">
                         {% if crypto.price != None %}{{ crypto.price|floatformat:2 }}{% else %}<span class="text-muted">—</span>{% endif %}

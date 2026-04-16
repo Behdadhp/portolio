@@ -5,7 +5,7 @@
          style="cursor: pointer;">
         <h5 class="mb-0 me-2">Analytics</h5>
         <svg id="analyticsChevron" xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="currentColor"
-             class="text-muted transition-transform" viewBox="0 0 16 16" style="transition: transform 0.3s;">
+             class="text-muted" viewBox="0 0 16 16" style="transition: transform 0.3s;">
             <path fill-rule="evenodd" d="M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z"/>
         </svg>
         {% if eur_usd_rate %}
@@ -24,222 +24,163 @@
         </div>
 
         {% if analytics.warning %}
-        <div style="background:rgba(251,191,36,0.08);border:1px solid rgba(251,191,36,0.25);border-radius:12px;padding:1rem 1.25rem;margin-bottom:1rem;">
-            <div class="d-flex align-items-start gap-2">
-                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="#fbbf24" viewBox="0 0 16 16" style="flex-shrink:0;margin-top:2px;">
-                    <path d="M8.982 1.566a1.13 1.13 0 0 0-1.96 0L.165 13.233c-.457.778.091 1.767.98 1.767h13.713c.889 0 1.438-.99.98-1.767zM8 5c.535 0 .954.462.9.995l-.35 3.507a.552.552 0 0 1-1.1 0L7.1 5.995A.905.905 0 0 1 8 5m.002 6a1 1 0 1 1 0 2 1 1 0 0 1 0-2"/>
-                </svg>
-                <div>
-                    <div class="fw-semibold" style="color:#fbbf24;font-size:0.9rem;">
-                        {% if analytics.warning == "sold_more_than_bought" %}
-                        You've sold more units than you bought
-                        {% else %}
-                        No current holdings
-                        {% endif %}
+        <!-- Warning state -->
+        <div class="an-alert">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="#fbbf24" viewBox="0 0 16 16" style="flex-shrink:0;margin-top:2px;">
+                <path d="M8.982 1.566a1.13 1.13 0 0 0-1.96 0L.165 13.233c-.457.778.091 1.767.98 1.767h13.713c.889 0 1.438-.99.98-1.767zM8 5c.535 0 .954.462.9.995l-.35 3.507a.552.552 0 0 1-1.1 0L7.1 5.995A.905.905 0 0 1 8 5m.002 6a1 1 0 1 1 0 2 1 1 0 0 1 0-2"/>
+            </svg>
+            <div>
+                <div class="fw-semibold" style="color:#fbbf24;font-size:0.88rem;">
+                    {% if analytics.warning == "sold_more_than_bought" %}You've sold more units than you bought{% else %}No current holdings{% endif %}
+                </div>
+                <div style="color:var(--text-secondary);font-size:0.8rem;margin-top:2px;">
+                    {% if analytics.warning == "sold_more_than_bought" %}
+                    Your sell transactions exceed buys by {{ analytics.units|floatformat:6 }} units. This may indicate missing buy records.
+                    {% else %}
+                    All units have been sold. Add a buy transaction to see full analytics.
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        <div class="an-grid an-grid-2">
+            <div class="an-stat"><div class="an-stat-label">Holdings</div><div class="an-stat-value text-danger">{{ analytics.units|floatformat:6 }}</div></div>
+            <div class="an-stat"><div class="an-stat-label">Total Invested</div><div class="an-stat-value" data-fmt-number="$">{{ analytics.total_invested|floatformat:2 }}</div></div>
+            <div class="an-stat"><div class="an-stat-label">Total Sold Value</div><div class="an-stat-value" data-fmt-number="$">{{ analytics.total_sold_value|floatformat:2 }}</div></div>
+            <div class="an-stat"><div class="an-stat-label">Realized P&L</div><div class="an-stat-value {% if analytics.realized_pnl >= 0 %}text-success{% else %}text-danger{% endif %}" data-fmt-number="$">{{ analytics.realized_pnl|floatformat:2 }}</div></div>
+        </div>
+
+        {% else %}
+        <!-- Full analytics -->
+
+        <!-- Stat cards row -->
+        <div class="an-grid">
+            <div class="an-stat">
+                <div class="an-stat-label">Avg. Cost</div>
+                <div class="an-stat-value" data-fmt-number="$">{{ analytics.avg_price|floatformat:2 }}</div>
+            </div>
+            <div class="an-stat">
+                <div class="an-stat-label">Holdings</div>
+                <div class="an-stat-value">{{ analytics.units|floatformat:6 }}</div>
+            </div>
+            <div class="an-stat">
+                <div class="an-stat-label">Cost Basis</div>
+                <div class="an-stat-value" data-fmt-number="$">{{ analytics.cost_basis|floatformat:2 }}</div>
+            </div>
+            <div class="an-stat">
+                <div class="an-stat-label">Total Invested</div>
+                <div class="an-stat-value" data-fmt-number="$">{{ analytics.total_invested|floatformat:2 }}</div>
+            </div>
+            {% if analytics.current_price != None %}
+            <div class="an-stat">
+                <div class="an-stat-label">Current Price</div>
+                <div class="an-stat-value" data-fmt-number="$">{{ analytics.current_price|floatformat:2 }}</div>
+            </div>
+            <div class="an-stat">
+                <div class="an-stat-label">Current Value</div>
+                <div class="an-stat-value" data-fmt-number="$">{{ analytics.current_value|floatformat:2 }}</div>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- P&L row -->
+        <div class="an-pnl-row">
+            {% if analytics.current_price != None %}
+            <div class="an-pnl-card {% if analytics.unrealized_pnl >= 0 %}an-pnl-up{% else %}an-pnl-down{% endif %}">
+                <div class="an-pnl-label">Unrealized P&L</div>
+                <div class="an-pnl-value" data-fmt-pnl="${{ analytics.unrealized_pnl|floatformat:2 }}|{{ analytics.unrealized_pnl_pct|floatformat:2 }}">
+                    ${{ analytics.unrealized_pnl|floatformat:2 }}
+                    <small>({{ analytics.unrealized_pnl_pct|floatformat:2 }}%)</small>
+                </div>
+                <div class="an-pnl-hint">If you sold everything now</div>
+            </div>
+            {% endif %}
+            <div class="an-pnl-card {% if analytics.realized_pnl >= 0 %}an-pnl-up{% else %}an-pnl-down{% endif %}">
+                <div class="an-pnl-label">Realized P&L</div>
+                <div class="an-pnl-value" data-fmt-number="$">{{ analytics.realized_pnl|floatformat:2 }}</div>
+                <div class="an-pnl-hint">Locked in from previous sales</div>
+            </div>
+        </div>
+
+        <!-- Targets + Simulators -->
+        {% if analytics.sell_5 != None %}
+        <div class="an-section" id="targetsTable"
+             data-symbol="{{ asset_symbol }}"
+             data-cost-basis="{{ analytics.cost_basis }}"
+             data-units="{{ analytics.units }}"
+             data-avg-price="{{ analytics.avg_price }}">
+            <h6 class="an-section-title">Targets</h6>
+
+            <!-- Preset targets -->
+            <div class="an-targets">
+                <div class="an-target-row an-target-sell" data-target-price="{{ analytics.sell_5 }}" data-target-dir="above">
+                    <span class="an-target-label">Sell @ +5%</span>
+                    <span class="an-target-price" data-fmt-number="$">{{ analytics.sell_5|floatformat:2 }}</span>
+                    <span class="an-target-bell"></span>
+                </div>
+                <div class="an-target-row an-target-sell" data-target-price="{{ analytics.sell_10 }}" data-target-dir="above">
+                    <span class="an-target-label">Sell @ +10%</span>
+                    <span class="an-target-price" data-fmt-number="$">{{ analytics.sell_10|floatformat:2 }}</span>
+                    <span class="an-target-bell"></span>
+                </div>
+                <div class="an-target-row an-target-sell" data-target-price="{{ analytics.sell_25 }}" data-target-dir="above">
+                    <span class="an-target-label">Sell @ +25%</span>
+                    <span class="an-target-price" data-fmt-number="$">{{ analytics.sell_25|floatformat:2 }}</span>
+                    <span class="an-target-bell"></span>
+                </div>
+                <div class="an-target-row an-target-buy" data-target-price="{{ analytics.buy_avg_minus_10 }}" data-target-dir="below">
+                    <span class="an-target-label">Lower avg by 10%<span class="an-target-hint">Buy {{ analytics.units|floatformat:6 }} more</span></span>
+                    <span class="an-target-price" data-fmt-number="$">{{ analytics.buy_avg_minus_10|floatformat:2 }}</span>
+                    <span class="an-target-bell"></span>
+                </div>
+            </div>
+
+            <!-- Simulators -->
+            <h6 class="an-section-title" style="margin-top:1.25rem;">Simulator</h6>
+            <div class="an-sim-grid">
+                <!-- Custom sell -->
+                <div class="an-sim-card">
+                    <div class="an-sim-label">Sell @ custom %</div>
+                    <div class="an-sim-row">
+                        <div class="input-group input-group-sm an-sim-input">
+                            <span class="input-group-text">+</span>
+                            <input type="number" id="customSellPct" class="form-control" placeholder="%" step="any" min="0">
+                            <span class="input-group-text">%</span>
+                        </div>
+                        <span class="an-sim-result" id="customSellResult">—</span>
+                        <span class="an-sim-bell" id="customSellAlert"></span>
                     </div>
-                    <div style="color:var(--text-secondary);font-size:0.82rem;margin-top:2px;">
-                        {% if analytics.warning == "sold_more_than_bought" %}
-                        Your sell transactions exceed your buy transactions by {{ analytics.units|floatformat:6 }} units. This may indicate missing buy records. Analytics below are limited.
-                        {% else %}
-                        All units have been sold. Add a buy transaction to see full analytics.
-                        {% endif %}
+                </div>
+
+                <!-- Buy $X to lower avg -->
+                <div class="an-sim-card">
+                    <div class="an-sim-label">Lower avg by investing a dollar amount</div>
+                    <div class="an-sim-row an-sim-row-multi">
+                        <div class="input-group input-group-sm an-sim-input">
+                            <span class="input-group-text">$</span>
+                            <input type="number" id="simBuyDollar" class="form-control" placeholder="Amount" step="any" min="0">
+                        </div>
+                        <div class="input-group input-group-sm an-sim-input">
+                            <span class="input-group-text">-</span>
+                            <input type="number" id="simBuyDollarPct" class="form-control" placeholder="%" step="any" min="0" max="100">
+                            <span class="input-group-text">%</span>
+                        </div>
+                        <span class="an-sim-result" id="simBuyDollarResult">—</span>
+                        <span class="an-sim-bell" id="simBuyDollarAlert"></span>
                     </div>
                 </div>
             </div>
         </div>
+        {% endif %}
 
-        <div class="row g-4">
-            <div class="col-md-6">
-                <table class="table table-sm table-borderless mb-0">
-                    <tbody>
-                        <tr>
-                            <td class="text-muted">Holdings</td>
-                            <td class="text-end fw-semibold text-danger">{{ analytics.units|floatformat:6 }}</td>
-                        </tr>
-                        <tr>
-                            <td class="text-muted">Total Invested</td>
-                            <td class="text-end fw-semibold" data-fmt-number="$">{{ analytics.total_invested|floatformat:2 }}</td>
-                        </tr>
-                        <tr>
-                            <td class="text-muted">Total Sold Value</td>
-                            <td class="text-end fw-semibold" data-fmt-number="$">{{ analytics.total_sold_value|floatformat:2 }}</td>
-                        </tr>
-                        <tr>
-                            <td class="text-muted">Realized P&L</td>
-                            <td class="text-end fw-semibold {% if analytics.realized_pnl >= 0 %}text-success{% else %}text-danger{% endif %}" data-fmt-number="$">{{ analytics.realized_pnl|floatformat:2 }}</td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-        </div>
-
-        {% else %}
-        <div class="row g-4">
-
-            <!-- Position Overview -->
-            <div class="col-md-6 col-lg-4">
-                <h6 class="text-muted text-uppercase small fw-bold mb-3">Position Overview</h6>
-                <table class="table table-sm table-borderless mb-0">
-                    <tbody>
-                        <tr>
-                            <td class="text-muted">Avg. Cost</td>
-                            <td class="text-end fw-semibold" data-fmt-number="$">{{ analytics.avg_price|floatformat:2 }}</td>
-                        </tr>
-                        <tr>
-                            <td class="text-muted">Holdings</td>
-                            <td class="text-end fw-semibold">{{ analytics.units|floatformat:6 }}</td>
-                        </tr>
-                        <tr>
-                            <td class="text-muted">Cost Basis
-                                <div class="text-muted small fst-italic" style="font-size:.7rem;">Total cost of your remaining holdings</div>
-                            </td>
-                            <td class="text-end fw-semibold" data-fmt-number="$">{{ analytics.cost_basis|floatformat:2 }}</td>
-                        </tr>
-                        <tr>
-                            <td class="text-muted">Total Invested</td>
-                            <td class="text-end fw-semibold" data-fmt-number="$">{{ analytics.total_invested|floatformat:2 }}</td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-
-            <!-- Profit / Loss -->
-            <div class="col-md-6 col-lg-4">
-                <h6 class="text-muted text-uppercase small fw-bold mb-3">Profit / Loss</h6>
-                <table class="table table-sm table-borderless mb-0">
-                    <tbody>
-                        {% if analytics.current_price != None %}
-                        <tr>
-                            <td class="text-muted">Current Price</td>
-                            <td class="text-end fw-semibold" data-fmt-number="$">{{ analytics.current_price|floatformat:2 }}</td>
-                        </tr>
-                        <tr>
-                            <td class="text-muted">Current Value</td>
-                            <td class="text-end fw-semibold" data-fmt-number="$">{{ analytics.current_value|floatformat:2 }}</td>
-                        </tr>
-                        <tr>
-                            <td class="text-muted">Unrealized P&L
-                                <div class="text-muted small fst-italic" style="font-size:.7rem;">Profit or loss if you sold everything now</div>
-                            </td>
-                            <td class="text-end fw-semibold {% if analytics.unrealized_pnl >= 0 %}text-success{% else %}text-danger{% endif %}"
-                                data-fmt-pnl="${{ analytics.unrealized_pnl|floatformat:2 }}|{{ analytics.unrealized_pnl_pct|floatformat:2 }}">
-                                ${{ analytics.unrealized_pnl|floatformat:2 }}
-                                <small>({{ analytics.unrealized_pnl_pct|floatformat:2 }}%)</small>
-                            </td>
-                        </tr>
-                        {% else %}
-                        <tr>
-                            <td class="text-muted" colspan="2">
-                                <span class="text-muted fst-italic">Live price unavailable</span>
-                            </td>
-                        </tr>
-                        {% endif %}
-                        <tr>
-                            <td class="text-muted">Realized P&L
-                                <div class="text-muted small fst-italic" style="font-size:.7rem;">Profit or loss already locked in from sales</div>
-                            </td>
-                            <td class="text-end fw-semibold {% if analytics.realized_pnl >= 0 %}text-success{% else %}text-danger{% endif %}"
-                                data-fmt-number="$">{{ analytics.realized_pnl|floatformat:2 }}</td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-
-            <!-- Targets -->
-            <div class="col-md-6 col-lg-4">
-                <h6 class="text-muted text-uppercase small fw-bold mb-3">Targets</h6>
-                <table class="table table-sm table-borderless mb-0" id="targetsTable"
-                       data-symbol="{{ asset_symbol }}"
-                       data-cost-basis="{{ analytics.cost_basis }}"
-                       data-units="{{ analytics.units }}"
-                       data-avg-price="{{ analytics.avg_price }}">
-                    <tbody>
-                        {% if analytics.sell_5 != None %}
-                        <tr data-target-price="{{ analytics.sell_5 }}" data-target-dir="above">
-                            <td class="text-muted">Sell @ +5%</td>
-                            <td class="text-end fw-semibold text-success">
-                                <span data-fmt-number="$">{{ analytics.sell_5|floatformat:2 }}</span>
-                            </td>
-                            <td class="text-end alert-btn-cell"></td>
-                        </tr>
-                        {% endif %}
-                        {% if analytics.sell_10 != None %}
-                        <tr data-target-price="{{ analytics.sell_10 }}" data-target-dir="above">
-                            <td class="text-muted">Sell @ +10%</td>
-                            <td class="text-end fw-semibold text-success">
-                                <span data-fmt-number="$">{{ analytics.sell_10|floatformat:2 }}</span>
-                            </td>
-                            <td class="text-end alert-btn-cell"></td>
-                        </tr>
-                        {% endif %}
-                        {% if analytics.sell_25 != None %}
-                        <tr data-target-price="{{ analytics.sell_25 }}" data-target-dir="above">
-                            <td class="text-muted">Sell @ +25%</td>
-                            <td class="text-end fw-semibold text-success">
-                                <span data-fmt-number="$">{{ analytics.sell_25|floatformat:2 }}</span>
-                            </td>
-                            <td class="text-end alert-btn-cell"></td>
-                        </tr>
-                        {% endif %}
-                        {% if analytics.buy_avg_minus_10 != None %}
-                        <tr data-target-price="{{ analytics.buy_avg_minus_10 }}" data-target-dir="below">
-                            <td class="text-muted">Buy to lower avg by 10%</td>
-                            <td class="text-end fw-semibold text-primary">
-                                <span data-fmt-number="$">{{ analytics.buy_avg_minus_10|floatformat:2 }}</span>
-                            </td>
-                            <td class="text-end alert-btn-cell"></td>
-                        </tr>
-                        {% endif %}
-
-                        <!-- Separator -->
-                        <tr><td colspan="3"><hr class="my-2"></td></tr>
-
-                        <!-- Custom Sell % -->
-                        <tr>
-                            <td class="text-muted" style="vertical-align:middle;">Sell @</td>
-                            <td>
-                                <div class="input-group input-group-sm">
-                                    <span class="input-group-text">+</span>
-                                    <input type="number" id="customSellPct" class="form-control form-control-sm"
-                                           placeholder="%" step="any" min="0" style="max-width:80px;">
-                                    <span class="input-group-text">%</span>
-                                </div>
-                            </td>
-                            <td class="text-end fw-semibold" id="customSellResult" style="vertical-align:middle; white-space:nowrap;">
-                                <span class="text-muted">—</span>
-                            </td>
-                        </tr>
-
-                        <!-- Custom Buy to lower avg % -->
-                        <tr>
-                            <td class="text-muted" style="vertical-align:middle;">Lower avg by</td>
-                            <td>
-                                <div class="input-group input-group-sm">
-                                    <span class="input-group-text">-</span>
-                                    <input type="number" id="customBuyPct" class="form-control form-control-sm"
-                                           placeholder="%" step="any" min="0" max="100" style="max-width:80px;">
-                                    <span class="input-group-text">%</span>
-                                </div>
-                            </td>
-                            <td class="text-end fw-semibold" id="customBuyResult" style="vertical-align:middle; white-space:nowrap;">
-                                <span class="text-muted">—</span>
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-
-        </div>
-
-        <!-- Active Alerts Table -->
-        <div class="mt-4" id="alertsSection">
-            <h6 class="text-muted text-uppercase small fw-bold mb-3">
-                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16" style="margin-right:4px;">
+        <!-- Active Alerts -->
+        <div class="an-section" id="alertsSection">
+            <h6 class="an-section-title">
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16" style="margin-right:4px;vertical-align:-1px;">
                     <path d="M8 16a2 2 0 0 0 2-2H6a2 2 0 0 0 2 2m.995-14.901a1 1 0 1 0-1.99 0A5 5 0 0 0 3 6c0 1.098-.5 6-2 7h14c-1.5-1-2-5.902-2-7 0-2.42-1.72-4.44-4.005-4.901"/>
                 </svg>
                 Price Alerts
             </h6>
-            <div id="alertMsg" style="display:none;font-size:0.8rem;padding:0.5rem 0.75rem;border-radius:8px;margin-bottom:0.75rem;"></div>
+            <div id="alertMsg" class="an-msg" style="display:none;"></div>
             <table class="table table-sm mb-0" id="alertsTable">
                 <thead>
                     <tr>
@@ -287,7 +228,95 @@
 </div>
 
 <style>
-    .alert-btn-cell { width: 42px; vertical-align: middle; }
+    /* ── Analytics layout ── */
+    .an-alert {
+        display: flex; align-items: flex-start; gap: 0.6rem;
+        background: rgba(251,191,36,0.06); border: 1px solid rgba(251,191,36,0.2);
+        border-radius: 10px; padding: 0.85rem 1rem; margin-bottom: 1.25rem;
+    }
+    .an-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+        gap: 0.75rem;
+        margin-bottom: 1.25rem;
+    }
+    .an-grid-2 { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); }
+    .an-stat {
+        background: rgba(255,255,255,0.02);
+        border: 1px solid var(--border-color);
+        border-radius: 10px;
+        padding: 0.75rem 0.9rem;
+    }
+    .an-stat-label {
+        font-size: 0.7rem; font-weight: 600; text-transform: uppercase;
+        letter-spacing: 0.4px; color: var(--text-muted); margin-bottom: 4px;
+    }
+    .an-stat-value {
+        font-size: 1rem; font-weight: 700;
+        font-family: 'SF Mono', 'Fira Code', monospace;
+    }
+
+    /* P&L cards */
+    .an-pnl-row { display: flex; gap: 0.75rem; margin-bottom: 1.25rem; flex-wrap: wrap; }
+    .an-pnl-card {
+        flex: 1; min-width: 180px;
+        border-radius: 10px; padding: 0.85rem 1rem;
+    }
+    .an-pnl-up { background: rgba(52,211,153,0.06); border: 1px solid rgba(52,211,153,0.15); }
+    .an-pnl-down { background: rgba(248,113,113,0.06); border: 1px solid rgba(248,113,113,0.15); }
+    .an-pnl-label { font-size: 0.72rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.4px; color: var(--text-muted); }
+    .an-pnl-value { font-size: 1.1rem; font-weight: 700; font-family: 'SF Mono', 'Fira Code', monospace; margin-top: 2px; }
+    .an-pnl-up .an-pnl-value { color: #34d399; }
+    .an-pnl-down .an-pnl-value { color: #f87171; }
+    .an-pnl-hint { font-size: 0.7rem; color: var(--text-muted); margin-top: 2px; }
+
+    /* Sections */
+    .an-section { margin-top: 1.25rem; }
+    .an-section-title {
+        font-size: 0.72rem; font-weight: 700; text-transform: uppercase;
+        letter-spacing: 0.6px; color: var(--text-muted); margin-bottom: 0.75rem;
+    }
+
+    /* Targets */
+    .an-targets { display: flex; flex-direction: column; gap: 0.4rem; }
+    .an-target-row {
+        display: flex; align-items: center; gap: 0.75rem;
+        padding: 0.5rem 0.75rem; border-radius: 8px;
+        background: rgba(255,255,255,0.02); border: 1px solid var(--border-color);
+    }
+    .an-target-label { flex: 1; font-size: 0.82rem; color: var(--text-secondary); }
+    .an-target-hint {
+        display: block; font-size: 0.68rem; color: var(--text-muted); font-style: italic; font-weight: 400;
+    }
+    .an-target-price {
+        font-family: 'SF Mono', 'Fira Code', monospace;
+        font-size: 0.88rem; font-weight: 700; white-space: nowrap;
+    }
+    .an-target-sell .an-target-price { color: #34d399; }
+    .an-target-buy .an-target-price { color: #818cf8; }
+    .an-target-bell { width: 32px; display: flex; justify-content: center; }
+
+    /* Simulators */
+    .an-sim-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
+    .an-sim-card-wide { grid-column: 1 / -1; }
+    .an-sim-card {
+        background: rgba(255,255,255,0.02); border: 1px solid var(--border-color);
+        border-radius: 10px; padding: 0.75rem 0.9rem;
+    }
+    .an-sim-label { font-size: 0.75rem; font-weight: 600; color: var(--text-muted); margin-bottom: 0.5rem; }
+    .an-sim-row { display: flex; align-items: center; gap: 0.5rem; }
+    .an-sim-row-multi { flex-wrap: wrap; }
+    .an-sim-input { max-width: 160px; flex-shrink: 0; }
+    .an-sim-result {
+        font-family: 'SF Mono', 'Fira Code', monospace;
+        font-size: 0.88rem; font-weight: 700; white-space: nowrap; color: var(--text-muted);
+    }
+    .an-sim-bell { width: 32px; display: flex; justify-content: center; flex-shrink: 0; }
+
+    /* Alert message */
+    .an-msg { font-size: 0.8rem; padding: 0.5rem 0.75rem; border-radius: 8px; margin-bottom: 0.75rem; }
+
+    /* Bell button */
     .btn-alert-toggle {
         border: none; background: none; padding: 4px 6px;
         border-radius: 6px; cursor: pointer; line-height: 1;
@@ -295,6 +324,8 @@
     }
     .btn-alert-toggle:hover { background-color: rgba(255,255,255,0.06); }
     .btn-alert-toggle svg { display: block; }
+
+    /* Alerts table */
     #alertsTable th { border-bottom-color: var(--border-color); }
     #alertsTable td { border-bottom-color: var(--border-color); vertical-align: middle; }
     .alert-edit-modal {
@@ -307,231 +338,227 @@
         border-radius: 14px; padding: 1.5rem; width: 320px;
         box-shadow: 0 16px 48px rgba(0,0,0,0.4);
     }
+
+    @media (max-width: 576px) {
+        .an-sim-grid { grid-template-columns: 1fr; }
+        .an-sim-row-multi { gap: 0.4rem; }
+    }
 </style>
 
 <script>
-    document.addEventListener("DOMContentLoaded", function () {
-        /* ── Chevron toggle ── */
-        const chevron = document.getElementById("analyticsChevron");
-        const collapse = document.getElementById("analyticsBody");
-        const header = document.getElementById("analyticsHeader");
-        const bsCollapse = new bootstrap.Collapse(collapse, { toggle: false });
-
-        header.addEventListener("click", function (e) {
-            if (e.target.closest(".currency-display-toggle")) return;
-            bsCollapse.toggle();
-        });
-        collapse.addEventListener("show.bs.collapse", function () { chevron.style.transform = "rotate(180deg)"; });
-        collapse.addEventListener("hide.bs.collapse", function () { chevron.style.transform = "rotate(0deg)"; });
-
-        /* ── Number formatting ── */
-        function fmtUSD(val) {
-            return val.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-        }
-
-        document.querySelectorAll("[data-fmt-number]").forEach(function (el) {
-            const raw = el.textContent.replace(/[^0-9.\-]/g, "");
-            const val = parseFloat(raw);
-            if (!isNaN(val)) el.textContent = (el.dataset.fmtNumber || "") + fmtUSD(val);
-        });
-
-        document.querySelectorAll("[data-fmt-pnl]").forEach(function (el) {
-            const parts = el.dataset.fmtPnl.split("|");
-            const pnlRaw = parseFloat(parts[0].replace(/[^0-9.\-]/g, ""));
-            const pctRaw = parseFloat(parts[1]);
-            if (!isNaN(pnlRaw) && !isNaN(pctRaw))
-                el.innerHTML = "$" + fmtUSD(pnlRaw) + ' <small>(' + fmtUSD(pctRaw) + '%)</small>';
-        });
-
-        /* ── Alert system (DB-backed) ── */
-        const table = document.getElementById("targetsTable");
-        if (!table) return;
-        const symbol = table.dataset.symbol;
-        const csrfToken = document.querySelector("[name=csrfmiddlewaretoken]")?.value
-            || "{{ csrf_token }}";
-        const alertsBody = document.getElementById("alertsBody");
-        const alertMsg = document.getElementById("alertMsg");
-
-        function showMsg(text, type) {
-            alertMsg.textContent = text;
-            alertMsg.style.display = "block";
-            alertMsg.style.background = type === "error" ? "rgba(248,113,113,0.1)" : "rgba(52,211,153,0.1)";
-            alertMsg.style.color = type === "error" ? "#f87171" : "#34d399";
-            alertMsg.style.border = type === "error" ? "1px solid rgba(248,113,113,0.2)" : "1px solid rgba(52,211,153,0.2)";
-            setTimeout(function () { alertMsg.style.display = "none"; }, 5000);
-        }
-
-        function apiCall(url, method, body) {
-            return fetch(url, {
-                method: method,
-                headers: { "Content-Type": "application/json", "X-CSRFToken": csrfToken },
-                body: body ? JSON.stringify(body) : undefined,
-            }).then(function (r) { return r.json().then(function (d) { return { status: r.status, data: d }; }); });
-        }
-
-        function addAlertRow(alert) {
-            const empty = document.getElementById("alertsEmpty");
-            if (empty) empty.remove();
-
-            const tr = document.createElement("tr");
-            tr.dataset.alertId = alert.id;
-            const dirLabel = alert.direction === "above" ? "Above (Sell)" : "Below (Buy)";
-            const dirClass = alert.direction === "above" ? "bg-success" : "bg-primary";
-            const statusBadge = alert.email_sent
-                ? '<span class="badge" style="background:rgba(251,191,36,0.15);color:#fbbf24;font-size:0.7rem;">Triggered</span>'
-                : '<span class="badge" style="background:rgba(52,211,153,0.15);color:#34d399;font-size:0.7rem;">Active</span>';
-            const actions = alert.email_sent
-                ? '<button class="btn btn-ghost btn-sm py-0 px-1 alert-delete-btn" style="font-size:0.75rem;color:#f87171;">Delete</button>'
-                : '<button class="btn btn-ghost btn-sm py-0 px-1 alert-edit-btn" style="font-size:0.75rem;">Edit</button>'
-                + '<button class="btn btn-ghost btn-sm py-0 px-1 alert-delete-btn" style="font-size:0.75rem;color:#f87171;">Delete</button>';
-
-            tr.innerHTML =
-                '<td class="fw-semibold" style="font-family:\'SF Mono\',\'Fira Code\',monospace;font-size:0.85rem;">$' + fmtUSD(alert.target_price) + '</td>'
-                + '<td><span class="badge ' + dirClass + '" style="font-size:0.7rem;">' + dirLabel + '</span></td>'
-                + '<td>' + statusBadge + '</td>'
-                + '<td class="text-end">' + actions + '</td>';
-            alertsBody.appendChild(tr);
-            bindRowActions(tr);
-        }
-
-        function createAlert(price, direction, updateId) {
-            var url = updateId
-                ? "/api/alerts/" + updateId + "/update/"
-                : "/api/alerts/create/";
-            var body = updateId
-                ? { target_price: price, direction: direction }
-                : { symbol: symbol, target_price: price, direction: direction };
-
-            apiCall(url, "POST", body).then(function (res) {
-                if (res.status === 409) {
-                    showMsg(res.data.message + " Use the edit button below to update it.", "error");
-                    return;
-                }
-                if (res.status >= 400) {
-                    showMsg(res.data.error || "Failed to create alert", "error");
-                    return;
-                }
-                if (updateId) {
-                    var row = alertsBody.querySelector('[data-alert-id="' + updateId + '"]');
-                    if (row) row.remove();
-                }
-                addAlertRow(res.data);
-                showMsg("Alert " + (updateId ? "updated" : "created") + " at $" + fmtUSD(price), "success");
-            });
-        }
-
-        function deleteAlert(id, row) {
-            apiCall("/api/alerts/" + id + "/delete/", "POST").then(function (res) {
-                if (res.data.deleted) {
-                    row.remove();
-                    if (!alertsBody.querySelector("tr[data-alert-id]")) {
-                        alertsBody.innerHTML = '<tr id="alertsEmpty"><td colspan="4" class="text-muted text-center py-2" style="font-size:0.8rem;">No active alerts.</td></tr>';
-                    }
-                    showMsg("Alert deleted", "success");
-                }
-            });
-        }
-
-        function showEditModal(alertId, currentPrice, currentDir) {
-            var overlay = document.createElement("div");
-            overlay.className = "alert-edit-modal";
-            overlay.innerHTML =
-                '<div class="modal-box">'
-                + '<h6 class="mb-3 fw-bold">Edit Alert</h6>'
-                + '<div class="mb-2"><label class="form-label small">Target Price ($)</label>'
-                + '<input type="number" class="form-control form-control-sm" id="editAlertPrice" step="0.01" value="' + currentPrice + '"></div>'
-                + '<div class="mb-3"><label class="form-label small">Direction</label>'
-                + '<select class="form-control form-control-sm" id="editAlertDir">'
-                + '<option value="above"' + (currentDir === "above" ? " selected" : "") + '>Above (Sell)</option>'
-                + '<option value="below"' + (currentDir === "below" ? " selected" : "") + '>Below (Buy)</option>'
-                + '</select></div>'
-                + '<div class="d-flex gap-2">'
-                + '<button class="btn btn-accent btn-sm flex-fill" id="editAlertSave">Save</button>'
-                + '<button class="btn btn-ghost btn-sm flex-fill" id="editAlertCancel">Cancel</button>'
-                + '</div></div>';
-            document.body.appendChild(overlay);
-
-            overlay.querySelector("#editAlertCancel").addEventListener("click", function () { overlay.remove(); });
-            overlay.addEventListener("click", function (e) { if (e.target === overlay) overlay.remove(); });
-            overlay.querySelector("#editAlertSave").addEventListener("click", function () {
-                var newPrice = parseFloat(document.getElementById("editAlertPrice").value);
-                var newDir = document.getElementById("editAlertDir").value;
-                if (isNaN(newPrice) || newPrice <= 0) return;
-                createAlert(newPrice, newDir, alertId);
-                overlay.remove();
-            });
-        }
-
-        function bindRowActions(row) {
-            var id = row.dataset.alertId;
-            var editBtn = row.querySelector(".alert-edit-btn");
-            var deleteBtn = row.querySelector(".alert-delete-btn");
-
-            if (editBtn) {
-                editBtn.addEventListener("click", function () {
-                    var price = parseFloat(row.querySelector("td").textContent.replace(/[^0-9.\-]/g, ""));
-                    var dir = row.querySelector(".bg-success") ? "above" : "below";
-                    showEditModal(id, price, dir);
-                });
-            }
-            if (deleteBtn) {
-                deleteBtn.addEventListener("click", function () { deleteAlert(id, row); });
-            }
-        }
-
-        /* Bind actions on server-rendered rows */
-        alertsBody.querySelectorAll("tr[data-alert-id]").forEach(bindRowActions);
-
-        /* Bell buttons on target rows */
-        var bellSVG = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="#64748b" viewBox="0 0 16 16">'
-            + '<path d="M8 16a2 2 0 0 0 2-2H6a2 2 0 0 0 2 2M8 1.918l-.797.161A4 4 0 0 0 4 6c0 .628-.134 2.197-.459 3.742-.16.767-.376 1.566-.663 2.258h10.244c-.287-.692-.502-1.49-.663-2.258C12.134 8.197 12 6.628 12 6a4 4 0 0 0-3.203-3.92zM14.22 12c.223.447.481.801.78 1H1c.299-.199.557-.553.78-1C2.68 10.2 3 6.88 3 6c0-2.42 1.72-4.44 4.005-4.901a1 1 0 1 1 1.99 0A5 5 0 0 1 13 6c0 .88.32 4.2 1.22 6"/>'
-            + '</svg>';
-
-        table.querySelectorAll("tr[data-target-price]").forEach(function (row) {
-            var price = parseFloat(row.dataset.targetPrice);
-            var direction = row.dataset.targetDir;
-            var cell = row.querySelector(".alert-btn-cell");
-            cell.innerHTML = '<button class="btn-alert-toggle" title="Set alert at $' + fmtUSD(price) + '">' + bellSVG + '</button>';
-            cell.querySelector("button").addEventListener("click", function (e) {
-                e.stopPropagation();
-                createAlert(price, direction);
-            });
-        });
-
-        /* ── Custom sell / buy simulators ── */
-        const costBasis = parseFloat(table.dataset.costBasis);
-        const units = parseFloat(table.dataset.units);
-        const avgPrice = parseFloat(table.dataset.avgPrice);
-
-        const sellPctInput = document.getElementById("customSellPct");
-        const sellResult = document.getElementById("customSellResult");
-        const buyPctInput = document.getElementById("customBuyPct");
-        const buyResult = document.getElementById("customBuyResult");
-
-        function updateSell() {
-            const pct = parseFloat(sellPctInput.value);
-            if (isNaN(pct) || pct < 0 || isNaN(avgPrice) || avgPrice <= 0) {
-                sellResult.innerHTML = '<span class="text-muted">\u2014</span>'; return;
-            }
-            const sellPrice = avgPrice * (1 + pct / 100);
-            sellResult.innerHTML = '<span class="text-success">$' + fmtUSD(sellPrice) + '</span>';
-        }
-
-        function updateBuy() {
-            const pct = parseFloat(buyPctInput.value);
-            if (isNaN(pct) || pct <= 0 || pct >= 100 || isNaN(avgPrice) || avgPrice <= 0) {
-                buyResult.innerHTML = '<span class="text-muted">\u2014</span>'; return;
-            }
-            const targetAvg = avgPrice * (1 - pct / 100);
-            const buyPrice = targetAvg * (units + 1) - costBasis;
-            if (buyPrice <= 0) {
-                buyResult.innerHTML = '<span class="text-muted">Not possible with 1 unit</span>'; return;
-            }
-            buyResult.innerHTML = '<span class="text-primary">$' + fmtUSD(buyPrice) + '</span>';
-        }
-
-        sellPctInput.addEventListener("input", updateSell);
-        buyPctInput.addEventListener("input", updateBuy);
+document.addEventListener("DOMContentLoaded", function () {
+    /* ── Collapse ── */
+    var chevron = document.getElementById("analyticsChevron");
+    var collapse = document.getElementById("analyticsBody");
+    var header = document.getElementById("analyticsHeader");
+    if (!collapse) return;
+    var bsCollapse = new bootstrap.Collapse(collapse, { toggle: false });
+    header.addEventListener("click", function (e) {
+        if (e.target.closest(".currency-display-toggle")) return;
+        bsCollapse.toggle();
     });
+    collapse.addEventListener("show.bs.collapse", function () { chevron.style.transform = "rotate(180deg)"; });
+    collapse.addEventListener("hide.bs.collapse", function () { chevron.style.transform = "rotate(0deg)"; });
+
+    /* ── Formatting ── */
+    function fmtUSD(v) {
+        return v.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+    document.querySelectorAll("[data-fmt-number]").forEach(function (el) {
+        var raw = el.textContent.replace(/[^0-9.\-]/g, "");
+        var val = parseFloat(raw);
+        if (!isNaN(val)) el.textContent = (el.dataset.fmtNumber || "") + fmtUSD(val);
+    });
+    document.querySelectorAll("[data-fmt-pnl]").forEach(function (el) {
+        var parts = el.dataset.fmtPnl.split("|");
+        var pnl = parseFloat(parts[0].replace(/[^0-9.\-]/g, ""));
+        var pct = parseFloat(parts[1]);
+        if (!isNaN(pnl) && !isNaN(pct))
+            el.innerHTML = "$" + fmtUSD(pnl) + ' <small>(' + fmtUSD(pct) + '%)</small>';
+    });
+
+    /* ── Alert system ── */
+    var table = document.getElementById("targetsTable");
+    if (!table) return;
+    var symbol = table.dataset.symbol;
+    var csrfToken = document.querySelector("[name=csrfmiddlewaretoken]")?.value || "{{ csrf_token }}";
+    var alertsBody = document.getElementById("alertsBody");
+    var alertMsg = document.getElementById("alertMsg");
+
+    var bellSVG = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="#64748b" viewBox="0 0 16 16">'
+        + '<path d="M8 16a2 2 0 0 0 2-2H6a2 2 0 0 0 2 2M8 1.918l-.797.161A4 4 0 0 0 4 6c0 .628-.134 2.197-.459 3.742-.16.767-.376 1.566-.663 2.258h10.244c-.287-.692-.502-1.49-.663-2.258C12.134 8.197 12 6.628 12 6a4 4 0 0 0-3.203-3.92zM14.22 12c.223.447.481.801.78 1H1c.299-.199.557-.553.78-1C2.68 10.2 3 6.88 3 6c0-2.42 1.72-4.44 4.005-4.901a1 1 0 1 1 1.99 0A5 5 0 0 1 13 6c0 .88.32 4.2 1.22 6"/>'
+        + '</svg>';
+
+    function showMsg(text, type) {
+        alertMsg.textContent = text;
+        alertMsg.style.display = "block";
+        alertMsg.style.background = type === "error" ? "rgba(248,113,113,0.1)" : "rgba(52,211,153,0.1)";
+        alertMsg.style.color = type === "error" ? "#f87171" : "#34d399";
+        alertMsg.style.border = type === "error" ? "1px solid rgba(248,113,113,0.2)" : "1px solid rgba(52,211,153,0.2)";
+        setTimeout(function () { alertMsg.style.display = "none"; }, 5000);
+    }
+
+    function apiCall(url, method, body) {
+        return fetch(url, {
+            method: method,
+            headers: { "Content-Type": "application/json", "X-CSRFToken": csrfToken },
+            body: body ? JSON.stringify(body) : undefined,
+        }).then(function (r) { return r.json().then(function (d) { return { status: r.status, data: d }; }); });
+    }
+
+    function addAlertRow(alert) {
+        var empty = document.getElementById("alertsEmpty");
+        if (empty) empty.remove();
+        var tr = document.createElement("tr");
+        tr.dataset.alertId = alert.id;
+        var dirLabel = alert.direction === "above" ? "Above (Sell)" : "Below (Buy)";
+        var dirClass = alert.direction === "above" ? "bg-success" : "bg-primary";
+        var statusBadge = alert.email_sent
+            ? '<span class="badge" style="background:rgba(251,191,36,0.15);color:#fbbf24;font-size:0.7rem;">Triggered</span>'
+            : '<span class="badge" style="background:rgba(52,211,153,0.15);color:#34d399;font-size:0.7rem;">Active</span>';
+        var actions = alert.email_sent
+            ? '<button class="btn btn-ghost btn-sm py-0 px-1 alert-delete-btn" style="font-size:0.75rem;color:#f87171;">Delete</button>'
+            : '<button class="btn btn-ghost btn-sm py-0 px-1 alert-edit-btn" style="font-size:0.75rem;">Edit</button>'
+            + '<button class="btn btn-ghost btn-sm py-0 px-1 alert-delete-btn" style="font-size:0.75rem;color:#f87171;">Delete</button>';
+        tr.innerHTML =
+            '<td class="fw-semibold" style="font-family:\'SF Mono\',\'Fira Code\',monospace;font-size:0.85rem;">$' + fmtUSD(alert.target_price) + '</td>'
+            + '<td><span class="badge ' + dirClass + '" style="font-size:0.7rem;">' + dirLabel + '</span></td>'
+            + '<td>' + statusBadge + '</td>'
+            + '<td class="text-end">' + actions + '</td>';
+        alertsBody.appendChild(tr);
+        bindRowActions(tr);
+    }
+
+    function createAlert(price, direction, updateId) {
+        var url = updateId ? "/api/alerts/" + updateId + "/update/" : "/api/alerts/create/";
+        var body = updateId ? { target_price: price, direction: direction } : { symbol: symbol, target_price: price, direction: direction };
+        apiCall(url, "POST", body).then(function (res) {
+            if (res.status === 409) { showMsg(res.data.message + " Use the edit button below.", "error"); return; }
+            if (res.status >= 400) { showMsg(res.data.error || "Failed to create alert", "error"); return; }
+            if (updateId) { var row = alertsBody.querySelector('[data-alert-id="' + updateId + '"]'); if (row) row.remove(); }
+            addAlertRow(res.data);
+            showMsg("Alert " + (updateId ? "updated" : "created") + " at $" + fmtUSD(price), "success");
+        });
+    }
+
+    function deleteAlert(id, row) {
+        apiCall("/api/alerts/" + id + "/delete/", "POST").then(function (res) {
+            if (res.data.deleted) {
+                row.remove();
+                if (!alertsBody.querySelector("tr[data-alert-id]"))
+                    alertsBody.innerHTML = '<tr id="alertsEmpty"><td colspan="4" class="text-muted text-center py-2" style="font-size:0.8rem;">No active alerts.</td></tr>';
+                showMsg("Alert deleted", "success");
+            }
+        });
+    }
+
+    function showEditModal(alertId, currentPrice, currentDir) {
+        var overlay = document.createElement("div");
+        overlay.className = "alert-edit-modal";
+        overlay.innerHTML =
+            '<div class="modal-box">'
+            + '<h6 class="mb-3 fw-bold">Edit Alert</h6>'
+            + '<div class="mb-2"><label class="form-label small">Target Price ($)</label>'
+            + '<input type="number" class="form-control form-control-sm" id="editAlertPrice" step="0.01" value="' + currentPrice + '"></div>'
+            + '<div class="mb-3"><label class="form-label small">Direction</label>'
+            + '<select class="form-control form-control-sm" id="editAlertDir">'
+            + '<option value="above"' + (currentDir === "above" ? " selected" : "") + '>Above (Sell)</option>'
+            + '<option value="below"' + (currentDir === "below" ? " selected" : "") + '>Below (Buy)</option>'
+            + '</select></div>'
+            + '<div class="d-flex gap-2">'
+            + '<button class="btn btn-accent btn-sm flex-fill" id="editAlertSave">Save</button>'
+            + '<button class="btn btn-ghost btn-sm flex-fill" id="editAlertCancel">Cancel</button>'
+            + '</div></div>';
+        document.body.appendChild(overlay);
+        overlay.querySelector("#editAlertCancel").addEventListener("click", function () { overlay.remove(); });
+        overlay.addEventListener("click", function (e) { if (e.target === overlay) overlay.remove(); });
+        overlay.querySelector("#editAlertSave").addEventListener("click", function () {
+            var newPrice = parseFloat(document.getElementById("editAlertPrice").value);
+            var newDir = document.getElementById("editAlertDir").value;
+            if (isNaN(newPrice) || newPrice <= 0) return;
+            createAlert(newPrice, newDir, alertId);
+            overlay.remove();
+        });
+    }
+
+    function bindRowActions(row) {
+        var id = row.dataset.alertId;
+        var editBtn = row.querySelector(".alert-edit-btn");
+        var deleteBtn = row.querySelector(".alert-delete-btn");
+        if (editBtn) editBtn.addEventListener("click", function () {
+            var price = parseFloat(row.querySelector("td").textContent.replace(/[^0-9.\-]/g, ""));
+            var dir = row.querySelector(".bg-success") ? "above" : "below";
+            showEditModal(id, price, dir);
+        });
+        if (deleteBtn) deleteBtn.addEventListener("click", function () { deleteAlert(id, row); });
+    }
+    alertsBody.querySelectorAll("tr[data-alert-id]").forEach(bindRowActions);
+
+    /* Bell buttons on preset targets */
+    function makeBell(container, price, direction) {
+        container.innerHTML = '<button class="btn-alert-toggle" title="Set alert at $' + fmtUSD(price) + '">' + bellSVG + '</button>';
+        container.querySelector("button").addEventListener("click", function (e) {
+            e.stopPropagation();
+            createAlert(price, direction);
+        });
+    }
+    document.querySelectorAll(".an-target-row[data-target-price]").forEach(function (row) {
+        var price = parseFloat(row.dataset.targetPrice);
+        var dir = row.dataset.targetDir;
+        var bell = row.querySelector(".an-target-bell");
+        makeBell(bell, price, dir);
+    });
+
+    /* ── Simulators ── */
+    var costBasis = parseFloat(table.dataset.costBasis);
+    var units = parseFloat(table.dataset.units);
+    var avgPrice = parseFloat(table.dataset.avgPrice);
+
+    function simBell(cell, price, direction) {
+        if (!price || price <= 0) { cell.innerHTML = ""; return; }
+        cell.innerHTML = '<button class="btn-alert-toggle" title="Set alert at $' + fmtUSD(price) + '">' + bellSVG + '</button>';
+        cell.querySelector("button").onclick = function (e) { e.stopPropagation(); createAlert(price, direction); };
+    }
+
+    /* Custom sell % */
+    var sellPctIn = document.getElementById("customSellPct");
+    var sellRes = document.getElementById("customSellResult");
+    var sellBell = document.getElementById("customSellAlert");
+    sellPctIn.addEventListener("input", function () {
+        var pct = parseFloat(sellPctIn.value);
+        if (isNaN(pct) || pct < 0 || avgPrice <= 0) { sellRes.textContent = "\u2014"; sellRes.style.color = "var(--text-muted)"; sellBell.innerHTML = ""; return; }
+        var p = avgPrice * (1 + pct / 100);
+        sellRes.textContent = "$" + fmtUSD(p); sellRes.style.color = "#34d399";
+        simBell(sellBell, parseFloat(p.toFixed(2)), "above");
+    });
+
+    /* Buy $X to lower avg by Y% */
+    var dollarIn = document.getElementById("simBuyDollar");
+    var dollarPctIn = document.getElementById("simBuyDollarPct");
+    var dollarRes = document.getElementById("simBuyDollarResult");
+    var dollarBell = document.getElementById("simBuyDollarAlert");
+    function updateDollarSim() {
+        var dollars = parseFloat(dollarIn.value);
+        var pct = parseFloat(dollarPctIn.value);
+        if (isNaN(dollars) || dollars <= 0 || isNaN(pct) || pct <= 0 || pct >= 100 || avgPrice <= 0) {
+            dollarRes.textContent = "\u2014"; dollarRes.style.color = "var(--text-muted)"; dollarBell.innerHTML = ""; return;
+        }
+        // new_avg = (cost_basis + dollars) / (units + dollars / price) = avg * (1 - pct/100)
+        // solve for price:
+        // target_avg * (units + dollars / price) = cost_basis + dollars
+        // target_avg * units + target_avg * dollars / price = cost_basis + dollars
+        // target_avg * dollars / price = cost_basis + dollars - target_avg * units
+        // price = target_avg * dollars / (cost_basis + dollars - target_avg * units)
+        var targetAvg = avgPrice * (1 - pct / 100);
+        var denom = costBasis + dollars - targetAvg * units;
+        if (denom <= 0) { dollarRes.textContent = "Not possible"; dollarRes.style.color = "var(--text-muted)"; dollarBell.innerHTML = ""; return; }
+        var p = (targetAvg * dollars) / denom;
+        if (p <= 0) { dollarRes.textContent = "Not possible"; dollarRes.style.color = "var(--text-muted)"; dollarBell.innerHTML = ""; return; }
+        dollarRes.textContent = "$" + fmtUSD(p); dollarRes.style.color = "#818cf8";
+        simBell(dollarBell, parseFloat(p.toFixed(2)), "below");
+    }
+    dollarIn.addEventListener("input", updateDollarSim);
+    dollarPctIn.addEventListener("input", updateDollarSim);
+});
 </script>
 {% endif %}

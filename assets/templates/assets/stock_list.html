@@ -73,7 +73,7 @@
                         </span>
                     </td>
                     <td class="text-end {% if stock.total >= 0 %}text-success{% else %}text-danger{% endif %}">
-                        {{ stock.total|floatformat:2 }}
+                        {{ stock.total|floatformat:6 }}
                     </td>
                     <td class="text-end" style="font-family:'SF Mono','Fira Code',monospace;font-size:0.9rem;">
                         {% if stock.price != None %}{{ stock.price|floatformat:2 }}{% else %}<span class="text-muted">—</span>{% endif %}
