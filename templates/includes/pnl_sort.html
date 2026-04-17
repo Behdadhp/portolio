@@ -1,0 +1,54 @@
+<script>
+/* Reusable: make a server-rendered P&L table sortable by the P&L and P&L %
+   columns. Rows must carry data-pnl and data-pnl-pct attributes, and the
+   rank cell (.pnl-rank) gets renumbered on sort. */
+function makePnlTableSortable(tableId) {
+    var table = document.getElementById(tableId);
+    if (!table) return;
+    var tbody = table.querySelector("tbody");
+    if (!tbody) return;
+
+    var sort = { key: "pnlPct", dir: "desc" };
+    var keyToAttr = { pnl: "data-pnl", pnlPct: "data-pnl-pct" };
+
+    function render() {
+        var rows = Array.prototype.slice.call(tbody.querySelectorAll("tr"));
+        rows.sort(function(a, b) {
+            var av = parseFloat(a.getAttribute(keyToAttr[sort.key])) || 0;
+            var bv = parseFloat(b.getAttribute(keyToAttr[sort.key])) || 0;
+            var diff = av - bv;
+            return sort.dir === "desc" ? -diff : diff;
+        });
+        rows.forEach(function(r, i) {
+            tbody.appendChild(r);
+            var rankCell = r.querySelector(".pnl-rank");
+            if (rankCell) rankCell.textContent = i + 1;
+        });
+        table.querySelectorAll("th.pnl-sortable").forEach(function(th) {
+            var k = th.getAttribute("data-sort");
+            var ind = th.querySelector(".sort-indicator");
+            if (k === sort.key) {
+                th.classList.add("sort-active");
+                if (ind) ind.textContent = sort.dir === "desc" ? "▼" : "▲";
+            } else {
+                th.classList.remove("sort-active");
+                if (ind) ind.textContent = "▼";
+            }
+        });
+    }
+
+    table.querySelectorAll("th.pnl-sortable").forEach(function(th) {
+        th.addEventListener("click", function() {
+            var k = th.getAttribute("data-sort");
+            if (sort.key === k) {
+                sort.dir = sort.dir === "desc" ? "asc" : "desc";
+            } else {
+                sort.key = k;
+                sort.dir = "desc";
+            }
+            render();
+        });
+    });
+    render();
+}
+</script>

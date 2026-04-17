@@ -60,6 +60,67 @@
     /* ── P&L ranking inside portfolio card ── */
     .pnl-table { width: 100%; }
     .pnl-table td { padding: 0.45rem 0.25rem; border: none; font-size: 0.85rem; }
+    .pnl-table th {
+        padding: 0.25rem 0.25rem 0.5rem;
+        border: none;
+        font-size: 0.7rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        color: var(--text-muted);
+    }
+    .pnl-table th.text-end { text-align: right; }
+    .pnl-table th.text-center { text-align: center; }
+    .pnl-table th.pnl-sortable { cursor: pointer; user-select: none; }
+    .pnl-table th.pnl-sortable:hover { color: var(--text-primary); }
+    .pnl-table th .sort-indicator {
+        display: inline-block;
+        margin-left: 4px;
+        font-size: 0.65rem;
+        opacity: 0.5;
+    }
+    .pnl-table th.sort-active .sort-indicator { opacity: 1; color: var(--accent-light); }
+
+    /* Type badges for ranking rows */
+    .pnl-table .type-badge {
+        display: inline-block;
+        padding: 2px 8px;
+        border-radius: 6px;
+        font-weight: 600;
+        font-size: 0.75rem;
+        margin-right: 6px;
+    }
+    .pnl-table .type-badge.stock { background: rgba(79, 70, 229, 0.12); color: var(--accent-light); }
+    .pnl-table .type-badge.crypto { background: rgba(6, 182, 212, 0.12); color: #22d3ee; }
+
+    /* Stocks vs Crypto breakdown under donut */
+    .type-breakdown {
+        margin-top: 0.75rem;
+        width: 100%;
+        display: flex;
+        flex-direction: column;
+        gap: 0.35rem;
+    }
+    .type-breakdown-row {
+        display: flex;
+        align-items: center;
+        font-size: 0.82rem;
+        gap: 0.5rem;
+    }
+    .type-dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        display: inline-block;
+    }
+    .type-dot-stock { background: var(--accent-light); }
+    .type-dot-crypto { background: #22d3ee; }
+    .type-label { color: var(--text-secondary); flex: 1; }
+    .type-pct {
+        font-family: 'SF Mono', 'Fira Code', monospace;
+        font-weight: 700;
+        color: var(--text-primary);
+    }
     .pnl-table .pnl-rank {
         width: 24px;
         color: var(--text-muted);
@@ -75,6 +136,13 @@
         color: var(--text-secondary);
     }
     .pnl-table .pnl-pnl {
+        text-align: right;
+        font-family: 'SF Mono', 'Fira Code', monospace;
+        font-size: 0.82rem;
+        font-weight: 600;
+        white-space: nowrap;
+    }
+    .pnl-table .pnl-pct {
         text-align: right;
         font-family: 'SF Mono', 'Fira Code', monospace;
         font-size: 0.82rem;
@@ -128,14 +196,35 @@
                             </div>
                         </div>
                         <div id="dashAllocationLegend" class="donut-legend"></div>
+                        <div id="type-breakdown" class="type-breakdown" style="display:none;">
+                            <div class="type-breakdown-row">
+                                <span class="type-dot type-dot-stock"></span>
+                                <span class="type-label">Stocks</span>
+                                <span class="type-pct" id="stock-pct">—</span>
+                            </div>
+                            <div class="type-breakdown-row">
+                                <span class="type-dot type-dot-crypto"></span>
+                                <span class="type-label">Crypto</span>
+                                <span class="type-pct" id="crypto-pct">—</span>
+                            </div>
+                        </div>
                     </div>
                 </div>
                 <!-- P&L Ranking -->
                 <div class="col-lg-7">
                     <h6 class="text-muted text-uppercase small fw-bold mb-3">P&L Ranking</h6>
                     <table class="pnl-table" id="pnl-ranking-table">
+                        <thead>
+                            <tr>
+                                <th class="text-center">#</th>
+                                <th>Asset</th>
+                                <th class="text-end">Value</th>
+                                <th class="text-end pnl-sortable" data-sort="pnl">P&L <span class="sort-indicator"></span></th>
+                                <th class="text-end pnl-sortable" data-sort="pnlPct">P&L % <span class="sort-indicator"></span></th>
+                            </tr>
+                        </thead>
                         <tbody id="pnl-ranking-body">
-                            <tr><td colspan="4" class="text-muted" style="font-size:0.85rem;">Waiting for live prices...</td></tr>
+                            <tr><td colspan="5" class="text-muted" style="font-size:0.85rem;">Waiting for live prices...</td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -247,9 +336,12 @@
         return v.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     }
 
+    var pnlSort = { key: "pnlPct", dir: "desc" };
+
     function updatePnlRanking() {
         var rows = [];
         var totalValue = 0, totalCost = 0;
+        var stockValue = 0, cryptoValue = 0;
 
         for (var i = 0; i < allocData.length; i++) {
             var item = allocData[i];
@@ -260,11 +352,27 @@
             var value = amt * price;
             var cb = costBases[sym] || 0;
             var pnl = value - cb;
+            var pnlPct = cb > 0 ? (pnl / cb) * 100 : 0;
             totalValue += value;
             totalCost += cb;
-            rows.push({ label: item.label, symbol: sym, value: value, pnl: pnl });
+            if (item.type === "stock") stockValue += value;
+            else if (item.type === "crypto") cryptoValue += value;
+            rows.push({ label: item.label, symbol: sym, type: item.type, value: value, pnl: pnl, pnlPct: pnlPct });
         }
-        rows.sort(function(a, b) { return b.pnl - a.pnl; });
+
+        /* Stock vs crypto breakdown */
+        var breakdownEl = document.getElementById("type-breakdown");
+        if (totalValue > 0) {
+            var stockPct = (stockValue / totalValue) * 100;
+            var cryptoPct = (cryptoValue / totalValue) * 100;
+            document.getElementById("stock-pct").textContent = stockPct.toFixed(1) + "%";
+            document.getElementById("crypto-pct").textContent = cryptoPct.toFixed(1) + "%";
+            breakdownEl.style.display = "";
+        }
+        rows.sort(function(a, b) {
+            var diff = a[pnlSort.key] - b[pnlSort.key];
+            return pnlSort.dir === "desc" ? -diff : diff;
+        });
 
         /* Overall P&L in hero */
         if (totalCost > 0) {
@@ -279,7 +387,7 @@
         }
 
         if (rows.length === 0) {
-            pnlBody.innerHTML = '<tr><td colspan="4" class="text-muted" style="font-size:0.85rem;">No holdings with live prices</td></tr>';
+            pnlBody.innerHTML = '<tr><td colspan="5" class="text-muted" style="font-size:0.85rem;">No holdings with live prices</td></tr>';
             return;
         }
         var html = "";
@@ -288,15 +396,48 @@
             var isProfit = r.pnl >= 0;
             var pnlColor = isProfit ? "#34d399" : "#f87171";
             var pnlSign = isProfit ? "+$" : "-$";
+            var pctSign = r.pnlPct >= 0 ? "+" : "";
+            var badgeClass = r.type === "crypto" ? "crypto" : "stock";
             html += '<tr>'
                 + '<td class="pnl-rank">' + (j + 1) + '</td>'
-                + '<td class="pnl-asset">' + r.label + ' <span class="pnl-sym">(' + r.symbol + ')</span></td>'
+                + '<td class="pnl-asset"><span class="type-badge ' + badgeClass + '">' + r.symbol + '</span>' + r.label + '</td>'
                 + '<td class="pnl-value">$' + fmtDollar(r.value) + '</td>'
                 + '<td class="pnl-pnl" style="color:' + pnlColor + ';">' + pnlSign + fmtDollar(Math.abs(r.pnl)) + '</td>'
+                + '<td class="pnl-pct" style="color:' + pnlColor + ';">' + pctSign + r.pnlPct.toFixed(2) + '%</td>'
                 + '</tr>';
         }
         pnlBody.innerHTML = html;
+        updateSortIndicators();
     }
+
+    function updateSortIndicators() {
+        var headers = document.querySelectorAll("#pnl-ranking-table th.pnl-sortable");
+        headers.forEach(function(th) {
+            var key = th.getAttribute("data-sort");
+            var ind = th.querySelector(".sort-indicator");
+            if (key === pnlSort.key) {
+                th.classList.add("sort-active");
+                ind.textContent = pnlSort.dir === "desc" ? "▼" : "▲";
+            } else {
+                th.classList.remove("sort-active");
+                ind.textContent = "▼";
+            }
+        });
+    }
+
+    document.querySelectorAll("#pnl-ranking-table th.pnl-sortable").forEach(function(th) {
+        th.addEventListener("click", function() {
+            var key = th.getAttribute("data-sort");
+            if (pnlSort.key === key) {
+                pnlSort.dir = pnlSort.dir === "desc" ? "asc" : "desc";
+            } else {
+                pnlSort.key = key;
+                pnlSort.dir = "desc";
+            }
+            updatePnlRanking();
+        });
+    });
+    updateSortIndicators();
 
     function updateWealth() {
         let total = 0;
