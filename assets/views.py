@@ -23,6 +23,23 @@ from .services import (
 # ── Generic CRUD helpers ─────────────────────────────────────
 
 
+def _cost_basis_for(txs):
+    """Weighted-average cost basis for a queryset of transactions."""
+    cb = 0.0
+    units = 0.0
+    for tx in txs.order_by("date", "status", "pk"):
+        amt = float(tx.amount)
+        px = float(tx.price)
+        if tx.status == "bought":
+            cb += amt * px
+            units += amt
+        elif tx.status == "sold" and units > 0:
+            avg = cb / units
+            cb -= amt * avg
+            units -= amt
+    return round(cb, 2)
+
+
 def _list_view(
     request, transaction_model, name_field, symbol_field, template, context_key
 ):
@@ -31,23 +48,47 @@ def _list_view(
         name_field,
         symbol_field,
     )
+    fk_field = symbol_field.split("__")[0]
     enriched = []
     allocation = []
+    pnl_ranking = []
     for row in summary:
         price = cache.get(f"finnhub_{row['symbol']}")
         row["price"] = price
+        amt = float(row["total"])
         row["worth"] = (
-            round(float(row["total"]) * float(price), 2) if price is not None else None
+            round(amt * float(price), 2) if price is not None else None
         )
         enriched.append(row)
         worth = (
-            round(float(row["total"]) * float(price), 2)
-            if price is not None and row["total"] > 0
+            round(amt * float(price), 2)
+            if price is not None and amt > 0
             else 0
         )
         allocation.append(
             {"label": row["name"], "symbol": row["symbol"], "value": worth}
         )
+        if price is not None and amt > 0:
+            cb = _cost_basis_for(
+                transaction_model.objects.filter(
+                    user=request.user,
+                    **{f"{fk_field}__symbol": row["symbol"]},
+                )
+            )
+            value = round(amt * float(price), 2)
+            pnl = round(value - cb, 2)
+            pnl_pct = round((pnl / cb) * 100, 2) if cb > 0 else 0.0
+            pnl_ranking.append(
+                {
+                    "label": row["name"],
+                    "symbol": row["symbol"],
+                    "value": value,
+                    "pnl": pnl,
+                    "pnl_pct": pnl_pct,
+                }
+            )
+
+    pnl_ranking.sort(key=lambda r: r["pnl_pct"], reverse=True)
 
     return render(
         request,
@@ -55,6 +96,7 @@ def _list_view(
         {
             context_key: enriched,
             "allocation_json": json.dumps(allocation),
+            "pnl_ranking": pnl_ranking,
         },
     )
 
