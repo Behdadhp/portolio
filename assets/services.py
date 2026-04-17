@@ -228,7 +228,9 @@ def compute_stock_tax(user, current_symbol=None):
     from .models import StockAsset
 
     TAX_RATE = 0.26375  # 25% + 5.5% Soli
-    FREIBETRAG = 1000.0
+    FREIBETRAG_EUR = 1000.0
+    eur_usd = get_eur_usd_rate() or 1.0
+    FREIBETRAG = FREIBETRAG_EUR * eur_usd  # threshold in USD for comparison
     current_year = date.today().year
 
     all_stocks_qs = StockAsset.objects.filter(user=user)
@@ -329,7 +331,9 @@ def compute_crypto_tax(user, current_symbol=None):
     from datetime import date, timedelta
     from .models import CryptoAsset
 
-    FREIGRENZE = 1000.0
+    FREIGRENZE_EUR = 1000.0
+    eur_usd = get_eur_usd_rate() or 1.0
+    FREIGRENZE = FREIGRENZE_EUR * eur_usd  # threshold in USD for comparison
     current_year = date.today().year
     today = date.today()
 
