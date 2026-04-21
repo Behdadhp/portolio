@@ -62,7 +62,7 @@ def dashboard_view(request):
     import json
     from django.core.cache import cache
     from assets.models import CryptoAsset, PriceAlert, StockAsset
-    from assets.services import get_asset_summary
+    from assets.services import cost_basis_for, get_asset_summary
 
     stock_summary = list(
         get_asset_summary(
@@ -81,22 +81,6 @@ def dashboard_view(request):
     allocation = []  # [{label, symbol, value, type}]
     cost_bases = {}  # {symbol: cost_basis} for P&L ranking
 
-    # Helper: compute cost basis using weighted average for a set of transactions
-    def _cost_basis_for(txs):
-        cb = 0.0
-        units = 0.0
-        for tx in txs.order_by("date", "status", "pk"):
-            amt = float(tx.amount)
-            px = float(tx.price)
-            if tx.status == "bought":
-                cb += amt * px
-                units += amt
-            elif tx.status == "sold" and units > 0:
-                avg = cb / units
-                cb -= amt * avg
-                units -= amt
-        return round(cb, 2)
-
     for row in stock_summary:
         amt = float(row["total"])
         holdings[row["symbol"]] = amt
@@ -111,7 +95,7 @@ def dashboard_view(request):
             }
         )
         if amt > 0:
-            cost_bases[row["symbol"]] = _cost_basis_for(
+            cost_bases[row["symbol"]] = cost_basis_for(
                 StockAsset.objects.filter(
                     user=request.user, stock__symbol=row["symbol"]
                 )
@@ -131,7 +115,7 @@ def dashboard_view(request):
             }
         )
         if amt > 0:
-            cost_bases[row["symbol"]] = _cost_basis_for(
+            cost_bases[row["symbol"]] = cost_basis_for(
                 CryptoAsset.objects.filter(
                     user=request.user, crypto__symbol=row["symbol"]
                 )

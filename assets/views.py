@@ -14,30 +14,15 @@ from .services import (
     compute_analytics,
     compute_crypto_tax,
     compute_stock_tax,
+    cost_basis_for,
     get_asset_summary,
     get_eur_usd_rate,
     get_filter_ranges,
     sort_and_paginate,
+    sync_alert_cache,
 )
 
 # ── Generic CRUD helpers ─────────────────────────────────────
-
-
-def _cost_basis_for(txs):
-    """Weighted-average cost basis for a queryset of transactions."""
-    cb = 0.0
-    units = 0.0
-    for tx in txs.order_by("date", "status", "pk"):
-        amt = float(tx.amount)
-        px = float(tx.price)
-        if tx.status == "bought":
-            cb += amt * px
-            units += amt
-        elif tx.status == "sold" and units > 0:
-            avg = cb / units
-            cb -= amt * avg
-            units -= amt
-    return round(cb, 2)
 
 
 def _list_view(
@@ -69,7 +54,7 @@ def _list_view(
             {"label": row["name"], "symbol": row["symbol"], "value": worth}
         )
         if price is not None and amt > 0:
-            cb = _cost_basis_for(
+            cb = cost_basis_for(
                 transaction_model.objects.filter(
                     user=request.user,
                     **{f"{fk_field}__symbol": row["symbol"]},
@@ -369,25 +354,6 @@ def crypto_delete_view(request, pk):
 ALERT_PROXIMITY_PCT = 1.0  # alerts within 1% are considered duplicates
 
 
-def _sync_alerts_to_cache():
-    """Rebuild the Redis alert cache from the database."""
-    alerts = PriceAlert.objects.filter(email_sent=False).select_related(
-        "stock", "crypto"
-    )
-    alert_data = {}
-    for a in alerts:
-        sym = a.symbol
-        alert_data.setdefault(sym, []).append(
-            {
-                "id": str(a.id),
-                "user_id": str(a.user_id),
-                "target_price": float(a.target_price),
-                "direction": a.direction,
-            }
-        )
-    cache.set("price_alerts_active", alert_data, timeout=None)
-
-
 @login_required
 @require_POST
 def alert_create(request):
@@ -454,7 +420,7 @@ def alert_create(request):
         target_price=target_price,
         direction=direction,
     )
-    _sync_alerts_to_cache()
+    sync_alert_cache()
 
     return JsonResponse(
         {
@@ -496,7 +462,7 @@ def alert_update(request, pk):
 
     alert.email_sent = False  # re-arm if updated
     alert.save()
-    _sync_alerts_to_cache()
+    sync_alert_cache()
 
     return JsonResponse(
         {
@@ -514,5 +480,5 @@ def alert_delete(request, pk):
     """Delete a price alert."""
     alert = get_object_or_404(PriceAlert, pk=pk, user=request.user)
     alert.delete()
-    _sync_alerts_to_cache()
+    sync_alert_cache()
     return JsonResponse({"deleted": True})

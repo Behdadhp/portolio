@@ -9,6 +9,8 @@ from celery import shared_task
 from django.conf import settings
 from django.core.cache import cache
 
+from .services import sync_alert_cache
+
 logger = logging.getLogger(__name__)
 
 SYMBOLS_CHANGED_KEY = "finnhub_symbols_changed"
@@ -222,28 +224,7 @@ def _check_price_alerts(short, price):
             ).start()
 
         # Rebuild cache to remove triggered alerts
-        _rebuild_alert_cache()
-
-
-def _rebuild_alert_cache():
-    """Rebuild the Redis alert cache from the DB."""
-    from assets.models import PriceAlert
-
-    alerts = PriceAlert.objects.filter(email_sent=False).select_related(
-        "stock", "crypto"
-    )
-    alert_data = {}
-    for a in alerts:
-        sym = a.symbol
-        alert_data.setdefault(sym, []).append(
-            {
-                "id": str(a.id),
-                "user_id": str(a.user_id),
-                "target_price": float(a.target_price),
-                "direction": a.direction,
-            }
-        )
-    cache.set("price_alerts_active", alert_data, timeout=None)
+        sync_alert_cache()
 
 
 def _broadcast(short, price):
@@ -282,7 +263,7 @@ def stream_prices():
     mcap_thread.start()
 
     # Load active price alerts into Redis cache
-    _rebuild_alert_cache()
+    sync_alert_cache()
 
     # Poll stock quotes via REST API (Finnhub free tier has no real-time WS for US stocks)
     _poll_stock_quotes()

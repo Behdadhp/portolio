@@ -482,3 +482,40 @@ def get_eur_usd_rate():
         logger.warning("Failed to fetch EUR/USD rate: %s", e)
 
     return None
+
+
+def cost_basis_for(txs):
+    """Weighted-average cost basis for a queryset of buy/sell transactions."""
+    cb = 0.0
+    units = 0.0
+    for tx in txs.order_by("date", "status", "pk"):
+        amt = float(tx.amount)
+        px = float(tx.price)
+        if tx.status == "bought":
+            cb += amt * px
+            units += amt
+        elif tx.status == "sold" and units > 0:
+            avg = cb / units
+            cb -= amt * avg
+            units -= amt
+    return round(cb, 2)
+
+
+def sync_alert_cache():
+    """Rebuild the Redis alert cache from the DB."""
+    from .models import PriceAlert
+
+    alerts = PriceAlert.objects.filter(email_sent=False).select_related(
+        "stock", "crypto"
+    )
+    alert_data = {}
+    for a in alerts:
+        alert_data.setdefault(a.symbol, []).append(
+            {
+                "id": str(a.id),
+                "user_id": str(a.user_id),
+                "target_price": float(a.target_price),
+                "direction": a.direction,
+            }
+        )
+    cache.set("price_alerts_active", alert_data, timeout=None)
