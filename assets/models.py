@@ -106,6 +106,16 @@ class PriceAlert(models.Model):
     direction = models.CharField(
         max_length=5, choices=Direction.choices, default=Direction.ABOVE
     )
+    invest_amount = models.DecimalField(
+        max_digits=18,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        help_text=(
+            "USD amount the user plans to spend when a 'below' (buy) alert "
+            "triggers. Null for sell alerts."
+        ),
+    )
     email_sent = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
 
