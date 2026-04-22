@@ -45,7 +45,7 @@
                 </td>
             </tr>
             <tr>
-                <td colspan="2" style="padding:12px 20px;">
+                <td colspan="2" style="padding:12px 20px;{% if invest_amount %}border-bottom:1px solid rgba(255,255,255,0.06);{% endif %}">
                     <span style="color:#64748b;font-size:13px;">Direction</span>&nbsp;&nbsp;
                     <span style="display:inline-block;padding:3px 10px;border-radius:6px;font-size:12px;font-weight:600;
                         {% if direction == 'above' %}background:rgba(52,211,153,0.15);color:#34d399;{% else %}background:rgba(99,102,241,0.15);color:#818cf8;{% endif %}">
@@ -53,6 +53,24 @@
                     </span>
                 </td>
             </tr>
+            {% if invest_amount %}
+            <tr>
+                <td colspan="2" style="padding:14px 20px;background:rgba(99,102,241,0.05);">
+                    <span style="color:#64748b;font-size:13px;">Planned Spend</span><br>
+                    <span style="color:#818cf8;font-size:18px;font-weight:700;font-family:'SF Mono','Fira Code',monospace;">
+                        ${{ invest_amount }}
+                    </span>
+                    {% if invest_units %}
+                    <span style="color:#94a3b8;font-size:13px;">
+                        &nbsp;&asymp;&nbsp;{{ invest_units }} {{ symbol }} at current price
+                    </span>
+                    {% endif %}
+                    <div style="color:#64748b;font-size:12px;margin-top:6px;line-height:1.5;">
+                        To hit the average cost you planned when you set this alert, buy approximately this dollar amount at the current price.
+                    </div>
+                </td>
+            </tr>
+            {% endif %}
         </table>
 
         <!-- CTA button -->

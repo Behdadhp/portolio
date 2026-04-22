@@ -366,6 +366,7 @@ def alert_create(request):
     symbol = data.get("symbol", "").strip()
     target_price = data.get("target_price")
     direction = data.get("direction", "above")
+    invest_amount = data.get("invest_amount")
 
     if not symbol or target_price is None:
         return JsonResponse({"error": "symbol and target_price required"}, status=400)
@@ -382,6 +383,19 @@ def alert_create(request):
         return JsonResponse(
             {"error": "direction must be 'above' or 'below'"}, status=400
         )
+
+    # invest_amount is only meaningful for buy (below) alerts
+    if direction == "below" and invest_amount is not None:
+        try:
+            invest_amount = float(invest_amount)
+        except (ValueError, TypeError):
+            return JsonResponse({"error": "Invalid invest_amount"}, status=400)
+        if invest_amount <= 0:
+            return JsonResponse(
+                {"error": "invest_amount must be positive"}, status=400
+            )
+    else:
+        invest_amount = None
 
     # Find the asset
     stock = Stock.objects.filter(symbol=symbol).first()
@@ -419,6 +433,7 @@ def alert_create(request):
         crypto=crypto,
         target_price=target_price,
         direction=direction,
+        invest_amount=invest_amount,
     )
     sync_alert_cache()
 
@@ -427,6 +442,9 @@ def alert_create(request):
             "id": str(alert.id),
             "target_price": float(alert.target_price),
             "direction": alert.direction,
+            "invest_amount": (
+                float(alert.invest_amount) if alert.invest_amount is not None else None
+            ),
             "email_sent": alert.email_sent,
             "created_at": alert.created_at.strftime("%Y-%m-%d %H:%M"),
         },
@@ -447,6 +465,8 @@ def alert_update(request, pk):
 
     new_price = data.get("target_price")
     new_direction = data.get("direction")
+    invest_amount_provided = "invest_amount" in data
+    new_invest_amount = data.get("invest_amount")
 
     if new_price is not None:
         try:
@@ -460,6 +480,24 @@ def alert_update(request, pk):
     if new_direction in ("above", "below"):
         alert.direction = new_direction
 
+    # invest_amount is only meaningful for buy (below) alerts.
+    # Clear it automatically if the (effective) direction is 'above'.
+    if alert.direction == "above":
+        alert.invest_amount = None
+    elif invest_amount_provided:
+        if new_invest_amount in (None, ""):
+            alert.invest_amount = None
+        else:
+            try:
+                amt = float(new_invest_amount)
+            except (ValueError, TypeError):
+                return JsonResponse({"error": "Invalid invest_amount"}, status=400)
+            if amt <= 0:
+                return JsonResponse(
+                    {"error": "invest_amount must be positive"}, status=400
+                )
+            alert.invest_amount = amt
+
     alert.email_sent = False  # re-arm if updated
     alert.save()
     sync_alert_cache()
@@ -469,6 +507,9 @@ def alert_update(request, pk):
             "id": str(alert.id),
             "target_price": float(alert.target_price),
             "direction": alert.direction,
+            "invest_amount": (
+                float(alert.invest_amount) if alert.invest_amount is not None else None
+            ),
             "email_sent": alert.email_sent,
         }
     )

@@ -127,8 +127,8 @@
                     <span class="an-target-price" data-fmt-number="$">{{ analytics.sell_25|floatformat:2 }}</span>
                     <span class="an-target-bell"></span>
                 </div>
-                <div class="an-target-row an-target-buy" data-target-price="{{ analytics.buy_avg_minus_10 }}" data-target-dir="below">
-                    <span class="an-target-label">Lower avg by 10%<span class="an-target-hint">Buy {{ analytics.units|floatformat:6 }} more</span></span>
+                <div class="an-target-row an-target-buy" data-target-price="{{ analytics.buy_avg_minus_10 }}" data-target-dir="below" data-target-invest="{{ analytics.buy_avg_minus_10_spend }}">
+                    <span class="an-target-label">Lower avg by 10%<span class="an-target-hint">Buy {{ analytics.units|floatformat:6 }} more (&asymp; ${{ analytics.buy_avg_minus_10_spend|floatformat:2 }})</span></span>
                     <span class="an-target-price" data-fmt-number="$">{{ analytics.buy_avg_minus_10|floatformat:2 }}</span>
                     <span class="an-target-bell"></span>
                 </div>
@@ -186,13 +186,14 @@
                     <tr>
                         <th class="text-muted" style="font-size:0.75rem;">Target Price</th>
                         <th class="text-muted" style="font-size:0.75rem;">Direction</th>
+                        <th class="text-muted" style="font-size:0.75rem;" title="Dollar amount to spend when a buy alert triggers">Spend</th>
                         <th class="text-muted" style="font-size:0.75rem;">Status</th>
                         <th class="text-muted text-end" style="font-size:0.75rem;">Actions</th>
                     </tr>
                 </thead>
                 <tbody id="alertsBody">
                     {% for alert in active_alerts %}
-                    <tr data-alert-id="{{ alert.id }}">
+                    <tr data-alert-id="{{ alert.id }}"{% if alert.invest_amount %} data-invest-amount="{{ alert.invest_amount }}"{% endif %}>
                         <td class="fw-semibold" style="font-family:'SF Mono','Fira Code',monospace;font-size:0.85rem;">
                             ${{ alert.target_price|floatformat:2 }}
                         </td>
@@ -200,6 +201,9 @@
                             <span class="badge {% if alert.direction == 'above' %}bg-success{% else %}bg-primary{% endif %}" style="font-size:0.7rem;">
                                 {{ alert.get_direction_display }}
                             </span>
+                        </td>
+                        <td style="font-family:'SF Mono','Fira Code',monospace;font-size:0.8rem;color:#818cf8;">
+                            {% if alert.invest_amount %}${{ alert.invest_amount|floatformat:2 }}{% else %}<span class="text-muted">—</span>{% endif %}
                         </td>
                         <td>
                             {% if alert.email_sent %}
@@ -216,7 +220,7 @@
                         </td>
                     </tr>
                     {% empty %}
-                    <tr id="alertsEmpty"><td colspan="4" class="text-muted text-center py-2" style="font-size:0.8rem;">No active alerts. Click a bell icon above to create one.</td></tr>
+                    <tr id="alertsEmpty"><td colspan="5" class="text-muted text-center py-2" style="font-size:0.8rem;">No active alerts. Click a bell icon above to create one.</td></tr>
                     {% endfor %}
                 </tbody>
             </table>
@@ -411,8 +415,12 @@ document.addEventListener("DOMContentLoaded", function () {
         if (empty) empty.remove();
         var tr = document.createElement("tr");
         tr.dataset.alertId = alert.id;
+        if (alert.invest_amount != null) tr.dataset.investAmount = alert.invest_amount;
         var dirLabel = alert.direction === "above" ? "Above (Sell)" : "Below (Buy)";
         var dirClass = alert.direction === "above" ? "bg-success" : "bg-primary";
+        var spendCell = alert.invest_amount != null
+            ? '<td style="font-family:\'SF Mono\',\'Fira Code\',monospace;font-size:0.8rem;color:#818cf8;">$' + fmtUSD(alert.invest_amount) + '</td>'
+            : '<td style="font-family:\'SF Mono\',\'Fira Code\',monospace;font-size:0.8rem;"><span class="text-muted">&mdash;</span></td>';
         var statusBadge = alert.email_sent
             ? '<span class="badge" style="background:rgba(251,191,36,0.15);color:#fbbf24;font-size:0.7rem;">Triggered</span>'
             : '<span class="badge" style="background:rgba(52,211,153,0.15);color:#34d399;font-size:0.7rem;">Active</span>';
@@ -423,15 +431,21 @@ document.addEventListener("DOMContentLoaded", function () {
         tr.innerHTML =
             '<td class="fw-semibold" style="font-family:\'SF Mono\',\'Fira Code\',monospace;font-size:0.85rem;">$' + fmtUSD(alert.target_price) + '</td>'
             + '<td><span class="badge ' + dirClass + '" style="font-size:0.7rem;">' + dirLabel + '</span></td>'
+            + spendCell
             + '<td>' + statusBadge + '</td>'
             + '<td class="text-end">' + actions + '</td>';
         alertsBody.appendChild(tr);
         bindRowActions(tr);
     }
 
-    function createAlert(price, direction, updateId) {
+    function createAlert(price, direction, updateId, investAmount) {
         var url = updateId ? "/api/alerts/" + updateId + "/update/" : "/api/alerts/create/";
-        var body = updateId ? { target_price: price, direction: direction } : { symbol: symbol, target_price: price, direction: direction };
+        var body = updateId
+            ? { target_price: price, direction: direction, invest_amount: investAmount != null ? investAmount : null }
+            : { symbol: symbol, target_price: price, direction: direction };
+        if (!updateId && direction === "below" && investAmount != null) {
+            body.invest_amount = investAmount;
+        }
         apiCall(url, "POST", body).then(function (res) {
             if (res.status === 409) { showMsg(res.data.message + " Use the edit button below.", "error"); return; }
             if (res.status >= 400) { showMsg(res.data.error || "Failed to create alert", "error"); return; }
@@ -446,37 +460,55 @@ document.addEventListener("DOMContentLoaded", function () {
             if (res.data.deleted) {
                 row.remove();
                 if (!alertsBody.querySelector("tr[data-alert-id]"))
-                    alertsBody.innerHTML = '<tr id="alertsEmpty"><td colspan="4" class="text-muted text-center py-2" style="font-size:0.8rem;">No active alerts.</td></tr>';
+                    alertsBody.innerHTML = '<tr id="alertsEmpty"><td colspan="5" class="text-muted text-center py-2" style="font-size:0.8rem;">No active alerts.</td></tr>';
                 showMsg("Alert deleted", "success");
             }
         });
     }
 
-    function showEditModal(alertId, currentPrice, currentDir) {
+    function showEditModal(alertId, currentPrice, currentDir, currentInvest) {
         var overlay = document.createElement("div");
         overlay.className = "alert-edit-modal";
+        var investVal = currentInvest != null && !isNaN(currentInvest) ? currentInvest : "";
         overlay.innerHTML =
             '<div class="modal-box">'
             + '<h6 class="mb-3 fw-bold">Edit Alert</h6>'
             + '<div class="mb-2"><label class="form-label small">Target Price ($)</label>'
             + '<input type="number" class="form-control form-control-sm" id="editAlertPrice" step="0.01" value="' + currentPrice + '"></div>'
-            + '<div class="mb-3"><label class="form-label small">Direction</label>'
+            + '<div class="mb-2"><label class="form-label small">Direction</label>'
             + '<select class="form-control form-control-sm" id="editAlertDir">'
             + '<option value="above"' + (currentDir === "above" ? " selected" : "") + '>Above (Sell)</option>'
             + '<option value="below"' + (currentDir === "below" ? " selected" : "") + '>Below (Buy)</option>'
             + '</select></div>'
+            + '<div class="mb-3" id="editAlertInvestWrap" style="' + (currentDir === "below" ? "" : "display:none;") + '">'
+            + '<label class="form-label small">Planned Spend ($) <span class="text-muted" style="font-size:0.7rem;">— only for Buy alerts</span></label>'
+            + '<input type="number" class="form-control form-control-sm" id="editAlertInvest" step="0.01" min="0" placeholder="e.g. 100" value="' + investVal + '">'
+            + '</div>'
             + '<div class="d-flex gap-2">'
             + '<button class="btn btn-accent btn-sm flex-fill" id="editAlertSave">Save</button>'
             + '<button class="btn btn-ghost btn-sm flex-fill" id="editAlertCancel">Cancel</button>'
             + '</div></div>';
         document.body.appendChild(overlay);
+        var dirSelect = overlay.querySelector("#editAlertDir");
+        var investWrap = overlay.querySelector("#editAlertInvestWrap");
+        dirSelect.addEventListener("change", function () {
+            investWrap.style.display = dirSelect.value === "below" ? "" : "none";
+        });
         overlay.querySelector("#editAlertCancel").addEventListener("click", function () { overlay.remove(); });
         overlay.addEventListener("click", function (e) { if (e.target === overlay) overlay.remove(); });
         overlay.querySelector("#editAlertSave").addEventListener("click", function () {
             var newPrice = parseFloat(document.getElementById("editAlertPrice").value);
-            var newDir = document.getElementById("editAlertDir").value;
+            var newDir = dirSelect.value;
             if (isNaN(newPrice) || newPrice <= 0) return;
-            createAlert(newPrice, newDir, alertId);
+            var newInvest = null;
+            if (newDir === "below") {
+                var raw = document.getElementById("editAlertInvest").value;
+                if (raw !== "" && raw !== null) {
+                    var parsed = parseFloat(raw);
+                    if (!isNaN(parsed) && parsed > 0) newInvest = parsed;
+                }
+            }
+            createAlert(newPrice, newDir, alertId, newInvest);
             overlay.remove();
         });
     }
@@ -488,25 +520,29 @@ document.addEventListener("DOMContentLoaded", function () {
         if (editBtn) editBtn.addEventListener("click", function () {
             var price = parseFloat(row.querySelector("td").textContent.replace(/[^0-9.\-]/g, ""));
             var dir = row.querySelector(".bg-success") ? "above" : "below";
-            showEditModal(id, price, dir);
+            var invest = row.dataset.investAmount ? parseFloat(row.dataset.investAmount) : null;
+            showEditModal(id, price, dir, invest);
         });
         if (deleteBtn) deleteBtn.addEventListener("click", function () { deleteAlert(id, row); });
     }
     alertsBody.querySelectorAll("tr[data-alert-id]").forEach(bindRowActions);
 
     /* Bell buttons on preset targets */
-    function makeBell(container, price, direction) {
+    function makeBell(container, price, direction, investAmount) {
         container.innerHTML = '<button class="btn-alert-toggle" title="Set alert at $' + fmtUSD(price) + '">' + bellSVG + '</button>';
         container.querySelector("button").addEventListener("click", function (e) {
             e.stopPropagation();
-            createAlert(price, direction);
+            createAlert(price, direction, null, investAmount);
         });
     }
     document.querySelectorAll(".an-target-row[data-target-price]").forEach(function (row) {
         var price = parseFloat(row.dataset.targetPrice);
         var dir = row.dataset.targetDir;
+        var investRaw = row.dataset.targetInvest;
+        var invest = (dir === "below" && investRaw) ? parseFloat(investRaw) : null;
+        if (invest != null && (isNaN(invest) || invest <= 0)) invest = null;
         var bell = row.querySelector(".an-target-bell");
-        makeBell(bell, price, dir);
+        makeBell(bell, price, dir, invest);
     });
 
     /* ── Simulators ── */
@@ -514,10 +550,10 @@ document.addEventListener("DOMContentLoaded", function () {
     var units = parseFloat(table.dataset.units);
     var avgPrice = parseFloat(table.dataset.avgPrice);
 
-    function simBell(cell, price, direction) {
+    function simBell(cell, price, direction, investAmount) {
         if (!price || price <= 0) { cell.innerHTML = ""; return; }
         cell.innerHTML = '<button class="btn-alert-toggle" title="Set alert at $' + fmtUSD(price) + '">' + bellSVG + '</button>';
-        cell.querySelector("button").onclick = function (e) { e.stopPropagation(); createAlert(price, direction); };
+        cell.querySelector("button").onclick = function (e) { e.stopPropagation(); createAlert(price, direction, null, investAmount); };
     }
 
     /* Custom sell % */
@@ -529,7 +565,7 @@ document.addEventListener("DOMContentLoaded", function () {
         if (isNaN(pct) || pct < 0 || avgPrice <= 0) { sellRes.textContent = "\u2014"; sellRes.style.color = "var(--text-muted)"; sellBell.innerHTML = ""; return; }
         var p = avgPrice * (1 + pct / 100);
         sellRes.textContent = "$" + fmtUSD(p); sellRes.style.color = "#34d399";
-        simBell(sellBell, parseFloat(p.toFixed(2)), "above");
+        simBell(sellBell, parseFloat(p.toFixed(2)), "above", null);
     });
 
     /* Buy $X to lower avg by Y% */
@@ -555,7 +591,7 @@ document.addEventListener("DOMContentLoaded", function () {
         var p = (targetAvg * dollars) / denom;
         if (p <= 0) { dollarRes.textContent = "Not possible"; dollarRes.style.color = "var(--text-muted)"; dollarBell.innerHTML = ""; return; }
         dollarRes.textContent = "$" + fmtUSD(p); dollarRes.style.color = "#818cf8";
-        simBell(dollarBell, parseFloat(p.toFixed(2)), "below");
+        simBell(dollarBell, parseFloat(p.toFixed(2)), "below", parseFloat(dollars.toFixed(2)));
     }
     dollarIn.addEventListener("input", updateDollarSim);
     dollarPctIn.addEventListener("input", updateDollarSim);

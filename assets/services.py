@@ -179,6 +179,7 @@ def compute_analytics(transactions, symbol):
         "sell_10": None,
         "sell_25": None,
         "buy_avg_minus_10": None,
+        "buy_avg_minus_10_spend": None,
     }
 
     if current_price is not None:
@@ -206,6 +207,13 @@ def compute_analytics(transactions, symbol):
         buy_price_for_minus_10 = (target_avg * (units * 2) - cost_basis) / units
         analytics["buy_avg_minus_10"] = (
             round(buy_price_for_minus_10, 2) if buy_price_for_minus_10 > 0 else 0.0
+        )
+        # Dollar spend needed to achieve the -10% avg at that price
+        # (buy <units> more at <buy_price_for_minus_10>).
+        analytics["buy_avg_minus_10_spend"] = (
+            round(buy_price_for_minus_10 * units, 2)
+            if buy_price_for_minus_10 > 0
+            else 0.0
         )
 
     return analytics
@@ -516,6 +524,9 @@ def sync_alert_cache():
                 "user_id": str(a.user_id),
                 "target_price": float(a.target_price),
                 "direction": a.direction,
+                "invest_amount": (
+                    float(a.invest_amount) if a.invest_amount is not None else None
+                ),
             }
         )
     cache.set("price_alerts_active", alert_data, timeout=None)

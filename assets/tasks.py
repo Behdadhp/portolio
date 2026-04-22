@@ -148,6 +148,15 @@ def _send_alert_email(alert, current_price):
         asset_type_path = "stocks" if is_stock else "crypto"
         detail_url = f"{settings.SITE_URL}/{asset_type_path}/{symbol}/"
 
+        invest_amount_str = None
+        invest_units_str = None
+        if alert.direction == "below" and alert.invest_amount is not None:
+            invest_amount_str = f"{alert.invest_amount:,.2f}"
+            if current_price and current_price > 0:
+                invest_units_str = (
+                    f"{float(alert.invest_amount) / float(current_price):,.6f}"
+                )
+
         context = {
             "first_name": user.first_name,
             "asset_name": alert.asset_name,
@@ -155,6 +164,8 @@ def _send_alert_email(alert, current_price):
             "target_price": f"{alert.target_price:,.2f}",
             "current_price": f"{current_price:,.2f}",
             "direction": alert.direction,
+            "invest_amount": invest_amount_str,
+            "invest_units": invest_units_str,
             "detail_url": detail_url,
         }
 

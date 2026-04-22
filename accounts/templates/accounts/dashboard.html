@@ -258,6 +258,7 @@
                         <th style="padding-left:1.25rem;">Asset</th>
                         <th class="text-end">Target</th>
                         <th class="text-end">Direction</th>
+                        <th class="text-end" title="Dollar amount to spend when a buy alert triggers">Spend</th>
                         <th class="text-end" style="padding-right:1.25rem;">Status</th>
                     </tr>
                 </thead>
@@ -276,6 +277,9 @@
                             <span class="badge {% if alert.direction == 'above' %}bg-success{% else %}bg-primary{% endif %}" style="font-size:0.7rem;">
                                 {% if alert.direction == 'above' %}Above{% else %}Below{% endif %}
                             </span>
+                        </td>
+                        <td class="text-end price-cell" style="color:#818cf8;">
+                            {% if alert.invest_amount %}${{ alert.invest_amount|floatformat:2 }}{% else %}<span class="text-muted">—</span>{% endif %}
                         </td>
                         <td class="text-end" style="padding-right:1.25rem;">
                             {% if alert.email_sent %}

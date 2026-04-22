@@ -5,7 +5,12 @@ Your price alert for {{ asset_name }} ({{ symbol }}) has been triggered.
   Target Price:   ${{ target_price }}
   Current Price:  ${{ current_price }}
   Direction:      {% if direction == "above" %}Above (Sell){% else %}Below (Buy){% endif %}
+{% if invest_amount %}
+  Planned Spend:  ${{ invest_amount }}{% if invest_units %} (~{{ invest_units }} {{ symbol }} at current price){% endif %}
 
+  To hit the average cost you planned when you set this alert,
+  buy approximately ${{ invest_amount }} worth at the current price.
+{% endif %}
 View details: {{ detail_url }}
 
 This is a one-time alert. To set a new alert, visit the asset's detail page.
