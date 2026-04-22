@@ -213,9 +213,6 @@
                             {% endif %}
                         </td>
                         <td class="text-end">
-                            {% if not alert.email_sent %}
-                            <button class="btn btn-ghost btn-sm py-0 px-1 alert-edit-btn" style="font-size:0.75rem;" title="Edit">Edit</button>
-                            {% endif %}
                             <button class="btn btn-ghost btn-sm py-0 px-1 alert-delete-btn" style="font-size:0.75rem;color:#f87171;" title="Delete">Delete</button>
                         </td>
                     </tr>
@@ -332,16 +329,6 @@
     /* Alerts table */
     #alertsTable th { border-bottom-color: var(--border-color); }
     #alertsTable td { border-bottom-color: var(--border-color); vertical-align: middle; }
-    .alert-edit-modal {
-        position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-        background: rgba(0,0,0,0.5); z-index: 1050;
-        display: flex; align-items: center; justify-content: center;
-    }
-    .alert-edit-modal .modal-box {
-        background: var(--bg-card); border: 1px solid var(--border-color);
-        border-radius: 14px; padding: 1.5rem; width: 320px;
-        box-shadow: 0 16px 48px rgba(0,0,0,0.4);
-    }
 
     @media (max-width: 576px) {
         .an-sim-grid { grid-template-columns: 1fr; }
@@ -424,10 +411,7 @@ document.addEventListener("DOMContentLoaded", function () {
         var statusBadge = alert.email_sent
             ? '<span class="badge" style="background:rgba(251,191,36,0.15);color:#fbbf24;font-size:0.7rem;">Triggered</span>'
             : '<span class="badge" style="background:rgba(52,211,153,0.15);color:#34d399;font-size:0.7rem;">Active</span>';
-        var actions = alert.email_sent
-            ? '<button class="btn btn-ghost btn-sm py-0 px-1 alert-delete-btn" style="font-size:0.75rem;color:#f87171;">Delete</button>'
-            : '<button class="btn btn-ghost btn-sm py-0 px-1 alert-edit-btn" style="font-size:0.75rem;">Edit</button>'
-            + '<button class="btn btn-ghost btn-sm py-0 px-1 alert-delete-btn" style="font-size:0.75rem;color:#f87171;">Delete</button>';
+        var actions = '<button class="btn btn-ghost btn-sm py-0 px-1 alert-delete-btn" style="font-size:0.75rem;color:#f87171;">Delete</button>';
         tr.innerHTML =
             '<td class="fw-semibold" style="font-family:\'SF Mono\',\'Fira Code\',monospace;font-size:0.85rem;">$' + fmtUSD(alert.target_price) + '</td>'
             + '<td><span class="badge ' + dirClass + '" style="font-size:0.7rem;">' + dirLabel + '</span></td>'
@@ -438,20 +422,19 @@ document.addEventListener("DOMContentLoaded", function () {
         bindRowActions(tr);
     }
 
-    function createAlert(price, direction, updateId, investAmount) {
-        var url = updateId ? "/api/alerts/" + updateId + "/update/" : "/api/alerts/create/";
-        var body = updateId
-            ? { target_price: price, direction: direction, invest_amount: investAmount != null ? investAmount : null }
-            : { symbol: symbol, target_price: price, direction: direction };
-        if (!updateId && direction === "below" && investAmount != null) {
+    function createAlert(price, direction, investAmount) {
+        var body = { symbol: symbol, target_price: price, direction: direction };
+        if (direction === "below" && investAmount != null) {
             body.invest_amount = investAmount;
         }
-        apiCall(url, "POST", body).then(function (res) {
-            if (res.status === 409) { showMsg(res.data.message + " Use the edit button below.", "error"); return; }
+        apiCall("/api/alerts/create/", "POST", body).then(function (res) {
+            if (res.status === 409) {
+                showMsg(res.data.message + " Delete it first if you want to change it.", "error");
+                return;
+            }
             if (res.status >= 400) { showMsg(res.data.error || "Failed to create alert", "error"); return; }
-            if (updateId) { var row = alertsBody.querySelector('[data-alert-id="' + updateId + '"]'); if (row) row.remove(); }
             addAlertRow(res.data);
-            showMsg("Alert " + (updateId ? "updated" : "created") + " at $" + fmtUSD(price), "success");
+            showMsg("Alert created at $" + fmtUSD(price), "success");
         });
     }
 
@@ -466,64 +449,9 @@ document.addEventListener("DOMContentLoaded", function () {
         });
     }
 
-    function showEditModal(alertId, currentPrice, currentDir, currentInvest) {
-        var overlay = document.createElement("div");
-        overlay.className = "alert-edit-modal";
-        var investVal = currentInvest != null && !isNaN(currentInvest) ? currentInvest : "";
-        overlay.innerHTML =
-            '<div class="modal-box">'
-            + '<h6 class="mb-3 fw-bold">Edit Alert</h6>'
-            + '<div class="mb-2"><label class="form-label small">Target Price ($)</label>'
-            + '<input type="number" class="form-control form-control-sm" id="editAlertPrice" step="0.01" value="' + currentPrice + '"></div>'
-            + '<div class="mb-2"><label class="form-label small">Direction</label>'
-            + '<select class="form-control form-control-sm" id="editAlertDir">'
-            + '<option value="above"' + (currentDir === "above" ? " selected" : "") + '>Above (Sell)</option>'
-            + '<option value="below"' + (currentDir === "below" ? " selected" : "") + '>Below (Buy)</option>'
-            + '</select></div>'
-            + '<div class="mb-3" id="editAlertInvestWrap" style="' + (currentDir === "below" ? "" : "display:none;") + '">'
-            + '<label class="form-label small">Planned Spend ($) <span class="text-muted" style="font-size:0.7rem;">— only for Buy alerts</span></label>'
-            + '<input type="number" class="form-control form-control-sm" id="editAlertInvest" step="0.01" min="0" placeholder="e.g. 100" value="' + investVal + '">'
-            + '</div>'
-            + '<div class="d-flex gap-2">'
-            + '<button class="btn btn-accent btn-sm flex-fill" id="editAlertSave">Save</button>'
-            + '<button class="btn btn-ghost btn-sm flex-fill" id="editAlertCancel">Cancel</button>'
-            + '</div></div>';
-        document.body.appendChild(overlay);
-        var dirSelect = overlay.querySelector("#editAlertDir");
-        var investWrap = overlay.querySelector("#editAlertInvestWrap");
-        dirSelect.addEventListener("change", function () {
-            investWrap.style.display = dirSelect.value === "below" ? "" : "none";
-        });
-        overlay.querySelector("#editAlertCancel").addEventListener("click", function () { overlay.remove(); });
-        overlay.addEventListener("click", function (e) { if (e.target === overlay) overlay.remove(); });
-        overlay.querySelector("#editAlertSave").addEventListener("click", function () {
-            var newPrice = parseFloat(document.getElementById("editAlertPrice").value);
-            var newDir = dirSelect.value;
-            if (isNaN(newPrice) || newPrice <= 0) return;
-            var newInvest = null;
-            if (newDir === "below") {
-                var raw = document.getElementById("editAlertInvest").value;
-                if (raw !== "" && raw !== null) {
-                    var parsed = parseFloat(raw);
-                    if (!isNaN(parsed) && parsed > 0) newInvest = parsed;
-                }
-            }
-            createAlert(newPrice, newDir, alertId, newInvest);
-            overlay.remove();
-        });
-    }
-
     function bindRowActions(row) {
-        var id = row.dataset.alertId;
-        var editBtn = row.querySelector(".alert-edit-btn");
         var deleteBtn = row.querySelector(".alert-delete-btn");
-        if (editBtn) editBtn.addEventListener("click", function () {
-            var price = parseFloat(row.querySelector("td").textContent.replace(/[^0-9.\-]/g, ""));
-            var dir = row.querySelector(".bg-success") ? "above" : "below";
-            var invest = row.dataset.investAmount ? parseFloat(row.dataset.investAmount) : null;
-            showEditModal(id, price, dir, invest);
-        });
-        if (deleteBtn) deleteBtn.addEventListener("click", function () { deleteAlert(id, row); });
+        if (deleteBtn) deleteBtn.addEventListener("click", function () { deleteAlert(row.dataset.alertId, row); });
     }
     alertsBody.querySelectorAll("tr[data-alert-id]").forEach(bindRowActions);
 
@@ -532,7 +460,7 @@ document.addEventListener("DOMContentLoaded", function () {
         container.innerHTML = '<button class="btn-alert-toggle" title="Set alert at $' + fmtUSD(price) + '">' + bellSVG + '</button>';
         container.querySelector("button").addEventListener("click", function (e) {
             e.stopPropagation();
-            createAlert(price, direction, null, investAmount);
+            createAlert(price, direction, investAmount);
         });
     }
     document.querySelectorAll(".an-target-row[data-target-price]").forEach(function (row) {
@@ -553,7 +481,7 @@ document.addEventListener("DOMContentLoaded", function () {
     function simBell(cell, price, direction, investAmount) {
         if (!price || price <= 0) { cell.innerHTML = ""; return; }
         cell.innerHTML = '<button class="btn-alert-toggle" title="Set alert at $' + fmtUSD(price) + '">' + bellSVG + '</button>';
-        cell.querySelector("button").onclick = function (e) { e.stopPropagation(); createAlert(price, direction, null, investAmount); };
+        cell.querySelector("button").onclick = function (e) { e.stopPropagation(); createAlert(price, direction, investAmount); };
     }
 
     /* Custom sell % */

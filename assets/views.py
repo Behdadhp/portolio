@@ -454,69 +454,6 @@ def alert_create(request):
 
 @login_required
 @require_POST
-def alert_update(request, pk):
-    """Update target_price and/or direction of an alert."""
-    alert = get_object_or_404(PriceAlert, pk=pk, user=request.user)
-
-    try:
-        data = json.loads(request.body)
-    except json.JSONDecodeError:
-        return JsonResponse({"error": "Invalid JSON"}, status=400)
-
-    new_price = data.get("target_price")
-    new_direction = data.get("direction")
-    invest_amount_provided = "invest_amount" in data
-    new_invest_amount = data.get("invest_amount")
-
-    if new_price is not None:
-        try:
-            new_price = float(new_price)
-        except (ValueError, TypeError):
-            return JsonResponse({"error": "Invalid target_price"}, status=400)
-        if new_price <= 0:
-            return JsonResponse({"error": "target_price must be positive"}, status=400)
-        alert.target_price = new_price
-
-    if new_direction in ("above", "below"):
-        alert.direction = new_direction
-
-    # invest_amount is only meaningful for buy (below) alerts.
-    # Clear it automatically if the (effective) direction is 'above'.
-    if alert.direction == "above":
-        alert.invest_amount = None
-    elif invest_amount_provided:
-        if new_invest_amount in (None, ""):
-            alert.invest_amount = None
-        else:
-            try:
-                amt = float(new_invest_amount)
-            except (ValueError, TypeError):
-                return JsonResponse({"error": "Invalid invest_amount"}, status=400)
-            if amt <= 0:
-                return JsonResponse(
-                    {"error": "invest_amount must be positive"}, status=400
-                )
-            alert.invest_amount = amt
-
-    alert.email_sent = False  # re-arm if updated
-    alert.save()
-    sync_alert_cache()
-
-    return JsonResponse(
-        {
-            "id": str(alert.id),
-            "target_price": float(alert.target_price),
-            "direction": alert.direction,
-            "invest_amount": (
-                float(alert.invest_amount) if alert.invest_amount is not None else None
-            ),
-            "email_sent": alert.email_sent,
-        }
-    )
-
-
-@login_required
-@require_POST
 def alert_delete(request, pk):
     """Delete a price alert."""
     alert = get_object_or_404(PriceAlert, pk=pk, user=request.user)

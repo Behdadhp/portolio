@@ -16,6 +16,5 @@ urlpatterns = [
     path("crypto/<str:symbol>/", views.crypto_detail_view, name="crypto_detail"),
     # Price Alert API
     path("api/alerts/create/", views.alert_create, name="alert_create"),
-    path("api/alerts/<uuid:pk>/update/", views.alert_update, name="alert_update"),
     path("api/alerts/<uuid:pk>/delete/", views.alert_delete, name="alert_delete"),
 ]
