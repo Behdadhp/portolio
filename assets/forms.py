@@ -1,5 +1,5 @@
 from django import forms
-from .models import CryptoAsset, StockAsset
+from .models import CryptoAsset, ETFAsset, StockAsset
 
 
 class CryptoAssetForm(forms.ModelForm):
@@ -23,6 +23,21 @@ class StockAssetForm(forms.ModelForm):
         fields = ["stock", "price", "amount", "date", "status"]
         widgets = {
             "stock": forms.Select(attrs={"class": "form-control"}),
+            "price": forms.NumberInput(attrs={"class": "form-control", "step": "0.01"}),
+            "amount": forms.NumberInput(
+                attrs={"class": "form-control", "step": "0.00000001"}
+            ),
+            "date": forms.DateInput(attrs={"class": "form-control", "type": "date"}),
+            "status": forms.Select(attrs={"class": "form-control"}),
+        }
+
+
+class ETFAssetForm(forms.ModelForm):
+    class Meta:
+        model = ETFAsset
+        fields = ["etf", "price", "amount", "date", "status"]
+        widgets = {
+            "etf": forms.Select(attrs={"class": "form-control"}),
             "price": forms.NumberInput(attrs={"class": "form-control", "step": "0.01"}),
             "amount": forms.NumberInput(
                 attrs={"class": "form-control", "step": "0.00000001"}

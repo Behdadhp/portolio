@@ -17,8 +17,8 @@ SYMBOLS_CHANGED_KEY = "finnhub_symbols_changed"
 
 
 def _build_symbol_map():
-    """Build lookup from Crypto and Stock tables: finnhub_symbol -> symbol."""
-    from assets.models import Crypto, Stock
+    """Build lookup from Crypto, Stock, and ETF tables: finnhub_symbol -> symbol."""
+    from assets.models import ETF, Crypto, Stock
 
     symbol_map = {}
     for finnhub, short in Crypto.objects.exclude(finnhub_symbol="").values_list(
@@ -29,19 +29,26 @@ def _build_symbol_map():
         "finnhub_symbol", "symbol"
     ):
         symbol_map[finnhub] = short
+    for finnhub, short in ETF.objects.exclude(finnhub_symbol="").values_list(
+        "finnhub_symbol", "symbol"
+    ):
+        symbol_map[finnhub] = short
     return symbol_map
 
 
 def _fetch_market_caps():
-    """Fetch market caps from Finnhub (stocks) and CoinGecko (crypto), store in cache."""
-    from assets.models import Crypto, Stock
+    """Fetch market caps from Finnhub (stocks/ETFs) and CoinGecko (crypto), store in cache."""
+    from assets.models import ETF, Crypto, Stock
 
     api_key = settings.FINNHUB_API_KEY
 
-    # Stocks — Finnhub /stock/profile2
-    for finnhub_sym, short in Stock.objects.exclude(finnhub_symbol="").values_list(
-        "finnhub_symbol", "symbol"
-    ):
+    # Stocks & ETFs — Finnhub /stock/profile2
+    stock_etf_pairs = list(
+        Stock.objects.exclude(finnhub_symbol="").values_list("finnhub_symbol", "symbol")
+    ) + list(
+        ETF.objects.exclude(finnhub_symbol="").values_list("finnhub_symbol", "symbol")
+    )
+    for finnhub_sym, short in stock_etf_pairs:
         try:
             resp = requests.get(
                 f"{settings.FINNHUB_REST_URL}/stock/profile2",
@@ -89,13 +96,16 @@ def _fetch_market_caps():
 
 
 def _poll_stock_quotes():
-    """Fetch latest stock quotes via REST API (free tier has no real-time WS for US stocks)."""
-    from assets.models import Stock
+    """Fetch latest stock & ETF quotes via REST API (free tier has no real-time WS for US stocks/ETFs)."""
+    from assets.models import ETF, Stock
 
     api_key = settings.FINNHUB_API_KEY
-    for finnhub_sym, short in Stock.objects.exclude(finnhub_symbol="").values_list(
-        "finnhub_symbol", "symbol"
-    ):
+    pairs = list(
+        Stock.objects.exclude(finnhub_symbol="").values_list("finnhub_symbol", "symbol")
+    ) + list(
+        ETF.objects.exclude(finnhub_symbol="").values_list("finnhub_symbol", "symbol")
+    )
+    for finnhub_sym, short in pairs:
         try:
             resp = requests.get(
                 f"{settings.FINNHUB_REST_URL}/quote",
@@ -143,9 +153,13 @@ def _send_alert_email(alert, current_price):
         from django.template.loader import render_to_string
 
         user = alert.user
-        is_stock = alert.stock_id is not None
         symbol = alert.symbol
-        asset_type_path = "stocks" if is_stock else "crypto"
+        if alert.stock_id is not None:
+            asset_type_path = "stocks"
+        elif alert.etf_id is not None:
+            asset_type_path = "etfs"
+        else:
+            asset_type_path = "crypto"
         detail_url = f"{settings.SITE_URL}/{asset_type_path}/{symbol}/"
 
         invest_amount_str = None
@@ -222,7 +236,7 @@ def _check_price_alerts(short, price):
         triggered_alerts = list(
             PriceAlert.objects.filter(
                 id__in=triggered_ids, email_sent=False
-            ).select_related("user", "stock", "crypto")
+            ).select_related("user", "stock", "crypto", "etf")
         )
         PriceAlert.objects.filter(id__in=triggered_ids, email_sent=False).update(
             email_sent=True

@@ -44,6 +44,27 @@ class Stock(models.Model):
         return f"{self.name} ({self.symbol})"
 
 
+class ETF(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    name = models.CharField(max_length=100, unique=True)
+    symbol = models.CharField(max_length=20, unique=True)
+    finnhub_symbol = models.CharField(
+        max_length=50,
+        blank=True,
+        default="",
+        help_text="Finnhub symbol (e.g. VOO). Leave blank to skip live tracking.",
+    )
+    date_added = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        verbose_name = "ETF"
+        verbose_name_plural = "ETFs"
+        ordering = ["name"]
+
+    def __str__(self):
+        return f"{self.name} ({self.symbol})"
+
+
 class Status(models.TextChoices):
     BOUGHT = "bought", "Bought"
     SOLD = "sold", "Sold"
@@ -87,6 +108,25 @@ class StockAsset(models.Model):
         return f"{self.stock.name} - {self.user.email}"
 
 
+class ETFAsset(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="etf_assets"
+    )
+    etf = models.ForeignKey(
+        ETF, on_delete=models.CASCADE, related_name="transactions"
+    )
+    price = models.DecimalField(max_digits=18, decimal_places=2)
+    amount = models.FloatField(default=0.0)
+    date = models.DateField()
+    status = models.CharField(
+        max_length=10, choices=Status.choices, default=Status.BOUGHT
+    )
+
+    def __str__(self):
+        return f"{self.etf.name} - {self.user.email}"
+
+
 class PriceAlert(models.Model):
     class Direction(models.TextChoices):
         ABOVE = "above", "Above (Sell)"
@@ -101,6 +141,9 @@ class PriceAlert(models.Model):
     )
     crypto = models.ForeignKey(
         Crypto, on_delete=models.CASCADE, null=True, blank=True, related_name="alerts"
+    )
+    etf = models.ForeignKey(
+        ETF, on_delete=models.CASCADE, null=True, blank=True, related_name="alerts"
     )
     target_price = models.DecimalField(max_digits=18, decimal_places=2)
     direction = models.CharField(
@@ -126,12 +169,16 @@ class PriceAlert(models.Model):
     def symbol(self):
         if self.stock_id:
             return self.stock.symbol
+        if self.etf_id:
+            return self.etf.symbol
         return self.crypto.symbol
 
     @property
     def asset_name(self):
         if self.stock_id:
             return self.stock.name
+        if self.etf_id:
+            return self.etf.name
         return self.crypto.name
 
     def __str__(self):

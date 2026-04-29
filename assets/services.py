@@ -323,6 +323,109 @@ def compute_stock_tax(user, current_symbol=None):
     }
 
 
+def compute_etf_tax(user, current_symbol=None):
+    """
+    Compute German ETF tax analytics for the current year across all user ETFs.
+
+    Uses the same German tax rules as stocks:
+    - Kapitalertragsteuer: 25% on gains
+    - Solidaritätszuschlag: 5.5% on the tax
+    - Effective rate: 26.375% (without Kirchensteuer)
+    - Freibetrag: 1,000 EUR/year (singles)
+    - ETF losses can only offset ETF gains
+
+    Returns a dict with tax breakdown, or None if no sells this year.
+    """
+    from datetime import date
+    from .models import ETFAsset
+
+    TAX_RATE = 0.26375  # 25% + 5.5% Soli
+    FREIBETRAG_EUR = 1000.0
+    eur_usd = get_eur_usd_rate() or 1.0
+    FREIBETRAG = FREIBETRAG_EUR * eur_usd  # threshold in USD for comparison
+    current_year = date.today().year
+
+    all_etfs_qs = ETFAsset.objects.filter(user=user)
+
+    # Get unique ETF FKs that have transactions
+    etf_ids = all_etfs_qs.values_list("etf_id", flat=True).distinct()
+
+    total_gains = 0.0
+    total_losses = 0.0
+    current_etf_gains = 0.0
+    current_etf_losses = 0.0
+    sell_count = 0
+
+    for etf_id in etf_ids:
+        txs = (
+            all_etfs_qs.filter(etf_id=etf_id)
+            .select_related("etf")
+            .order_by("date", "status", "pk")
+        )
+        etf_symbol = None
+        cost_basis = 0.0
+        units = 0.0
+
+        for tx in txs:
+            if etf_symbol is None:
+                etf_symbol = tx.etf.symbol
+            amt = float(tx.amount)
+            px = float(tx.price)
+
+            if tx.status == "bought":
+                cost_basis += amt * px
+                units += amt
+            elif tx.status == "sold":
+                if units > 0:
+                    avg = cost_basis / units
+                    pnl = (px - avg) * amt
+                    cost_basis -= amt * avg
+                    units -= amt
+
+                    if tx.date.year == current_year:
+                        if pnl >= 0:
+                            total_gains += pnl
+                        else:
+                            total_losses += abs(pnl)
+
+                        if etf_symbol == current_symbol:
+                            if pnl >= 0:
+                                current_etf_gains += pnl
+                            else:
+                                current_etf_losses += abs(pnl)
+
+                        sell_count += 1
+
+    net_gain = total_gains - total_losses
+    taxable = max(0.0, net_gain - FREIBETRAG)
+    tax_owed = taxable * TAX_RATE
+    freibetrag_used = min(net_gain, FREIBETRAG) if net_gain > 0 else 0.0
+    freibetrag_remaining = FREIBETRAG - freibetrag_used
+
+    gain_until_taxed = max(0.0, FREIBETRAG - net_gain) if net_gain < FREIBETRAG else 0.0
+
+    current_etf_net = current_etf_gains - current_etf_losses
+
+    return {
+        "year": current_year,
+        "total_gains": round(total_gains, 2),
+        "total_losses": round(total_losses, 2),
+        "net_gain": round(net_gain, 2),
+        "freibetrag": FREIBETRAG,
+        "freibetrag_used": round(freibetrag_used, 2),
+        "freibetrag_remaining": round(freibetrag_remaining, 2),
+        "gain_until_taxed": round(gain_until_taxed, 2),
+        "taxable": round(taxable, 2),
+        "tax_rate_pct": round(TAX_RATE * 100, 3),
+        "tax_owed": round(tax_owed, 2),
+        "net_after_tax": round(net_gain - tax_owed, 2),
+        "current_etf_gains": round(current_etf_gains, 2),
+        "current_etf_losses": round(current_etf_losses, 2),
+        "current_etf_net": round(current_etf_net, 2),
+        "sell_count": sell_count,
+    }
+
+
 def compute_crypto_tax(user, current_symbol=None):
     """
     Compute German crypto tax analytics for the current year.
@@ -514,7 +617,7 @@ def sync_alert_cache():
     from .models import PriceAlert
 
     alerts = PriceAlert.objects.filter(email_sent=False).select_related(
-        "stock", "crypto"
+        "stock", "crypto", "etf"
     )
     alert_data = {}
     for a in alerts:

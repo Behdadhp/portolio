@@ -6,13 +6,14 @@ from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 
-from .forms import CryptoAssetForm, StockAssetForm
-from .models import Crypto, CryptoAsset, PriceAlert, Stock, StockAsset
+from .forms import CryptoAssetForm, ETFAssetForm, StockAssetForm
+from .models import ETF, Crypto, CryptoAsset, ETFAsset, PriceAlert, Stock, StockAsset
 from .services import (
     DETAIL_COLUMNS,
     apply_filters,
     compute_analytics,
     compute_crypto_tax,
+    compute_etf_tax,
     compute_stock_tax,
     cost_basis_for,
     get_asset_summary,
@@ -279,6 +280,76 @@ def stock_delete_view(request, pk):
     )
 
 
+# ── ETF views ────────────────────────────────────────────────
+
+
+@login_required
+def etf_list_view(request):
+    return _list_view(
+        request,
+        ETFAsset,
+        "etf__name",
+        "etf__symbol",
+        "assets/etf_list.html",
+        "etfs",
+    )
+
+
+@login_required
+def etf_detail_view(request, symbol):
+    tax = compute_etf_tax(request.user, current_symbol=symbol)
+    return _detail_view(
+        request,
+        symbol,
+        ETF,
+        ETFAsset,
+        "etf",
+        "etf__name",
+        "etf__symbol",
+        "assets/etf_detail.html",
+        extra_context={"tax": tax},
+    )
+
+
+@login_required
+def etf_add_view(request, symbol=None):
+    return _add_view(
+        request,
+        ETFAssetForm,
+        ETF,
+        "etf",
+        "assets/etf_add.html",
+        "etf_detail",
+        symbol,
+    )
+
+
+@login_required
+def etf_edit_view(request, pk):
+    return _edit_view(
+        request,
+        pk,
+        ETFAssetForm,
+        ETFAsset,
+        "etf",
+        "assets/etf_edit.html",
+        "etf_detail",
+    )
+
+
+@login_required
+def etf_delete_view(request, pk):
+    return _delete_view(
+        request,
+        pk,
+        ETFAsset,
+        "etf",
+        "assets/etf_delete.html",
+        "etfs",
+        "etf_detail",
+    )
+
+
 # ── Crypto views ─────────────────────────────────────────────
 
 
@@ -399,9 +470,14 @@ def alert_create(request):
 
     # Find the asset
     stock = Stock.objects.filter(symbol=symbol).first()
-    crypto = Crypto.objects.filter(symbol=symbol).first() if not stock else None
+    etf = ETF.objects.filter(symbol=symbol).first() if not stock else None
+    crypto = (
+        Crypto.objects.filter(symbol=symbol).first()
+        if not stock and not etf
+        else None
+    )
 
-    if not stock and not crypto:
+    if not stock and not etf and not crypto:
         return JsonResponse(
             {"error": f"No asset found for symbol '{symbol}'"}, status=404
         )
@@ -410,6 +486,7 @@ def alert_create(request):
     existing = PriceAlert.objects.filter(
         user=request.user,
         stock=stock,
+        etf=etf,
         crypto=crypto,
         direction=direction,
         email_sent=False,
@@ -430,6 +507,7 @@ def alert_create(request):
     alert = PriceAlert.objects.create(
         user=request.user,
         stock=stock,
+        etf=etf,
         crypto=crypto,
         target_price=target_price,
         direction=direction,
