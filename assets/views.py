@@ -474,12 +474,18 @@ def etf_plan_delete_view(request, pk):
     return render(request, "assets/etf_plan_delete.html", {"plan": plan, "etf": etf})
 
 
-def _refresh_etf_last_price(etf, price):
-    """Mirror the latest user-entered transaction price onto the master ETF."""
-    if price is None:
-        return
-    etf.last_price = price
-    etf.save(update_fields=["last_price"])
+def _refresh_etf_last_price(etf):
+    """
+    Mirror the most recent transaction's price onto the master ETF.
+
+    Picks the latest by (date, pk) across all users so historical inserts/edits
+    don't clobber a more recent price.
+    """
+    latest = etf.transactions.order_by("-date", "-pk").first()
+    new_price = latest.price if latest else None
+    if new_price != etf.last_price:
+        etf.last_price = new_price
+        etf.save(update_fields=["last_price"])
 
 
 @login_required
@@ -498,7 +504,7 @@ def etf_add_view(request, symbol=None):
             transaction = form.save(commit=False)
             transaction.user = request.user
             transaction.save()
-            _refresh_etf_last_price(transaction.etf, transaction.price)
+            _refresh_etf_last_price(transaction.etf)
             return redirect("etf_detail", symbol=transaction.etf.symbol)
 
     return render(
@@ -517,7 +523,7 @@ def etf_edit_view(request, pk):
         form = ETFAssetForm(request.POST, instance=transaction)
         if form.is_valid():
             transaction = form.save()
-            _refresh_etf_last_price(transaction.etf, transaction.price)
+            _refresh_etf_last_price(transaction.etf)
             return redirect("etf_detail", symbol=transaction.etf.symbol)
 
     return render(

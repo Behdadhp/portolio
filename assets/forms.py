@@ -1,6 +1,9 @@
 from django import forms
 from .models import ETF, CryptoAsset, ETFAsset, ETFSavingsPlan, StockAsset
 
+# Symbols that would shadow ETF URL routes (urls.py).
+RESERVED_ETF_SYMBOLS = {"new", "add", "edit", "delete", "plans", "master"}
+
 
 class ETFForm(forms.ModelForm):
     class Meta:
@@ -13,6 +16,14 @@ class ETFForm(forms.ModelForm):
                 attrs={"class": "form-control", "step": "0.01"}
             ),
         }
+
+    def clean_symbol(self):
+        symbol = self.cleaned_data["symbol"].strip()
+        if symbol.lower() in RESERVED_ETF_SYMBOLS:
+            raise forms.ValidationError(
+                f"'{symbol}' is reserved and cannot be used as an ETF symbol."
+            )
+        return symbol
 
 
 class CryptoAssetForm(forms.ModelForm):
@@ -72,3 +83,9 @@ class ETFSavingsPlanForm(forms.ModelForm):
             "start_date": forms.DateInput(attrs={"class": "form-control", "type": "date"}),
             "active": forms.CheckboxInput(attrs={"class": "form-check-input"}),
         }
+
+    def clean_amount(self):
+        amount = self.cleaned_data["amount"]
+        if amount is None or amount <= 0:
+            raise forms.ValidationError("Amount must be greater than zero.")
+        return amount
