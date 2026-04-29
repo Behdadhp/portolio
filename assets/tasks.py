@@ -9,7 +9,7 @@ from celery import shared_task
 from django.conf import settings
 from django.core.cache import cache
 
-from .services import sync_alert_cache
+from .services import execute_due_savings_plans, sync_alert_cache
 
 logger = logging.getLogger(__name__)
 
@@ -17,8 +17,8 @@ SYMBOLS_CHANGED_KEY = "finnhub_symbols_changed"
 
 
 def _build_symbol_map():
-    """Build lookup from Crypto, Stock, and ETF tables: finnhub_symbol -> symbol."""
-    from assets.models import ETF, Crypto, Stock
+    """Build lookup from Crypto and Stock tables: finnhub_symbol -> symbol."""
+    from assets.models import Crypto, Stock
 
     symbol_map = {}
     for finnhub, short in Crypto.objects.exclude(finnhub_symbol="").values_list(
@@ -29,26 +29,19 @@ def _build_symbol_map():
         "finnhub_symbol", "symbol"
     ):
         symbol_map[finnhub] = short
-    for finnhub, short in ETF.objects.exclude(finnhub_symbol="").values_list(
-        "finnhub_symbol", "symbol"
-    ):
-        symbol_map[finnhub] = short
     return symbol_map
 
 
 def _fetch_market_caps():
-    """Fetch market caps from Finnhub (stocks/ETFs) and CoinGecko (crypto), store in cache."""
-    from assets.models import ETF, Crypto, Stock
+    """Fetch market caps from Finnhub (stocks) and CoinGecko (crypto), store in cache."""
+    from assets.models import Crypto, Stock
 
     api_key = settings.FINNHUB_API_KEY
 
-    # Stocks & ETFs — Finnhub /stock/profile2
-    stock_etf_pairs = list(
-        Stock.objects.exclude(finnhub_symbol="").values_list("finnhub_symbol", "symbol")
-    ) + list(
-        ETF.objects.exclude(finnhub_symbol="").values_list("finnhub_symbol", "symbol")
-    )
-    for finnhub_sym, short in stock_etf_pairs:
+    # Stocks — Finnhub /stock/profile2
+    for finnhub_sym, short in Stock.objects.exclude(finnhub_symbol="").values_list(
+        "finnhub_symbol", "symbol"
+    ):
         try:
             resp = requests.get(
                 f"{settings.FINNHUB_REST_URL}/stock/profile2",
@@ -96,16 +89,13 @@ def _fetch_market_caps():
 
 
 def _poll_stock_quotes():
-    """Fetch latest stock & ETF quotes via REST API (free tier has no real-time WS for US stocks/ETFs)."""
-    from assets.models import ETF, Stock
+    """Fetch latest stock quotes via REST API (free tier has no real-time WS for US stocks)."""
+    from assets.models import Stock
 
     api_key = settings.FINNHUB_API_KEY
-    pairs = list(
-        Stock.objects.exclude(finnhub_symbol="").values_list("finnhub_symbol", "symbol")
-    ) + list(
-        ETF.objects.exclude(finnhub_symbol="").values_list("finnhub_symbol", "symbol")
-    )
-    for finnhub_sym, short in pairs:
+    for finnhub_sym, short in Stock.objects.exclude(finnhub_symbol="").values_list(
+        "finnhub_symbol", "symbol"
+    ):
         try:
             resp = requests.get(
                 f"{settings.FINNHUB_REST_URL}/quote",
@@ -144,6 +134,19 @@ def _market_cap_loop():
         except Exception as e:
             logger.warning("Market cap refresh error: %s", e)
         time.sleep(settings.MARKET_CAP_REFRESH)
+
+
+SAVINGS_PLAN_CHECK_INTERVAL = 3600  # 1 hour; idempotent so frequent checks are safe
+
+
+def _savings_plan_loop():
+    """Background thread that executes due ETF savings plans hourly."""
+    while True:
+        try:
+            execute_due_savings_plans()
+        except Exception as e:
+            logger.warning("Savings plan execution error: %s", e)
+        time.sleep(SAVINGS_PLAN_CHECK_INTERVAL)
 
 
 def _send_alert_email(alert, current_price):
@@ -294,6 +297,14 @@ def stream_prices():
     _poll_stock_quotes()
     stock_poll_thread = threading.Thread(target=_stock_quote_loop, daemon=True)
     stock_poll_thread.start()
+
+    # Execute due ETF savings plans (idempotent; runs hourly)
+    try:
+        execute_due_savings_plans()
+    except Exception as e:
+        logger.warning("Initial savings plan run failed: %s", e)
+    savings_plan_thread = threading.Thread(target=_savings_plan_loop, daemon=True)
+    savings_plan_thread.start()
 
     # Clear any stale flag
     cache.delete(SYMBOLS_CHANGED_KEY)

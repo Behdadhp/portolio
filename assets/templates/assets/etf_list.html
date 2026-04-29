@@ -67,7 +67,9 @@
         <p class="mb-0" style="color:var(--text-secondary); font-size:0.9rem;">Your ETF holdings at a glance</p>
     </div>
     <div class="d-flex gap-2">
+        <a href="{% url 'etf_create' %}" class="btn btn-accent btn-sm">+ Add ETF</a>
         <a href="{% url 'etf_add' %}" class="btn btn-accent btn-sm">+ Add Transaction</a>
+        <a href="{% url 'etf_plan_create' %}" class="btn btn-accent btn-sm">+ Savings Plan</a>
         <a href="{% url 'dashboard' %}" class="btn btn-ghost btn-sm">Dashboard</a>
     </div>
 </div>
@@ -184,7 +186,10 @@
                 </svg>
             </div>
             <p style="color:var(--text-secondary);" class="mb-2">No ETF assets yet</p>
-            <a href="{% url 'etf_add' %}" class="btn btn-accent btn-sm">Add your first transaction</a>
+            <div class="d-flex gap-2 justify-content-center">
+                <a href="{% url 'etf_create' %}" class="btn btn-accent btn-sm">Add an ETF</a>
+                <a href="{% url 'etf_add' %}" class="btn btn-ghost btn-sm">Add your first transaction</a>
+            </div>
         </div>
         {% endif %}
     </div>

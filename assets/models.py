@@ -48,11 +48,12 @@ class ETF(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     name = models.CharField(max_length=100, unique=True)
     symbol = models.CharField(max_length=20, unique=True)
-    finnhub_symbol = models.CharField(
-        max_length=50,
+    last_price = models.DecimalField(
+        max_digits=18,
+        decimal_places=2,
+        null=True,
         blank=True,
-        default="",
-        help_text="Finnhub symbol (e.g. VOO). Leave blank to skip live tracking.",
+        help_text="User-maintained last known price (USD). Used for analytics and savings-plan auto-transactions.",
     )
     date_added = models.DateTimeField(default=timezone.now)
 
@@ -60,6 +61,16 @@ class ETF(models.Model):
         verbose_name = "ETF"
         verbose_name_plural = "ETFs"
         ordering = ["name"]
+
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        # Mirror last_price into the shared price cache so analytics/list views
+        # transparently use it (same key shape as Finnhub-tracked assets).
+        from django.core.cache import cache
+        if self.last_price is not None:
+            cache.set(f"finnhub_{self.symbol}", float(self.last_price), timeout=None)
+        else:
+            cache.delete(f"finnhub_{self.symbol}")
 
     def __str__(self):
         return f"{self.name} ({self.symbol})"
@@ -125,6 +136,56 @@ class ETFAsset(models.Model):
 
     def __str__(self):
         return f"{self.etf.name} - {self.user.email}"
+
+
+class ETFSavingsPlan(models.Model):
+    class Interval(models.TextChoices):
+        WEEKLY = "weekly", "Weekly"
+        BIWEEKLY = "biweekly", "Bi-weekly"
+        MONTHLY = "monthly", "Monthly"
+        QUARTERLY = "quarterly", "Quarterly"
+
+    class Currency(models.TextChoices):
+        USD = "USD", "USD"
+        EUR = "EUR", "EUR"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="etf_savings_plans"
+    )
+    etf = models.ForeignKey(
+        ETF, on_delete=models.CASCADE, related_name="savings_plans"
+    )
+    amount = models.DecimalField(
+        max_digits=18,
+        decimal_places=2,
+        help_text="Amount to invest each interval, in the plan's currency.",
+    )
+    currency = models.CharField(
+        max_length=3,
+        choices=Currency.choices,
+        default=Currency.USD,
+        help_text="Currency of `amount`. EUR plans are converted to USD at execution time.",
+    )
+    interval = models.CharField(
+        max_length=10, choices=Interval.choices, default=Interval.MONTHLY
+    )
+    start_date = models.DateField(
+        help_text="Original start date (used to anchor day-of-month). Never changes."
+    )
+    next_execution_date = models.DateField(
+        help_text="Next date the plan will auto-execute. Advances after each run."
+    )
+    last_executed_at = models.DateTimeField(null=True, blank=True)
+    active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        sign = "€" if self.currency == "EUR" else "$"
+        return f"{self.etf.symbol} {sign}{self.amount} {self.interval} ({self.user.email})"
 
 
 class PriceAlert(models.Model):

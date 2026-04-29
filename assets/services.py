@@ -572,9 +572,13 @@ def get_eur_usd_rate():
     Returns None if the API is unreachable.
     """
     CACHE_KEY = "fx_eur_usd"
+    UNAVAILABLE_KEY = "fx_eur_usd_unavailable"
     rate = cache.get(CACHE_KEY)
     if rate is not None:
         return rate
+
+    if cache.get(UNAVAILABLE_KEY):
+        return None
 
     try:
         resp = requests.get(
@@ -587,11 +591,13 @@ def get_eur_usd_rate():
         rate = data.get("rates", {}).get("USD")
         if rate:
             cache.set(CACHE_KEY, float(rate), timeout=6 * 3600)
+            cache.delete(UNAVAILABLE_KEY)
             logger.info("EUR/USD rate: %s", rate)
             return float(rate)
     except Exception as e:
         logger.warning("Failed to fetch EUR/USD rate: %s", e)
 
+    cache.set(UNAVAILABLE_KEY, True, timeout=15 * 60)
     return None
 
 
@@ -610,6 +616,97 @@ def cost_basis_for(txs):
             cb -= amt * avg
             units -= amt
     return round(cb, 2)
+
+
+def advance_savings_plan_date(plan, current):
+    """
+    Compute the next execution date for a savings plan after `current`.
+
+    Monthly/quarterly anchor to the original `start_date.day`, clamped to
+    month-end (so a 31st plan falls on Feb 28/29, March 31, April 30, etc.).
+    """
+    import calendar
+    from datetime import date, timedelta
+
+    interval = plan.interval
+    if interval == "weekly":
+        return current + timedelta(days=7)
+    if interval == "biweekly":
+        return current + timedelta(days=14)
+
+    months = {"monthly": 1, "quarterly": 3}.get(interval, 1)
+    target_year = current.year + (current.month - 1 + months) // 12
+    target_month = (current.month - 1 + months) % 12 + 1
+    last_day = calendar.monthrange(target_year, target_month)[1]
+    target_day = min(plan.start_date.day, last_day)
+    return date(target_year, target_month, target_day)
+
+
+def execute_due_savings_plans():
+    """
+    Run all active ETFSavingsPlans whose next_execution_date <= today.
+
+    For each due plan:
+      - Loop while still due (catches up missed days).
+      - Use last cached Finnhub price for the ETF symbol.
+        If unavailable, create the transaction with price=0 and amount=0
+        so the user can fill it in manually later.
+      - Insert an ETFAsset row dated `next_execution_date`.
+      - Advance next_execution_date by interval, anchored to start_date.day.
+
+    Idempotent: safe to call repeatedly; each plan only executes when due.
+    """
+    from datetime import date
+    from django.utils import timezone
+    from .models import ETFAsset, ETFSavingsPlan
+
+    today = date.today()
+    due = ETFSavingsPlan.objects.filter(
+        active=True, next_execution_date__lte=today
+    ).select_related("etf", "user")
+
+    executed = 0
+    for plan in due:
+        while plan.active and plan.next_execution_date <= today:
+            if plan.currency == "EUR":
+                fx = get_eur_usd_rate()
+                if fx is None:
+                    logger.warning(
+                        "Skipping EUR savings plan %s: EUR/USD rate unavailable",
+                        plan.id,
+                    )
+                    break
+                usd_spend = float(plan.amount) * fx
+            else:
+                usd_spend = float(plan.amount)
+
+            last_price = plan.etf.last_price
+            if last_price is not None and float(last_price) > 0:
+                price_val = float(last_price)
+                amount_val = usd_spend / price_val
+            else:
+                price_val = 0.0
+                amount_val = 0.0
+
+            ETFAsset.objects.create(
+                user=plan.user,
+                etf=plan.etf,
+                price=round(price_val, 2),
+                amount=round(amount_val, 8),
+                date=plan.next_execution_date,
+                status="bought",
+            )
+
+            plan.last_executed_at = timezone.now()
+            plan.next_execution_date = advance_savings_plan_date(
+                plan, plan.next_execution_date
+            )
+            plan.save(update_fields=["last_executed_at", "next_execution_date"])
+            executed += 1
+
+    if executed:
+        logger.info("Executed %d ETF savings plan transaction(s)", executed)
+    return executed
 
 
 def sync_alert_cache():

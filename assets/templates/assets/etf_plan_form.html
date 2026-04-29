@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+
+{% block title %}{% if mode == "edit" %}Edit{% else %}New{% endif %} Savings Plan — Folio{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h3>{% if mode == "edit" %}Edit Savings Plan{% else %}New Savings Plan{% endif %}</h3>
+    {% if etf %}
+    <a href="{% url 'etf_detail' etf.symbol %}" class="btn btn-ghost btn-sm">Cancel</a>
+    {% else %}
+    <a href="{% url 'etfs' %}" class="btn btn-ghost btn-sm">Cancel</a>
+    {% endif %}
+</div>
+
+<div class="row">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-body p-4">
+                {% if form.errors %}
+                <div class="alert alert-danger">
+                    {% for field, errors in form.errors.items %}
+                        {% for error in errors %}
+                        <p class="mb-0">{{ error }}</p>
+                        {% endfor %}
+                    {% endfor %}
+                </div>
+                {% endif %}
+
+                <form method="post">
+                    {% csrf_token %}
+                    <div class="mb-3">
+                        <label for="id_etf" class="form-label">ETF</label>
+                        {{ form.etf }}
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col">
+                            <label for="id_amount" class="form-label">Amount per interval</label>
+                            <div class="input-group">
+                                {{ form.amount }}
+                                <button type="button" class="btn btn-outline-secondary" id="planCurrencyToggle"
+                                        data-current="{{ form.currency.value|default:'USD' }}"
+                                        style="min-width:54px;font-weight:700;font-size:0.85rem;">
+                                    {{ form.currency.value|default:'USD' }}
+                                </button>
+                            </div>
+                            {{ form.currency }}
+                            <div id="planCurrencyHint" class="form-text" style="font-size:0.72rem;color:var(--text-muted);">
+                                EUR amounts are converted to USD at each execution using the live rate.
+                            </div>
+                        </div>
+                        <div class="col">
+                            <label for="id_interval" class="form-label">Interval</label>
+                            {{ form.interval }}
+                        </div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col">
+                            <label for="id_start_date" class="form-label">Start date</label>
+                            {{ form.start_date }}
+                            <div class="form-text" style="font-size:0.72rem;">First execution. Day-of-month is anchored (clamped to month-end if needed).</div>
+                        </div>
+                        <div class="col d-flex align-items-end">
+                            <div class="form-check mb-2">
+                                {{ form.active }}
+                                <label for="id_active" class="form-check-label" style="font-size:0.85rem;">Active</label>
+                            </div>
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-accent w-100">
+                        {% if mode == "edit" %}Save Changes{% else %}Create Plan{% endif %}
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function() {
+    var btn = document.getElementById("planCurrencyToggle");
+    var hidden = document.getElementById("id_currency");
+    if (!btn || !hidden) return;
+
+    function paint(cur) {
+        btn.textContent = cur;
+        btn.dataset.current = cur;
+        hidden.value = cur;
+        if (cur === "EUR") {
+            btn.classList.remove("btn-outline-secondary");
+            btn.classList.add("btn-outline-info");
+        } else {
+            btn.classList.remove("btn-outline-info");
+            btn.classList.add("btn-outline-secondary");
+        }
+    }
+
+    paint(hidden.value || "USD");
+
+    btn.addEventListener("click", function() {
+        paint(btn.dataset.current === "USD" ? "EUR" : "USD");
+    });
+})();
+</script>
+{% endblock %}

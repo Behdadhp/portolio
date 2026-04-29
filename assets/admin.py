@@ -1,6 +1,15 @@
 from django.contrib import admin
 
-from .models import ETF, Crypto, CryptoAsset, ETFAsset, PriceAlert, Stock, StockAsset
+from .models import (
+    ETF,
+    Crypto,
+    CryptoAsset,
+    ETFAsset,
+    ETFSavingsPlan,
+    PriceAlert,
+    Stock,
+    StockAsset,
+)
 
 
 @admin.register(Crypto)
@@ -31,7 +40,7 @@ class StockAssetAdmin(admin.ModelAdmin):
 
 @admin.register(ETF)
 class ETFAdmin(admin.ModelAdmin):
-    list_display = ("name", "symbol", "finnhub_symbol", "date_added")
+    list_display = ("name", "symbol", "last_price", "date_added")
     search_fields = ("name", "symbol")
 
 
@@ -40,6 +49,24 @@ class ETFAssetAdmin(admin.ModelAdmin):
     list_display = ("etf", "user", "price", "amount", "date", "status")
     list_filter = ("status",)
     search_fields = ("etf__name", "etf__symbol", "user__email")
+
+
+@admin.register(ETFSavingsPlan)
+class ETFSavingsPlanAdmin(admin.ModelAdmin):
+    list_display = (
+        "etf",
+        "user",
+        "amount",
+        "currency",
+        "interval",
+        "start_date",
+        "next_execution_date",
+        "last_executed_at",
+        "active",
+    )
+    list_filter = ("interval", "currency", "active")
+    search_fields = ("etf__name", "etf__symbol", "user__email")
+    readonly_fields = ("created_at", "last_executed_at")
 
 
 @admin.register(PriceAlert)

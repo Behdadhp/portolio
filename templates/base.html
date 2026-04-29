@@ -240,6 +240,17 @@
     </nav>
     {% endif %}
 
+    {% if eur_rate_unavailable %}
+    <div style="background:rgba(248,113,113,0.12);border-bottom:1px solid rgba(248,113,113,0.3);">
+        <div class="container py-2 d-flex align-items-center" style="font-size:0.85rem;color:#fca5a5;">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16" class="me-2 flex-shrink-0">
+                <path d="M8.982 1.566a1.13 1.13 0 0 0-1.96 0L.165 13.233c-.457.778.091 1.767.98 1.767h13.713c.889 0 1.438-.99.98-1.767zM8 5c.535 0 .954.462.9.995l-.35 3.507a.552.552 0 0 1-1.1 0L7.1 5.995A.905.905 0 0 1 8 5m.002 6a1 1 0 1 1 0 2 1 1 0 0 1 0-2"/>
+            </svg>
+            <span>EUR/USD conversion rate is currently unavailable. EUR-denominated savings plans will be skipped until the rate is restored.</span>
+        </div>
+    </div>
+    {% endif %}
+
     <div class="container pb-5">
         {% block content %}{% endblock %}
     </div>

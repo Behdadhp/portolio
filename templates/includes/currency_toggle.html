@@ -2,7 +2,8 @@
 <script>
 (function() {
     var btn = document.getElementById("currencyToggle");
-    var priceInput = document.getElementById("id_price");
+    var inputId = (btn && btn.dataset.target) || "id_price";
+    var priceInput = document.getElementById(inputId);
     var hint = document.getElementById("currencyHint");
     if (!btn || !priceInput) return;
 

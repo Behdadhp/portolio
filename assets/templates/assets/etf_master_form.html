@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+
+{% block title %}{% if mode == "edit" %}Edit ETF{% else %}Add ETF{% endif %} — Folio{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h3>{% if mode == "edit" %}Edit ETF{% else %}Add ETF{% endif %}</h3>
+    {% if etf %}
+    <a href="{% url 'etf_detail' etf.symbol %}" class="btn btn-ghost btn-sm">Cancel</a>
+    {% else %}
+    <a href="{% url 'etfs' %}" class="btn btn-ghost btn-sm">Cancel</a>
+    {% endif %}
+</div>
+
+<div class="row">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-body p-4">
+                {% if form.errors %}
+                <div class="alert alert-danger">
+                    {% for field, errors in form.errors.items %}
+                        {% for error in errors %}
+                        <p class="mb-0">{{ error }}</p>
+                        {% endfor %}
+                    {% endfor %}
+                </div>
+                {% endif %}
+
+                <form method="post">
+                    {% csrf_token %}
+                    <div class="mb-3">
+                        <label for="id_name" class="form-label">Name</label>
+                        {{ form.name }}
+                    </div>
+                    <div class="mb-3">
+                        <label for="id_symbol" class="form-label">Symbol</label>
+                        {{ form.symbol }}
+                    </div>
+                    <div class="mb-4">
+                        <label for="id_last_price" class="form-label">Last Price</label>
+                        <div class="input-group">
+                            {{ form.last_price }}
+                            <button type="button" class="btn btn-outline-secondary currency-toggle" id="currencyToggle"
+                                    data-currency="USD" data-rate="{{ eur_usd_rate|default:'0' }}"
+                                    data-target="id_last_price"
+                                    style="min-width:54px;font-weight:700;font-size:0.85rem;">
+                                USD
+                            </button>
+                        </div>
+                        <div id="currencyHint" class="form-text" style="font-size:0.72rem;color:var(--text-muted);display:none;"></div>
+                        <div class="form-text" style="font-size:0.72rem;color:var(--text-muted);">
+                            Optional. Used for savings-plan auto-purchases and analytics. Leave blank if unknown.
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-accent w-100">
+                        {% if mode == "edit" %}Save Changes{% else %}Add ETF{% endif %}
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+{% include "includes/currency_toggle.html" %}
+{% endblock %}

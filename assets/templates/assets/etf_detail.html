@@ -40,11 +40,14 @@
     </div>
     <div class="d-flex gap-2">
         <a href="{% url 'etf_add_for' etf.symbol %}" class="btn btn-accent btn-sm">+ Add Transaction</a>
+        <a href="{% url 'etf_master_edit' etf.symbol %}" class="btn btn-ghost btn-sm">Edit ETF</a>
         <a href="{% url 'etfs' %}" class="btn btn-ghost btn-sm">Back to ETFs</a>
     </div>
 </div>
 
 {% include "includes/analytics.html" %}
+
+{% include "assets/_etf_savings_plans.html" %}
 
 {% include "includes/etf_tax_analytics.html" %}
 

@@ -6,8 +6,23 @@ from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 
-from .forms import CryptoAssetForm, ETFAssetForm, StockAssetForm
-from .models import ETF, Crypto, CryptoAsset, ETFAsset, PriceAlert, Stock, StockAsset
+from .forms import (
+    CryptoAssetForm,
+    ETFAssetForm,
+    ETFForm,
+    ETFSavingsPlanForm,
+    StockAssetForm,
+)
+from .models import (
+    ETF,
+    Crypto,
+    CryptoAsset,
+    ETFAsset,
+    ETFSavingsPlan,
+    PriceAlert,
+    Stock,
+    StockAsset,
+)
 from .services import (
     DETAIL_COLUMNS,
     apply_filters,
@@ -27,7 +42,13 @@ from .services import (
 
 
 def _list_view(
-    request, transaction_model, name_field, symbol_field, template, context_key
+    request,
+    transaction_model,
+    name_field,
+    symbol_field,
+    template,
+    context_key,
+    extra_rows=None,
 ):
     summary = get_asset_summary(
         transaction_model.objects.filter(user=request.user),
@@ -75,6 +96,12 @@ def _list_view(
             )
 
     pnl_ranking.sort(key=lambda r: r["pnl_pct"], reverse=True)
+
+    if extra_rows:
+        seen = {row["symbol"] for row in enriched}
+        for row in extra_rows:
+            if row["symbol"] not in seen:
+                enriched.append(row)
 
     return render(
         request,
@@ -284,7 +311,56 @@ def stock_delete_view(request, pk):
 
 
 @login_required
+def etf_create_view(request):
+    form = ETFForm()
+    if request.method == "POST":
+        form = ETFForm(request.POST)
+        if form.is_valid():
+            etf = form.save()
+            return redirect("etf_detail", symbol=etf.symbol)
+    return render(
+        request,
+        "assets/etf_master_form.html",
+        {"form": form, "mode": "create", "eur_usd_rate": get_eur_usd_rate()},
+    )
+
+
+@login_required
+def etf_master_edit_view(request, symbol):
+    etf = get_object_or_404(ETF, symbol=symbol)
+    form = ETFForm(instance=etf)
+    if request.method == "POST":
+        form = ETFForm(request.POST, instance=etf)
+        if form.is_valid():
+            etf = form.save()
+            return redirect("etf_detail", symbol=etf.symbol)
+    return render(
+        request,
+        "assets/etf_master_form.html",
+        {
+            "form": form,
+            "etf": etf,
+            "mode": "edit",
+            "eur_usd_rate": get_eur_usd_rate(),
+        },
+    )
+
+
+@login_required
 def etf_list_view(request):
+    # Surface ETFs the user has a savings plan for (or that they just added
+    # without any transactions yet) so the detail page stays reachable.
+    plan_etfs = ETF.objects.filter(savings_plans__user=request.user).distinct()
+    extra_rows = [
+        {
+            "name": etf.name,
+            "symbol": etf.symbol,
+            "total": 0.0,
+            "price": cache.get(f"finnhub_{etf.symbol}"),
+            "worth": None,
+        }
+        for etf in plan_etfs
+    ]
     return _list_view(
         request,
         ETFAsset,
@@ -292,12 +368,15 @@ def etf_list_view(request):
         "etf__symbol",
         "assets/etf_list.html",
         "etfs",
+        extra_rows=extra_rows,
     )
 
 
 @login_required
 def etf_detail_view(request, symbol):
     tax = compute_etf_tax(request.user, current_symbol=symbol)
+    etf = get_object_or_404(ETF, symbol=symbol)
+    savings_plans = ETFSavingsPlan.objects.filter(user=request.user, etf=etf)
     return _detail_view(
         request,
         symbol,
@@ -307,33 +386,149 @@ def etf_detail_view(request, symbol):
         "etf__name",
         "etf__symbol",
         "assets/etf_detail.html",
-        extra_context={"tax": tax},
+        extra_context={"tax": tax, "savings_plans": savings_plans},
+    )
+
+
+# ── ETF Savings Plan views ──────────────────────────────────
+
+
+@login_required
+def etf_plan_create_view(request, symbol=None):
+    initial = {}
+    etf = None
+    if symbol:
+        etf = get_object_or_404(ETF, symbol=symbol)
+        initial["etf"] = etf
+
+    form = ETFSavingsPlanForm(initial=initial)
+
+    if request.method == "POST":
+        form = ETFSavingsPlanForm(request.POST)
+        if form.is_valid():
+            plan = form.save(commit=False)
+            plan.user = request.user
+            plan.next_execution_date = plan.start_date
+            plan.save()
+            return redirect("etf_detail", symbol=plan.etf.symbol)
+
+    return render(
+        request,
+        "assets/etf_plan_form.html",
+        {
+            "form": form,
+            "etf": etf,
+            "mode": "create",
+            "eur_usd_rate": get_eur_usd_rate(),
+        },
     )
 
 
 @login_required
-def etf_add_view(request, symbol=None):
-    return _add_view(
+def etf_plan_edit_view(request, pk):
+    plan = get_object_or_404(ETFSavingsPlan, pk=pk, user=request.user)
+    form = ETFSavingsPlanForm(instance=plan)
+
+    if request.method == "POST":
+        form = ETFSavingsPlanForm(request.POST, instance=plan)
+        if form.is_valid():
+            updated = form.save(commit=False)
+            # If start_date changed and plan hasn't run yet, realign next_execution_date.
+            if (
+                "start_date" in form.changed_data
+                and updated.last_executed_at is None
+            ):
+                updated.next_execution_date = updated.start_date
+            updated.save()
+            return redirect("etf_detail", symbol=updated.etf.symbol)
+
+    return render(
         request,
-        ETFAssetForm,
-        ETF,
-        "etf",
+        "assets/etf_plan_form.html",
+        {
+            "form": form,
+            "etf": plan.etf,
+            "plan": plan,
+            "mode": "edit",
+            "eur_usd_rate": get_eur_usd_rate(),
+        },
+    )
+
+
+@login_required
+@require_POST
+def etf_plan_toggle_view(request, pk):
+    plan = get_object_or_404(ETFSavingsPlan, pk=pk, user=request.user)
+    plan.active = not plan.active
+    plan.save(update_fields=["active"])
+    return redirect("etf_detail", symbol=plan.etf.symbol)
+
+
+@login_required
+def etf_plan_delete_view(request, pk):
+    plan = get_object_or_404(ETFSavingsPlan, pk=pk, user=request.user)
+    etf = plan.etf
+    if request.method == "POST":
+        plan.delete()
+        return redirect("etf_detail", symbol=etf.symbol)
+    return render(request, "assets/etf_plan_delete.html", {"plan": plan, "etf": etf})
+
+
+def _refresh_etf_last_price(etf, price):
+    """Mirror the latest user-entered transaction price onto the master ETF."""
+    if price is None:
+        return
+    etf.last_price = price
+    etf.save(update_fields=["last_price"])
+
+
+@login_required
+def etf_add_view(request, symbol=None):
+    initial = {}
+    etf = None
+    if symbol:
+        etf = get_object_or_404(ETF, symbol=symbol)
+        initial["etf"] = etf
+
+    form = ETFAssetForm(initial=initial)
+
+    if request.method == "POST":
+        form = ETFAssetForm(request.POST)
+        if form.is_valid():
+            transaction = form.save(commit=False)
+            transaction.user = request.user
+            transaction.save()
+            _refresh_etf_last_price(transaction.etf, transaction.price)
+            return redirect("etf_detail", symbol=transaction.etf.symbol)
+
+    return render(
+        request,
         "assets/etf_add.html",
-        "etf_detail",
-        symbol,
+        {"form": form, "etf": etf, "eur_usd_rate": get_eur_usd_rate()},
     )
 
 
 @login_required
 def etf_edit_view(request, pk):
-    return _edit_view(
+    transaction = get_object_or_404(ETFAsset, pk=pk, user=request.user)
+    form = ETFAssetForm(instance=transaction)
+
+    if request.method == "POST":
+        form = ETFAssetForm(request.POST, instance=transaction)
+        if form.is_valid():
+            transaction = form.save()
+            _refresh_etf_last_price(transaction.etf, transaction.price)
+            return redirect("etf_detail", symbol=transaction.etf.symbol)
+
+    return render(
         request,
-        pk,
-        ETFAssetForm,
-        ETFAsset,
-        "etf",
         "assets/etf_edit.html",
-        "etf_detail",
+        {
+            "form": form,
+            "transaction": transaction,
+            "etf": transaction.etf,
+            "eur_usd_rate": get_eur_usd_rate(),
+        },
     )
 
 

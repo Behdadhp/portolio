@@ -1,0 +1,56 @@
+<div class="card shadow-sm mb-4">
+    <div class="card-header d-flex align-items-center">
+        <h5 class="mb-0 me-2">Savings Plans</h5>
+        <span class="badge" style="background:rgba(79,70,229,0.12);color:var(--accent-light);font-size:0.7rem;">{{ savings_plans|length }}</span>
+        <div class="ms-auto">
+            <a href="{% url 'etf_plan_create_for' etf.symbol %}" class="btn btn-accent btn-sm">+ New Plan</a>
+        </div>
+    </div>
+    <div class="card-body p-0">
+        {% if savings_plans %}
+        <table class="table mb-0">
+            <thead>
+                <tr>
+                    <th style="padding-left:1.25rem;">Amount</th>
+                    <th>Interval</th>
+                    <th>Start</th>
+                    <th>Next Run</th>
+                    <th>Last Run</th>
+                    <th>Status</th>
+                    <th class="text-end" style="padding-right:1.25rem;">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for plan in savings_plans %}
+                <tr>
+                    <td style="padding-left:1.25rem;font-weight:600;">{% if plan.currency == "EUR" %}€{% else %}${% endif %}{{ plan.amount|floatformat:2 }}</td>
+                    <td><span class="badge bg-primary">{{ plan.get_interval_display }}</span></td>
+                    <td>{{ plan.start_date }}</td>
+                    <td>{{ plan.next_execution_date }}</td>
+                    <td>{% if plan.last_executed_at %}{{ plan.last_executed_at|date:"Y-m-d H:i" }}{% else %}<span class="text-muted">—</span>{% endif %}</td>
+                    <td>
+                        {% if plan.active %}
+                        <span class="badge bg-success">Active</span>
+                        {% else %}
+                        <span class="badge" style="background:rgba(148,163,184,0.18);color:var(--text-secondary);">Paused</span>
+                        {% endif %}
+                    </td>
+                    <td class="text-end" style="padding-right:1.25rem;">
+                        <form method="post" action="{% url 'etf_plan_toggle' plan.pk %}" style="display:inline;">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-ghost btn-sm py-1 px-2" style="font-size:0.8rem;">
+                                {% if plan.active %}Pause{% else %}Resume{% endif %}
+                            </button>
+                        </form>
+                        <a href="{% url 'etf_plan_edit' plan.pk %}" class="btn btn-ghost btn-sm py-1 px-2" style="font-size:0.8rem;">Edit</a>
+                        <a href="{% url 'etf_plan_delete' plan.pk %}" class="btn btn-ghost btn-sm py-1 px-2" style="font-size:0.8rem;border-color:rgba(248,113,113,0.3);color:#f87171;">Delete</a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <p class="text-muted text-center mb-0 py-4" style="font-size:0.9rem;">No savings plans for this ETF yet.</p>
+        {% endif %}
+    </div>
+</div>
