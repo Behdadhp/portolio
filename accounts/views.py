@@ -62,7 +62,12 @@ def dashboard_view(request):
     import json
     from django.core.cache import cache
     from assets.models import CryptoAsset, PriceAlert, StockAsset
-    from assets.services import cost_basis_for, get_asset_summary
+    from assets.services import (
+        cost_basis_for,
+        get_asset_summary,
+        get_cash_summary,
+        get_total_portfolio_worth_usd,
+    )
 
     stock_summary = list(
         get_asset_summary(
@@ -127,6 +132,15 @@ def dashboard_view(request):
         .order_by("-created_at")
     )
 
+    cash_summary = get_cash_summary(request.user)
+    portfolio_worth = get_total_portfolio_worth_usd(request.user)
+    real_pnl = round(portfolio_worth - cash_summary["net_invested_usd"], 2)
+    real_pnl_pct = (
+        round(real_pnl / cash_summary["net_invested_usd"] * 100, 2)
+        if cash_summary["net_invested_usd"] > 0
+        else 0.0
+    )
+
     return render(
         request,
         "accounts/dashboard.html",
@@ -135,6 +149,10 @@ def dashboard_view(request):
             "allocation_json": json.dumps(allocation),
             "cost_bases_json": json.dumps(cost_bases),
             "active_alerts": active_alerts,
+            "cash_summary": cash_summary,
+            "portfolio_worth": portfolio_worth,
+            "real_pnl": real_pnl,
+            "real_pnl_pct": real_pnl_pct,
         },
     )
 

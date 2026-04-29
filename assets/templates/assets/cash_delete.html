@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+
+{% block title %}Delete Cash Entry — Folio{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h3>Delete Cash Entry</h3>
+    <a href="{% url 'cash' %}" class="btn btn-ghost btn-sm">Cancel</a>
+</div>
+
+<div class="row">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-body p-4">
+                <p>You're about to delete this entry:</p>
+                <ul style="color:var(--text-secondary);">
+                    <li><strong>{{ flow.get_direction_display }}</strong> of <strong>${{ flow.amount_usd|floatformat:2 }}</strong> on {{ flow.date }}</li>
+                    {% if flow.note %}<li>Note: {{ flow.note }}</li>{% endif %}
+                </ul>
+                <form method="post">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-danger">Delete</button>
+                    <a href="{% url 'cash' %}" class="btn btn-ghost">Cancel</a>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

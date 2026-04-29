@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+
+{% block title %}Cash Flow — Folio{% endblock %}
+
+{% block extra_css %}
+<style>
+    .stat-card {
+        padding: 1rem 1.25rem;
+        background: var(--bg-card);
+        border: 1px solid var(--border-color);
+        border-radius: 12px;
+        height: 100%;
+    }
+    .stat-card .label { color: var(--text-muted); font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600; }
+    .stat-card .value { font-weight: 700; font-size: 1.5rem; font-family: 'SF Mono', 'Fira Code', monospace; }
+    .stat-card .sub { color: var(--text-muted); font-size: 0.75rem; margin-top: 4px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h3 class="mb-1">Cash Flow</h3>
+        <p class="mb-0" style="color:var(--text-secondary); font-size:0.9rem;">Real money you've put into and pulled out of the brokerage</p>
+    </div>
+    <div class="d-flex gap-2">
+        <a href="{% url 'cash_add' %}" class="btn btn-accent btn-sm">+ Add Cash Entry</a>
+        <a href="{% url 'dashboard' %}" class="btn btn-ghost btn-sm">Dashboard</a>
+    </div>
+</div>
+
+<div class="row g-3 mb-4">
+    <div class="col-md-4">
+        <div class="stat-card">
+            <div class="label">Net Invested</div>
+            <div class="value">${{ summary.net_invested_usd|floatformat:2 }}</div>
+            <div class="sub">Deposits ${{ summary.deposits_usd|floatformat:2 }} − Withdrawals ${{ summary.withdrawals_usd|floatformat:2 }}</div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="stat-card">
+            <div class="label">Portfolio Worth</div>
+            <div class="value">${{ portfolio_worth|floatformat:2 }}</div>
+            <div class="sub">Stocks + ETFs + Crypto at last price</div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="stat-card">
+            <div class="label">Real P&L</div>
+            <div class="value" style="color: {% if real_pnl >= 0 %}#34d399{% else %}#f87171{% endif %};">
+                {% if real_pnl >= 0 %}+{% endif %}${{ real_pnl|floatformat:2 }}
+            </div>
+            <div class="sub" style="color: {% if real_pnl_pct >= 0 %}#34d399{% else %}#f87171{% endif %};">
+                {% if real_pnl_pct >= 0 %}+{% endif %}{{ real_pnl_pct|floatformat:2 }}%
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-body p-0">
+        {% if flows %}
+        <table class="table table-hover mb-0">
+            <thead>
+                <tr>
+                    <th style="padding-left:1.25rem;">Date</th>
+                    <th>Direction</th>
+                    <th class="text-end">Amount (USD)</th>
+                    <th>Note</th>
+                    <th class="text-end" style="padding-right:1.25rem;">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for flow in flows %}
+                <tr>
+                    <td style="padding-left:1.25rem;">{{ flow.date }}</td>
+                    <td>
+                        {% if flow.direction == "deposit" %}
+                        <span class="badge bg-success">Deposit</span>
+                        {% else %}
+                        <span class="badge bg-warning text-dark">Withdraw</span>
+                        {% endif %}
+                    </td>
+                    <td class="text-end fw-semibold" style="font-family:'SF Mono','Fira Code',monospace;">
+                        {% if flow.direction == "deposit" %}+{% else %}-{% endif %}${{ flow.amount_usd|floatformat:2 }}
+                    </td>
+                    <td style="color:var(--text-secondary);font-size:0.85rem;">{{ flow.note|default:"—" }}</td>
+                    <td class="text-end" style="padding-right:1.25rem;">
+                        <a href="{% url 'cash_edit' flow.pk %}" class="btn btn-ghost btn-sm py-1 px-2" style="font-size:0.8rem;">Edit</a>
+                        <a href="{% url 'cash_delete' flow.pk %}" class="btn btn-ghost btn-sm py-1 px-2" style="font-size:0.8rem;border-color:rgba(248,113,113,0.3);color:#f87171;">Delete</a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <div class="text-center py-5">
+            <p style="color:var(--text-secondary);" class="mb-2">No cash entries yet</p>
+            <a href="{% url 'cash_add' %}" class="btn btn-accent btn-sm">Record your first deposit</a>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

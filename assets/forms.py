@@ -1,5 +1,25 @@
 from django import forms
-from .models import ETF, CryptoAsset, ETFAsset, ETFSavingsPlan, StockAsset
+from .models import ETF, CashFlow, CryptoAsset, ETFAsset, ETFSavingsPlan, StockAsset
+
+
+class CashFlowForm(forms.ModelForm):
+    class Meta:
+        model = CashFlow
+        fields = ["amount_usd", "direction", "date", "note"]
+        widgets = {
+            "amount_usd": forms.NumberInput(
+                attrs={"class": "form-control", "step": "0.01"}
+            ),
+            "direction": forms.Select(attrs={"class": "form-control"}),
+            "date": forms.DateInput(attrs={"class": "form-control", "type": "date"}),
+            "note": forms.TextInput(attrs={"class": "form-control"}),
+        }
+
+    def clean_amount_usd(self):
+        amount = self.cleaned_data["amount_usd"]
+        if amount is None or amount <= 0:
+            raise forms.ValidationError("Amount must be greater than zero.")
+        return amount
 
 # Symbols that would shadow ETF URL routes (urls.py).
 RESERVED_ETF_SYMBOLS = {"new", "add", "edit", "delete", "plans", "master"}

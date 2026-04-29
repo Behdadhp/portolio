@@ -43,6 +43,11 @@ urlpatterns = [
     path("crypto/edit/<uuid:pk>/", views.crypto_edit_view, name="crypto_edit"),
     path("crypto/delete/<uuid:pk>/", views.crypto_delete_view, name="crypto_delete"),
     path("crypto/<str:symbol>/", views.crypto_detail_view, name="crypto_detail"),
+    # Cash flow
+    path("cash/", views.cash_list_view, name="cash"),
+    path("cash/add/", views.cash_add_view, name="cash_add"),
+    path("cash/edit/<uuid:pk>/", views.cash_edit_view, name="cash_edit"),
+    path("cash/delete/<uuid:pk>/", views.cash_delete_view, name="cash_delete"),
     # Price Alert API
     path("api/alerts/create/", views.alert_create, name="alert_create"),
     path("api/alerts/<uuid:pk>/delete/", views.alert_delete, name="alert_delete"),

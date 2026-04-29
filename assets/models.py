@@ -188,6 +188,40 @@ class ETFSavingsPlan(models.Model):
         return f"{self.etf.symbol} {sign}{self.amount} {self.interval} ({self.user.email})"
 
 
+class CashFlow(models.Model):
+    """
+    External money moving in or out of the brokerage account.
+    Always stored in USD (EUR inputs are converted at submit time).
+    """
+
+    class Direction(models.TextChoices):
+        DEPOSIT = "deposit", "Deposit"
+        WITHDRAW = "withdraw", "Withdraw"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="cash_flows"
+    )
+    amount_usd = models.DecimalField(
+        max_digits=18,
+        decimal_places=2,
+        help_text="Amount in USD. EUR inputs are converted on save.",
+    )
+    direction = models.CharField(
+        max_length=10, choices=Direction.choices, default=Direction.DEPOSIT
+    )
+    date = models.DateField()
+    note = models.CharField(max_length=200, blank=True, default="")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-date", "-created_at"]
+
+    def __str__(self):
+        sign = "+" if self.direction == "deposit" else "-"
+        return f"{sign}${self.amount_usd} {self.date} ({self.user.email})"
+
+
 class PriceAlert(models.Model):
     class Direction(models.TextChoices):
         ABOVE = "above", "Above (Sell)"

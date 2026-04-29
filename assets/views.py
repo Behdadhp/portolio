@@ -7,6 +7,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 
 from .forms import (
+    CashFlowForm,
     CryptoAssetForm,
     ETFAssetForm,
     ETFForm,
@@ -15,6 +16,7 @@ from .forms import (
 )
 from .models import (
     ETF,
+    CashFlow,
     Crypto,
     CryptoAsset,
     ETFAsset,
@@ -32,8 +34,10 @@ from .services import (
     compute_stock_tax,
     cost_basis_for,
     get_asset_summary,
+    get_cash_summary,
     get_eur_usd_rate,
     get_filter_ranges,
+    get_total_portfolio_worth_usd,
     sort_and_paginate,
     sync_alert_cache,
 )
@@ -739,3 +743,78 @@ def alert_delete(request, pk):
     alert.delete()
     sync_alert_cache()
     return JsonResponse({"deleted": True})
+
+
+# ── Cash flow views ─────────────────────────────────────────
+
+
+@login_required
+def cash_list_view(request):
+    flows = CashFlow.objects.filter(user=request.user)
+    summary = get_cash_summary(request.user)
+    portfolio_worth = get_total_portfolio_worth_usd(request.user)
+    real_pnl = portfolio_worth - summary["net_invested_usd"]
+    real_pnl_pct = (
+        (real_pnl / summary["net_invested_usd"] * 100)
+        if summary["net_invested_usd"] > 0
+        else 0.0
+    )
+    return render(
+        request,
+        "assets/cash_list.html",
+        {
+            "flows": flows,
+            "summary": summary,
+            "portfolio_worth": portfolio_worth,
+            "real_pnl": real_pnl,
+            "real_pnl_pct": real_pnl_pct,
+            "eur_usd_rate": get_eur_usd_rate(),
+        },
+    )
+
+
+@login_required
+def cash_add_view(request):
+    form = CashFlowForm()
+    if request.method == "POST":
+        form = CashFlowForm(request.POST)
+        if form.is_valid():
+            flow = form.save(commit=False)
+            flow.user = request.user
+            flow.save()
+            return redirect("cash")
+    return render(
+        request,
+        "assets/cash_form.html",
+        {"form": form, "mode": "create", "eur_usd_rate": get_eur_usd_rate()},
+    )
+
+
+@login_required
+def cash_edit_view(request, pk):
+    flow = get_object_or_404(CashFlow, pk=pk, user=request.user)
+    form = CashFlowForm(instance=flow)
+    if request.method == "POST":
+        form = CashFlowForm(request.POST, instance=flow)
+        if form.is_valid():
+            form.save()
+            return redirect("cash")
+    return render(
+        request,
+        "assets/cash_form.html",
+        {
+            "form": form,
+            "flow": flow,
+            "mode": "edit",
+            "eur_usd_rate": get_eur_usd_rate(),
+        },
+    )
+
+
+@login_required
+def cash_delete_view(request, pk):
+    flow = get_object_or_404(CashFlow, pk=pk, user=request.user)
+    if request.method == "POST":
+        flow.delete()
+        return redirect("cash")
+    return render(request, "assets/cash_delete.html", {"flow": flow})

@@ -2,6 +2,7 @@ from django.contrib import admin
 
 from .models import (
     ETF,
+    CashFlow,
     Crypto,
     CryptoAsset,
     ETFAsset,
@@ -67,6 +68,14 @@ class ETFSavingsPlanAdmin(admin.ModelAdmin):
     list_filter = ("interval", "currency", "active")
     search_fields = ("etf__name", "etf__symbol", "user__email")
     readonly_fields = ("created_at", "last_executed_at")
+
+
+@admin.register(CashFlow)
+class CashFlowAdmin(admin.ModelAdmin):
+    list_display = ("user", "direction", "amount_usd", "date", "note", "created_at")
+    list_filter = ("direction",)
+    search_fields = ("user__email", "note")
+    readonly_fields = ("created_at",)
 
 
 @admin.register(PriceAlert)

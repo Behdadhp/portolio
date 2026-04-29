@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+
+{% block title %}{% if mode == "edit" %}Edit{% else %}Add{% endif %} Cash Entry — Folio{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h3>{% if mode == "edit" %}Edit Cash Entry{% else %}Add Cash Entry{% endif %}</h3>
+    <a href="{% url 'cash' %}" class="btn btn-ghost btn-sm">Cancel</a>
+</div>
+
+<div class="row">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-body p-4">
+                {% if form.errors %}
+                <div class="alert alert-danger">
+                    {% for field, errors in form.errors.items %}
+                        {% for error in errors %}
+                        <p class="mb-0">{{ error }}</p>
+                        {% endfor %}
+                    {% endfor %}
+                </div>
+                {% endif %}
+
+                <form method="post">
+                    {% csrf_token %}
+                    <div class="mb-3">
+                        <label for="id_amount_usd" class="form-label">Amount</label>
+                        <div class="input-group">
+                            {{ form.amount_usd }}
+                            <button type="button" class="btn btn-outline-secondary currency-toggle" id="currencyToggle"
+                                    data-currency="USD" data-rate="{{ eur_usd_rate|default:'0' }}"
+                                    data-target="id_amount_usd"
+                                    style="min-width:54px;font-weight:700;font-size:0.85rem;">
+                                USD
+                            </button>
+                        </div>
+                        <div id="currencyHint" class="form-text" style="font-size:0.72rem;color:var(--text-muted);display:none;"></div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col">
+                            <label for="id_direction" class="form-label">Direction</label>
+                            {{ form.direction }}
+                        </div>
+                        <div class="col">
+                            <label for="id_date" class="form-label">Date</label>
+                            {{ form.date }}
+                        </div>
+                    </div>
+                    <div class="mb-4">
+                        <label for="id_note" class="form-label">Note <span style="color:var(--text-muted);font-weight:400;">(optional)</span></label>
+                        {{ form.note }}
+                    </div>
+                    <button type="submit" class="btn btn-accent w-100">
+                        {% if mode == "edit" %}Save Changes{% else %}Add Entry{% endif %}
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+{% include "includes/currency_toggle.html" %}
+{% endblock %}

@@ -709,6 +709,58 @@ def execute_due_savings_plans():
     return executed
 
 
+def get_cash_summary(user):
+    """
+    Return totals for a user's cash deposits/withdrawals (all USD).
+
+    `net_invested_usd` is the principal still committed to the brokerage:
+    deposits − withdrawals. Negative means the user has pulled out more than
+    they've put in (rare but possible after large gains).
+    """
+    from .models import CashFlow
+
+    flows = CashFlow.objects.filter(user=user)
+    deposits = float(
+        flows.filter(direction="deposit").aggregate(s=Sum("amount_usd"))["s"] or 0
+    )
+    withdrawals = float(
+        flows.filter(direction="withdraw").aggregate(s=Sum("amount_usd"))["s"] or 0
+    )
+    return {
+        "deposits_usd": round(deposits, 2),
+        "withdrawals_usd": round(withdrawals, 2),
+        "net_invested_usd": round(deposits - withdrawals, 2),
+    }
+
+
+def get_total_portfolio_worth_usd(user):
+    """
+    Sum the user's current holdings across stocks, ETFs, and crypto in USD.
+
+    Uses the price cache (`finnhub_{symbol}`) — symbols without a cached price
+    contribute 0 (same convention as list/dashboard views).
+    """
+    from .models import CryptoAsset, ETFAsset, StockAsset
+
+    total = 0.0
+    for model, name_field, symbol_field in (
+        (StockAsset, "stock__name", "stock__symbol"),
+        (ETFAsset, "etf__name", "etf__symbol"),
+        (CryptoAsset, "crypto__name", "crypto__symbol"),
+    ):
+        for row in get_asset_summary(
+            model.objects.filter(user=user), name_field, symbol_field
+        ):
+            amt = float(row["total"])
+            if amt <= 0:
+                continue
+            price = cache.get(f"finnhub_{row['symbol']}")
+            if price is None:
+                continue
+            total += amt * float(price)
+    return round(total, 2)
+
+
 def sync_alert_cache():
     """Rebuild the Redis alert cache from the DB."""
     from .models import PriceAlert
