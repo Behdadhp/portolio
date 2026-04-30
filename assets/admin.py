@@ -1,61 +1,32 @@
 from django.contrib import admin
 
 from .models import (
-    ETF,
     CashFlow,
-    Crypto,
-    CryptoAsset,
-    ETFAsset,
     ETFSavingsPlan,
+    Instrument,
     PriceAlert,
-    Stock,
-    StockAsset,
+    Transaction,
 )
 
 
-@admin.register(Crypto)
-class CryptoAdmin(admin.ModelAdmin):
-    list_display = ("name", "symbol", "finnhub_symbol", "date_added")
+@admin.register(Instrument)
+class InstrumentAdmin(admin.ModelAdmin):
+    list_display = ("name", "symbol", "kind", "finnhub_symbol", "last_price", "date_added")
+    list_filter = ("kind",)
     search_fields = ("name", "symbol")
 
 
-@admin.register(Stock)
-class StockAdmin(admin.ModelAdmin):
-    list_display = ("name", "symbol", "finnhub_symbol", "date_added")
-    search_fields = ("name", "symbol")
-
-
-@admin.register(CryptoAsset)
-class CryptoAssetAdmin(admin.ModelAdmin):
-    list_display = ("crypto", "user", "price", "amount", "date", "status")
-    list_filter = ("status",)
-    search_fields = ("crypto__name", "crypto__symbol", "user__email")
-
-
-@admin.register(StockAsset)
-class StockAssetAdmin(admin.ModelAdmin):
-    list_display = ("stock", "user", "price", "amount", "date", "status")
-    list_filter = ("status",)
-    search_fields = ("stock__name", "stock__symbol", "user__email")
-
-
-@admin.register(ETF)
-class ETFAdmin(admin.ModelAdmin):
-    list_display = ("name", "symbol", "last_price", "date_added")
-    search_fields = ("name", "symbol")
-
-
-@admin.register(ETFAsset)
-class ETFAssetAdmin(admin.ModelAdmin):
-    list_display = ("etf", "user", "price", "amount", "date", "status")
-    list_filter = ("status",)
-    search_fields = ("etf__name", "etf__symbol", "user__email")
+@admin.register(Transaction)
+class TransactionAdmin(admin.ModelAdmin):
+    list_display = ("instrument", "user", "price", "amount", "date", "status")
+    list_filter = ("status", "instrument__kind")
+    search_fields = ("instrument__name", "instrument__symbol", "user__email")
 
 
 @admin.register(ETFSavingsPlan)
 class ETFSavingsPlanAdmin(admin.ModelAdmin):
     list_display = (
-        "etf",
+        "instrument",
         "user",
         "amount",
         "currency",
@@ -66,7 +37,7 @@ class ETFSavingsPlanAdmin(admin.ModelAdmin):
         "active",
     )
     list_filter = ("interval", "currency", "active")
-    search_fields = ("etf__name", "etf__symbol", "user__email")
+    search_fields = ("instrument__name", "instrument__symbol", "user__email")
     readonly_fields = ("created_at", "last_executed_at")
 
 
@@ -89,5 +60,5 @@ class PriceAlertAdmin(admin.ModelAdmin):
         "created_at",
     )
     list_filter = ("direction", "email_sent")
-    search_fields = ("user__email", "stock__symbol", "crypto__symbol", "etf__symbol")
+    search_fields = ("user__email", "instrument__symbol", "instrument__name")
     readonly_fields = ("created_at",)

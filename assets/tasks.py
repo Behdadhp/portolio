@@ -17,31 +17,26 @@ SYMBOLS_CHANGED_KEY = "finnhub_symbols_changed"
 
 
 def _build_symbol_map():
-    """Build lookup from Crypto and Stock tables: finnhub_symbol -> symbol."""
-    from assets.models import Crypto, Stock
+    """Build lookup from Instrument table: finnhub_symbol -> symbol."""
+    from assets.models import Instrument
 
-    symbol_map = {}
-    for finnhub, short in Crypto.objects.exclude(finnhub_symbol="").values_list(
-        "finnhub_symbol", "symbol"
-    ):
-        symbol_map[finnhub] = short
-    for finnhub, short in Stock.objects.exclude(finnhub_symbol="").values_list(
-        "finnhub_symbol", "symbol"
-    ):
-        symbol_map[finnhub] = short
-    return symbol_map
+    return dict(
+        Instrument.objects.exclude(finnhub_symbol="").values_list(
+            "finnhub_symbol", "symbol"
+        )
+    )
 
 
 def _fetch_market_caps():
     """Fetch market caps from Finnhub (stocks) and CoinGecko (crypto), store in cache."""
-    from assets.models import Crypto, Stock
+    from assets.models import Instrument
 
     api_key = settings.FINNHUB_API_KEY
 
     # Stocks — Finnhub /stock/profile2
-    for finnhub_sym, short in Stock.objects.exclude(finnhub_symbol="").values_list(
-        "finnhub_symbol", "symbol"
-    ):
+    for finnhub_sym, short in Instrument.objects.filter(
+        kind=Instrument.Kind.STOCK
+    ).exclude(finnhub_symbol="").values_list("finnhub_symbol", "symbol"):
         try:
             resp = requests.get(
                 f"{settings.FINNHUB_REST_URL}/stock/profile2",
@@ -60,7 +55,9 @@ def _fetch_market_caps():
 
     # Crypto — CoinGecko /coins/markets (free, no key needed)
     crypto_symbols = set(
-        Crypto.objects.exclude(finnhub_symbol="").values_list("symbol", flat=True)
+        Instrument.objects.filter(kind=Instrument.Kind.CRYPTO)
+        .exclude(finnhub_symbol="")
+        .values_list("symbol", flat=True)
     )
     if not crypto_symbols:
         return
@@ -90,12 +87,12 @@ def _fetch_market_caps():
 
 def _poll_stock_quotes():
     """Fetch latest stock quotes via REST API (free tier has no real-time WS for US stocks)."""
-    from assets.models import Stock
+    from assets.models import Instrument
 
     api_key = settings.FINNHUB_API_KEY
-    for finnhub_sym, short in Stock.objects.exclude(finnhub_symbol="").values_list(
-        "finnhub_symbol", "symbol"
-    ):
+    for finnhub_sym, short in Instrument.objects.filter(
+        kind=Instrument.Kind.STOCK
+    ).exclude(finnhub_symbol="").values_list("finnhub_symbol", "symbol"):
         try:
             resp = requests.get(
                 f"{settings.FINNHUB_REST_URL}/quote",
@@ -157,12 +154,8 @@ def _send_alert_email(alert, current_price):
 
         user = alert.user
         symbol = alert.symbol
-        if alert.stock_id is not None:
-            asset_type_path = "stocks"
-        elif alert.etf_id is not None:
-            asset_type_path = "etfs"
-        else:
-            asset_type_path = "crypto"
+        kind_to_path = {"stock": "stocks", "etf": "etfs", "crypto": "crypto"}
+        asset_type_path = kind_to_path.get(alert.instrument.kind, "crypto")
         detail_url = f"{settings.SITE_URL}/{asset_type_path}/{symbol}/"
 
         invest_amount_str = None
@@ -239,7 +232,7 @@ def _check_price_alerts(short, price):
         triggered_alerts = list(
             PriceAlert.objects.filter(
                 id__in=triggered_ids, email_sent=False
-            ).select_related("user", "stock", "crypto", "etf")
+            ).select_related("user", "instrument")
         )
         PriceAlert.objects.filter(id__in=triggered_ids, email_sent=False).update(
             email_sent=True
@@ -282,7 +275,7 @@ def stream_prices():
 
     symbol_map = _build_symbol_map()
     if not symbol_map:
-        logger.warning("No symbols with finnhub_symbol set in Crypto or Stock tables.")
+        logger.warning("No instruments with finnhub_symbol set.")
         return
 
     # Fetch market caps on startup, then refresh in background

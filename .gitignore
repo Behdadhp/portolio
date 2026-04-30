@@ -13,6 +13,7 @@
 .DS_Store
 
 *.sqlite3
+db.sqlite3*
 *.db
 
 # .nfs files are created when an open file is removed but is still being accessed

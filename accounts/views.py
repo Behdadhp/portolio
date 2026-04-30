@@ -61,7 +61,7 @@ def register_view(request):
 def dashboard_view(request):
     import json
     from django.core.cache import cache
-    from assets.models import CryptoAsset, PriceAlert, StockAsset
+    from assets.models import PriceAlert, Transaction
     from assets.services import (
         cost_basis_for,
         get_asset_summary,
@@ -69,66 +69,35 @@ def dashboard_view(request):
         get_total_portfolio_worth_usd,
     )
 
-    stock_summary = list(
-        get_asset_summary(
-            StockAsset.objects.filter(user=request.user), "stock__name", "stock__symbol"
-        )
-    )
-    crypto_summary = list(
-        get_asset_summary(
-            CryptoAsset.objects.filter(user=request.user),
-            "crypto__name",
-            "crypto__symbol",
-        )
-    )
-
     holdings = {}
     allocation = []  # [{label, symbol, value, type}]
     cost_bases = {}  # {symbol: cost_basis} for P&L ranking
 
-    for row in stock_summary:
-        amt = float(row["total"])
-        holdings[row["symbol"]] = amt
-        price = cache.get(f"finnhub_{row['symbol']}")
-        worth = round(amt * float(price), 2) if price is not None and amt > 0 else 0
-        allocation.append(
-            {
-                "label": row["name"],
-                "symbol": row["symbol"],
-                "value": worth,
-                "type": "stock",
-            }
-        )
-        if amt > 0:
-            cost_bases[row["symbol"]] = cost_basis_for(
-                StockAsset.objects.filter(
-                    user=request.user, stock__symbol=row["symbol"]
-                )
+    for kind in ("stock", "crypto"):
+        qs = Transaction.objects.filter(user=request.user, instrument__kind=kind)
+        for row in get_asset_summary(qs):
+            amt = float(row["total"])
+            holdings[row["symbol"]] = amt
+            price = cache.get(f"finnhub_{row['symbol']}")
+            worth = (
+                round(amt * float(price), 2) if price is not None and amt > 0 else 0
             )
-
-    for row in crypto_summary:
-        amt = float(row["total"])
-        holdings[row["symbol"]] = amt
-        price = cache.get(f"finnhub_{row['symbol']}")
-        worth = round(amt * float(price), 2) if price is not None and amt > 0 else 0
-        allocation.append(
-            {
-                "label": row["name"],
-                "symbol": row["symbol"],
-                "value": worth,
-                "type": "crypto",
-            }
-        )
-        if amt > 0:
-            cost_bases[row["symbol"]] = cost_basis_for(
-                CryptoAsset.objects.filter(
-                    user=request.user, crypto__symbol=row["symbol"]
-                )
+            allocation.append(
+                {
+                    "label": row["name"],
+                    "symbol": row["symbol"],
+                    "value": worth,
+                    "type": kind,
+                }
             )
+            if amt > 0:
+                cost_bases[row["symbol"]] = cost_basis_for(
+                    qs.filter(instrument__symbol=row["symbol"])
+                )
 
     active_alerts = (
         PriceAlert.objects.filter(user=request.user)
-        .select_related("stock", "crypto")
+        .select_related("instrument")
         .order_by("-created_at")
     )
 
@@ -188,15 +157,14 @@ def edit_profile_view(request):
 
 @login_required
 def market_view(request):
-    from assets.models import Crypto, Stock
     from assets.services import load_live_prices
 
     return render(
         request,
         "accounts/market.html",
         {
-            "stock_prices": load_live_prices(Stock),
-            "crypto_prices": load_live_prices(Crypto),
+            "stock_prices": load_live_prices("stock"),
+            "crypto_prices": load_live_prices("crypto"),
         },
     )
 

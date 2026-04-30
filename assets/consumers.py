@@ -32,18 +32,17 @@ class PriceConsumer(AsyncWebsocketConsumer):
 
     @sync_to_async
     def _get_cached_data(self):
-        from assets.models import Crypto, Stock
+        from assets.models import Instrument
 
         prices = {}
         market_caps = {}
-        for model in (Crypto, Stock):
-            for symbol in model.objects.exclude(finnhub_symbol="").values_list(
-                "symbol", flat=True
-            ):
-                price = cache.get(f"finnhub_{symbol}")
-                mcap = cache.get(f"finnhub_{symbol}_mcap")
-                if price is not None:
-                    prices[symbol] = price
-                if mcap is not None:
-                    market_caps[symbol] = mcap
+        for symbol in Instrument.objects.exclude(finnhub_symbol="").values_list(
+            "symbol", flat=True
+        ):
+            price = cache.get(f"finnhub_{symbol}")
+            mcap = cache.get(f"finnhub_{symbol}_mcap")
+            if price is not None:
+                prices[symbol] = price
+            if mcap is not None:
+                market_caps[symbol] = mcap
         return {"prices": prices, "market_caps": market_caps}

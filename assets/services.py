@@ -1,4 +1,5 @@
 import logging
+from decimal import Decimal
 
 import requests
 from django.conf import settings
@@ -86,16 +87,21 @@ def sort_and_paginate(request, queryset, allowed_sort_fields=None):
     return page_obj, sort, order, per_page
 
 
-def get_asset_summary(queryset, name_field, symbol_field):
-    """Group assets by name and calculate net total amount (bought=+, sold=-)."""
+def get_asset_summary(queryset):
+    """
+    Group a Transaction queryset by instrument and return rows with name,
+    symbol, and net total amount (bought=+, sold=−).
+    """
     return (
-        queryset.values(name=F(name_field), symbol=F(symbol_field))
+        queryset.values(
+            name=F("instrument__name"), symbol=F("instrument__symbol")
+        )
         .annotate(
             total=Coalesce(
                 Sum(
                     Case(
                         When(status="bought", then=F("amount")),
-                        When(status="sold", then=F("amount") * Value(-1.0)),
+                        When(status="sold", then=F("amount") * Value(Decimal("-1.0"))),
                         output_field=FloatField(),
                     )
                 ),
@@ -195,21 +201,15 @@ def compute_analytics(transactions, symbol):
         analytics["unrealized_pnl"] = round(unrealized_pnl, 2)
         analytics["unrealized_pnl_pct"] = round(unrealized_pnl_pct, 2)
 
-        # Sell prices for +5%, +10%, +25% profit
         analytics["sell_5"] = round(avg_price * 1.05, 2)
         analytics["sell_10"] = round(avg_price * 1.10, 2)
         analytics["sell_25"] = round(avg_price * 1.25, 2)
 
-        # Price to buy <units> more to decrease average by 10%
-        # New avg = (cost_basis + units * buy_price) / (units * 2) = avg_price * 0.9
-        # buy_price = (avg_price * 0.9 * units * 2 - cost_basis) / units
         target_avg = avg_price * 0.90
         buy_price_for_minus_10 = (target_avg * (units * 2) - cost_basis) / units
         analytics["buy_avg_minus_10"] = (
             round(buy_price_for_minus_10, 2) if buy_price_for_minus_10 > 0 else 0.0
         )
-        # Dollar spend needed to achieve the -10% avg at that price
-        # (buy <units> more at <buy_price_for_minus_10>).
         analytics["buy_avg_minus_10_spend"] = (
             round(buy_price_for_minus_10 * units, 2)
             if buy_price_for_minus_10 > 0
@@ -219,89 +219,78 @@ def compute_analytics(transactions, symbol):
     return analytics
 
 
-def compute_stock_tax(user, current_symbol=None):
+def _compute_freibetrag_tax(user, kind, current_symbol, key_prefix):
     """
-    Compute German stock tax analytics for the current year across all user stocks.
+    Shared weighted-average tax calculator for stocks and ETFs.
 
-    German tax rules:
-    - Kapitalertragsteuer: 25% on gains
-    - Solidaritätszuschlag: 5.5% on the tax
-    - Effective rate: 26.375% (without Kirchensteuer)
-    - Freibetrag: 1,000 EUR/year (singles)
-    - Stock losses can only offset stock gains
-
-    Returns a dict with tax breakdown, or None if no sells this year.
+    German rules: 26.375% on gains above €1,000 Freibetrag.
+    Losses can only offset gains within the same kind.
     """
     from datetime import date
-    from .models import StockAsset
 
-    TAX_RATE = 0.26375  # 25% + 5.5% Soli
+    from .models import Transaction
+
+    TAX_RATE = 0.26375
     FREIBETRAG_EUR = 1000.0
     eur_usd = get_eur_usd_rate() or 1.0
-    FREIBETRAG = FREIBETRAG_EUR * eur_usd  # threshold in USD for comparison
+    FREIBETRAG = FREIBETRAG_EUR * eur_usd
     current_year = date.today().year
 
-    all_stocks_qs = StockAsset.objects.filter(user=user)
-
-    # Get unique stock FKs that have transactions
-    stock_ids = all_stocks_qs.values_list("stock_id", flat=True).distinct()
+    qs = Transaction.objects.filter(user=user, instrument__kind=kind)
+    instrument_ids = qs.values_list("instrument_id", flat=True).distinct()
 
     total_gains = 0.0
     total_losses = 0.0
-    current_stock_gains = 0.0
-    current_stock_losses = 0.0
+    current_gains = 0.0
+    current_losses = 0.0
     sell_count = 0
 
-    for stock_id in stock_ids:
+    for inst_id in instrument_ids:
         txs = (
-            all_stocks_qs.filter(stock_id=stock_id)
-            .select_related("stock")
+            qs.filter(instrument_id=inst_id)
+            .select_related("instrument")
             .order_by("date", "status", "pk")
         )
-        stock_symbol = None
+        symbol = None
         cost_basis = 0.0
         units = 0.0
 
         for tx in txs:
-            if stock_symbol is None:
-                stock_symbol = tx.stock.symbol
+            if symbol is None:
+                symbol = tx.instrument.symbol
             amt = float(tx.amount)
             px = float(tx.price)
 
             if tx.status == "bought":
                 cost_basis += amt * px
                 units += amt
-            elif tx.status == "sold":
-                if units > 0:
-                    avg = cost_basis / units
-                    pnl = (px - avg) * amt
-                    cost_basis -= amt * avg
-                    units -= amt
+            elif tx.status == "sold" and units > 0:
+                avg = cost_basis / units
+                pnl = (px - avg) * amt
+                cost_basis -= amt * avg
+                units -= amt
 
-                    if tx.date.year == current_year:
+                if tx.date.year == current_year:
+                    if pnl >= 0:
+                        total_gains += pnl
+                    else:
+                        total_losses += abs(pnl)
+
+                    if symbol == current_symbol:
                         if pnl >= 0:
-                            total_gains += pnl
+                            current_gains += pnl
                         else:
-                            total_losses += abs(pnl)
+                            current_losses += abs(pnl)
 
-                        if stock_symbol == current_symbol:
-                            if pnl >= 0:
-                                current_stock_gains += pnl
-                            else:
-                                current_stock_losses += abs(pnl)
-
-                        sell_count += 1
+                    sell_count += 1
 
     net_gain = total_gains - total_losses
     taxable = max(0.0, net_gain - FREIBETRAG)
     tax_owed = taxable * TAX_RATE
     freibetrag_used = min(net_gain, FREIBETRAG) if net_gain > 0 else 0.0
     freibetrag_remaining = FREIBETRAG - freibetrag_used
-
-    # How much more can you gain before hitting Freibetrag
     gain_until_taxed = max(0.0, FREIBETRAG - net_gain) if net_gain < FREIBETRAG else 0.0
-
-    current_stock_net = current_stock_gains - current_stock_losses
+    current_net = current_gains - current_losses
 
     return {
         "year": current_year,
@@ -316,114 +305,21 @@ def compute_stock_tax(user, current_symbol=None):
         "tax_rate_pct": round(TAX_RATE * 100, 3),
         "tax_owed": round(tax_owed, 2),
         "net_after_tax": round(net_gain - tax_owed, 2),
-        "current_stock_gains": round(current_stock_gains, 2),
-        "current_stock_losses": round(current_stock_losses, 2),
-        "current_stock_net": round(current_stock_net, 2),
+        f"current_{key_prefix}_gains": round(current_gains, 2),
+        f"current_{key_prefix}_losses": round(current_losses, 2),
+        f"current_{key_prefix}_net": round(current_net, 2),
         "sell_count": sell_count,
     }
+
+
+def compute_stock_tax(user, current_symbol=None):
+    """German stock capital-gains tax for the current year (Freibetrag €1,000)."""
+    return _compute_freibetrag_tax(user, "stock", current_symbol, "stock")
 
 
 def compute_etf_tax(user, current_symbol=None):
-    """
-    Compute German ETF tax analytics for the current year across all user ETFs.
-
-    Uses the same German tax rules as stocks:
-    - Kapitalertragsteuer: 25% on gains
-    - Solidaritätszuschlag: 5.5% on the tax
-    - Effective rate: 26.375% (without Kirchensteuer)
-    - Freibetrag: 1,000 EUR/year (singles)
-    - ETF losses can only offset ETF gains
-
-    Returns a dict with tax breakdown, or None if no sells this year.
-    """
-    from datetime import date
-    from .models import ETFAsset
-
-    TAX_RATE = 0.26375  # 25% + 5.5% Soli
-    FREIBETRAG_EUR = 1000.0
-    eur_usd = get_eur_usd_rate() or 1.0
-    FREIBETRAG = FREIBETRAG_EUR * eur_usd  # threshold in USD for comparison
-    current_year = date.today().year
-
-    all_etfs_qs = ETFAsset.objects.filter(user=user)
-
-    # Get unique ETF FKs that have transactions
-    etf_ids = all_etfs_qs.values_list("etf_id", flat=True).distinct()
-
-    total_gains = 0.0
-    total_losses = 0.0
-    current_etf_gains = 0.0
-    current_etf_losses = 0.0
-    sell_count = 0
-
-    for etf_id in etf_ids:
-        txs = (
-            all_etfs_qs.filter(etf_id=etf_id)
-            .select_related("etf")
-            .order_by("date", "status", "pk")
-        )
-        etf_symbol = None
-        cost_basis = 0.0
-        units = 0.0
-
-        for tx in txs:
-            if etf_symbol is None:
-                etf_symbol = tx.etf.symbol
-            amt = float(tx.amount)
-            px = float(tx.price)
-
-            if tx.status == "bought":
-                cost_basis += amt * px
-                units += amt
-            elif tx.status == "sold":
-                if units > 0:
-                    avg = cost_basis / units
-                    pnl = (px - avg) * amt
-                    cost_basis -= amt * avg
-                    units -= amt
-
-                    if tx.date.year == current_year:
-                        if pnl >= 0:
-                            total_gains += pnl
-                        else:
-                            total_losses += abs(pnl)
-
-                        if etf_symbol == current_symbol:
-                            if pnl >= 0:
-                                current_etf_gains += pnl
-                            else:
-                                current_etf_losses += abs(pnl)
-
-                        sell_count += 1
-
-    net_gain = total_gains - total_losses
-    taxable = max(0.0, net_gain - FREIBETRAG)
-    tax_owed = taxable * TAX_RATE
-    freibetrag_used = min(net_gain, FREIBETRAG) if net_gain > 0 else 0.0
-    freibetrag_remaining = FREIBETRAG - freibetrag_used
-
-    gain_until_taxed = max(0.0, FREIBETRAG - net_gain) if net_gain < FREIBETRAG else 0.0
-
-    current_etf_net = current_etf_gains - current_etf_losses
-
-    return {
-        "year": current_year,
-        "total_gains": round(total_gains, 2),
-        "total_losses": round(total_losses, 2),
-        "net_gain": round(net_gain, 2),
-        "freibetrag": FREIBETRAG,
-        "freibetrag_used": round(freibetrag_used, 2),
-        "freibetrag_remaining": round(freibetrag_remaining, 2),
-        "gain_until_taxed": round(gain_until_taxed, 2),
-        "taxable": round(taxable, 2),
-        "tax_rate_pct": round(TAX_RATE * 100, 3),
-        "tax_owed": round(tax_owed, 2),
-        "net_after_tax": round(net_gain - tax_owed, 2),
-        "current_etf_gains": round(current_etf_gains, 2),
-        "current_etf_losses": round(current_etf_losses, 2),
-        "current_etf_net": round(current_etf_net, 2),
-        "sell_count": sell_count,
-    }
+    """German ETF capital-gains tax for the current year (Freibetrag €1,000)."""
+    return _compute_freibetrag_tax(user, "etf", current_symbol, "etf")
 
 
 def compute_crypto_tax(user, current_symbol=None):
@@ -432,47 +328,43 @@ def compute_crypto_tax(user, current_symbol=None):
 
     German crypto tax rules:
     - Hold > 1 year → completely tax-free on sale
-    - Hold < 1 year → subject to income tax (Einkommensteuer, rate varies)
+    - Hold < 1 year → subject to income tax (Einkommensteuer)
     - Freigrenze: €1,000/year — if total short-term gains < €1,000, all tax-free
       (unlike Freibetrag: if you exceed €1,000, the ENTIRE amount is taxed)
     - Uses FIFO (First In, First Out) for determining holding period
-
-    Returns a dict with tax breakdown and per-lot holding timers.
     """
     from datetime import date, timedelta
-    from .models import CryptoAsset
+
+    from .models import Transaction
 
     FREIGRENZE_EUR = 1000.0
     eur_usd = get_eur_usd_rate() or 1.0
-    FREIGRENZE = FREIGRENZE_EUR * eur_usd  # threshold in USD for comparison
+    FREIGRENZE = FREIGRENZE_EUR * eur_usd
     current_year = date.today().year
     today = date.today()
 
-    all_crypto_qs = CryptoAsset.objects.filter(user=user)
-    crypto_ids = all_crypto_qs.values_list("crypto_id", flat=True).distinct()
+    qs = Transaction.objects.filter(user=user, instrument__kind="crypto")
+    instrument_ids = qs.values_list("instrument_id", flat=True).distinct()
 
     total_short_term_gains = 0.0
     total_short_term_losses = 0.0
     total_long_term_gains = 0.0
-    current_crypto_short_gains = 0.0
-    current_crypto_short_losses = 0.0
-
-    # Per-lot timers for the current symbol
+    current_short_gains = 0.0
+    current_short_losses = 0.0
     holding_lots = []
 
-    for crypto_id in crypto_ids:
+    for inst_id in instrument_ids:
         txs = (
-            all_crypto_qs.filter(crypto_id=crypto_id)
-            .select_related("crypto")
+            qs.filter(instrument_id=inst_id)
+            .select_related("instrument")
             .order_by("date", "status", "pk")
         )
-        crypto_symbol = None
-        # FIFO lot queue: list of {date, amount, price}
+        symbol = None
         lots = []
 
         for tx in txs:
-            if crypto_symbol is None:
-                crypto_symbol = tx.crypto.symbol
+            if symbol is None:
+                symbol = tx.instrument.symbol
             amt = float(tx.amount)
             px = float(tx.price)
 
@@ -488,18 +380,16 @@ def compute_crypto_tax(user, current_symbol=None):
 
                     if tx.date.year == current_year:
                         if holding_days <= 365:
-                            # Short-term
                             if pnl >= 0:
                                 total_short_term_gains += pnl
                             else:
                                 total_short_term_losses += abs(pnl)
-                            if crypto_symbol == current_symbol:
+                            if symbol == current_symbol:
                                 if pnl >= 0:
-                                    current_crypto_short_gains += pnl
+                                    current_short_gains += pnl
                                 else:
-                                    current_crypto_short_losses += abs(pnl)
+                                    current_short_losses += abs(pnl)
                         else:
-                            # Long-term → tax-free
                             total_long_term_gains += pnl if pnl > 0 else 0
 
                     lot["amount"] -= sell_from_lot
@@ -507,8 +397,7 @@ def compute_crypto_tax(user, current_symbol=None):
                     if lot["amount"] <= 0.0001:
                         lots.pop(0)
 
-        # Collect remaining lots for current symbol's timer
-        if crypto_symbol == current_symbol:
+        if symbol == current_symbol:
             for lot in lots:
                 if lot["amount"] > 0.0001:
                     tax_free_date = lot["date"] + timedelta(days=366)
@@ -525,10 +414,7 @@ def compute_crypto_tax(user, current_symbol=None):
                     )
 
     net_short_term = total_short_term_gains - total_short_term_losses
-    current_net = current_crypto_short_gains - current_crypto_short_losses
-
-    # Freigrenze: if net short-term gains < 1000, all tax-free
-    # If >= 1000, the ENTIRE amount is taxable (not just the excess)
+    current_net = current_short_gains - current_short_losses
     exceeds_freigrenze = net_short_term >= FREIGRENZE
     room_to_freigrenze = (
         max(0.0, FREIGRENZE - net_short_term) if not exceeds_freigrenze else 0.0
@@ -543,19 +429,21 @@ def compute_crypto_tax(user, current_symbol=None):
         "total_long_term_gains": round(total_long_term_gains, 2),
         "exceeds_freigrenze": exceeds_freigrenze,
         "room_to_freigrenze": round(room_to_freigrenze, 2),
-        "current_crypto_short_gains": round(current_crypto_short_gains, 2),
-        "current_crypto_short_losses": round(current_crypto_short_losses, 2),
+        "current_crypto_short_gains": round(current_short_gains, 2),
+        "current_crypto_short_losses": round(current_short_losses, 2),
         "current_crypto_net": round(current_net, 2),
         "holding_lots": holding_lots,
     }
 
 
-def load_live_prices(model):
-    """Load cached live prices and market caps for tracked symbols of a model."""
+def load_live_prices(kind):
+    """Load cached live prices and market caps for tracked symbols of a kind."""
+    from .models import Instrument
+
     result = []
-    for symbol in model.objects.exclude(finnhub_symbol="").values_list(
-        "symbol", flat=True
-    ):
+    for symbol in Instrument.objects.filter(kind=kind).exclude(
+        finnhub_symbol=""
+    ).values_list("symbol", flat=True):
         price = cache.get(f"finnhub_{symbol}")
         mcap = cache.get(f"finnhub_{symbol}_mcap")
         result.append({"short": symbol, "price": price, "market_cap": mcap or 0})
@@ -568,7 +456,6 @@ def get_eur_usd_rate():
     Get the current EUR → USD exchange rate.
 
     Caches the rate for 6 hours (ECB updates daily).
-    Returns the rate as a float, e.g. 1.1372 means 1 EUR = 1.1372 USD.
     Returns None if the API is unreachable.
     """
     CACHE_KEY = "fx_eur_usd"
@@ -648,22 +535,24 @@ def execute_due_savings_plans():
 
     For each due plan:
       - Loop while still due (catches up missed days).
-      - Use last cached Finnhub price for the ETF symbol.
+      - Use the ETF's last_price (which mirrors the price cache).
         If unavailable, create the transaction with price=0 and amount=0
         so the user can fill it in manually later.
-      - Insert an ETFAsset row dated `next_execution_date`.
+      - Insert a Transaction row dated `next_execution_date`.
       - Advance next_execution_date by interval, anchored to start_date.day.
 
     Idempotent: safe to call repeatedly; each plan only executes when due.
     """
     from datetime import date
+
     from django.utils import timezone
-    from .models import ETFAsset, ETFSavingsPlan
+
+    from .models import ETFSavingsPlan, Transaction
 
     today = date.today()
     due = ETFSavingsPlan.objects.filter(
         active=True, next_execution_date__lte=today
-    ).select_related("etf", "user")
+    ).select_related("instrument", "user")
 
     executed = 0
     for plan in due:
@@ -680,7 +569,7 @@ def execute_due_savings_plans():
             else:
                 usd_spend = float(plan.amount)
 
-            last_price = plan.etf.last_price
+            last_price = plan.instrument.last_price
             if last_price is not None and float(last_price) > 0:
                 price_val = float(last_price)
                 amount_val = usd_spend / price_val
@@ -688,11 +577,11 @@ def execute_due_savings_plans():
                 price_val = 0.0
                 amount_val = 0.0
 
-            ETFAsset.objects.create(
+            Transaction.objects.create(
                 user=plan.user,
-                etf=plan.etf,
-                price=round(price_val, 2),
-                amount=round(amount_val, 8),
+                instrument=plan.instrument,
+                price=Decimal(str(round(price_val, 2))),
+                amount=Decimal(str(round(amount_val, 8))),
                 date=plan.next_execution_date,
                 status="bought",
             )
@@ -714,8 +603,7 @@ def get_cash_summary(user):
     Return totals for a user's cash deposits/withdrawals (all USD).
 
     `net_invested_usd` is the principal still committed to the brokerage:
-    deposits − withdrawals. Negative means the user has pulled out more than
-    they've put in (rare but possible after large gains).
+    deposits − withdrawals.
     """
     from .models import CashFlow
 
@@ -735,29 +623,19 @@ def get_cash_summary(user):
 
 def get_total_portfolio_worth_usd(user):
     """
-    Sum the user's current holdings across stocks, ETFs, and crypto in USD.
-
-    Uses the price cache (`finnhub_{symbol}`) — symbols without a cached price
-    contribute 0 (same convention as list/dashboard views).
+    Sum the user's current holdings (all kinds) in USD using the price cache.
     """
-    from .models import CryptoAsset, ETFAsset, StockAsset
+    from .models import Transaction
 
     total = 0.0
-    for model, name_field, symbol_field in (
-        (StockAsset, "stock__name", "stock__symbol"),
-        (ETFAsset, "etf__name", "etf__symbol"),
-        (CryptoAsset, "crypto__name", "crypto__symbol"),
-    ):
-        for row in get_asset_summary(
-            model.objects.filter(user=user), name_field, symbol_field
-        ):
-            amt = float(row["total"])
-            if amt <= 0:
-                continue
-            price = cache.get(f"finnhub_{row['symbol']}")
-            if price is None:
-                continue
-            total += amt * float(price)
+    for row in get_asset_summary(Transaction.objects.filter(user=user)):
+        amt = float(row["total"])
+        if amt <= 0:
+            continue
+        price = cache.get(f"finnhub_{row['symbol']}")
+        if price is None:
+            continue
+        total += amt * float(price)
     return round(total, 2)
 
 
@@ -765,12 +643,12 @@ def sync_alert_cache():
     """Rebuild the Redis alert cache from the DB."""
     from .models import PriceAlert
 
-    alerts = PriceAlert.objects.filter(email_sent=False).select_related(
-        "stock", "crypto", "etf"
-    )
+    alerts = PriceAlert.objects.filter(email_sent=False).select_related("instrument")
     alert_data = {}
     for a in alerts:
-        alert_data.setdefault(a.symbol, []).append(
+        if a.instrument_id is None:
+            continue
+        alert_data.setdefault(a.instrument.symbol, []).append(
             {
                 "id": str(a.id),
                 "user_id": str(a.user_id),
@@ -782,3 +660,18 @@ def sync_alert_cache():
             }
         )
     cache.set("price_alerts_active", alert_data, timeout=None)
+
+
+def refresh_instrument_last_price(instrument):
+    """
+    Mirror the most recent transaction's price onto the master Instrument.
+
+    Picks the latest by (date, pk) across all users so historical inserts/edits
+    don't clobber a more recent price. Used after creating/editing ETF
+    transactions where `last_price` drives savings-plan execution.
+    """
+    latest = instrument.transactions.order_by("-date", "-pk").first()
+    new_price = latest.price if latest else None
+    if new_price != instrument.last_price:
+        instrument.last_price = new_price
+        instrument.save(update_fields=["last_price"])

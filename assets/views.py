@@ -15,15 +15,11 @@ from .forms import (
     StockAssetForm,
 )
 from .models import (
-    ETF,
     CashFlow,
-    Crypto,
-    CryptoAsset,
-    ETFAsset,
     ETFSavingsPlan,
+    Instrument,
     PriceAlert,
-    Stock,
-    StockAsset,
+    Transaction,
 )
 from .services import (
     DETAIL_COLUMNS,
@@ -38,6 +34,7 @@ from .services import (
     get_eur_usd_rate,
     get_filter_ranges,
     get_total_portfolio_worth_usd,
+    refresh_instrument_last_price,
     sort_and_paginate,
     sync_alert_cache,
 )
@@ -45,21 +42,9 @@ from .services import (
 # ── Generic CRUD helpers ─────────────────────────────────────
 
 
-def _list_view(
-    request,
-    transaction_model,
-    name_field,
-    symbol_field,
-    template,
-    context_key,
-    extra_rows=None,
-):
-    summary = get_asset_summary(
-        transaction_model.objects.filter(user=request.user),
-        name_field,
-        symbol_field,
-    )
-    fk_field = symbol_field.split("__")[0]
+def _list_view(request, kind, template, context_key, extra_rows=None):
+    base_qs = Transaction.objects.filter(user=request.user, instrument__kind=kind)
+    summary = get_asset_summary(base_qs)
     enriched = []
     allocation = []
     pnl_ranking = []
@@ -67,24 +52,15 @@ def _list_view(
         price = cache.get(f"finnhub_{row['symbol']}")
         row["price"] = price
         amt = float(row["total"])
-        row["worth"] = (
-            round(amt * float(price), 2) if price is not None else None
-        )
+        row["worth"] = round(amt * float(price), 2) if price is not None else None
         enriched.append(row)
-        worth = (
-            round(amt * float(price), 2)
-            if price is not None and amt > 0
-            else 0
-        )
+        worth = round(amt * float(price), 2) if price is not None and amt > 0 else 0
         allocation.append(
             {"label": row["name"], "symbol": row["symbol"], "value": worth}
         )
         if price is not None and amt > 0:
             cb = cost_basis_for(
-                transaction_model.objects.filter(
-                    user=request.user,
-                    **{f"{fk_field}__symbol": row["symbol"]},
-                )
+                base_qs.filter(instrument__symbol=row["symbol"])
             )
             value = round(amt * float(price), 2)
             pnl = round(value - cb, 2)
@@ -118,21 +94,11 @@ def _list_view(
     )
 
 
-def _detail_view(
-    request,
-    symbol,
-    master_model,
-    transaction_model,
-    fk_field,
-    name_field,
-    symbol_field,
-    template,
-    extra_context=None,
-):
-    master = get_object_or_404(master_model, symbol=symbol)
-    base_qs = transaction_model.objects.filter(user=request.user, **{fk_field: master})
+def _detail_view(request, symbol, kind, context_key, template, extra_context=None):
+    instrument = get_object_or_404(Instrument, kind=kind, symbol=symbol)
+    base_qs = Transaction.objects.filter(user=request.user, instrument=instrument)
 
-    summary = get_asset_summary(base_qs, name_field, symbol_field).first()
+    summary = get_asset_summary(base_qs).first()
     total = summary["total"] if summary else 0
 
     analytics = compute_analytics(base_qs, symbol)
@@ -143,15 +109,13 @@ def _detail_view(
         request, transactions
     )
 
-    # Active price alerts for this asset
-    alert_filter = {"user": request.user, fk_field: master}
-    active_alerts = PriceAlert.objects.filter(**alert_filter).select_related(
-        "stock", "crypto"
-    )
+    active_alerts = PriceAlert.objects.filter(
+        user=request.user, instrument=instrument
+    ).select_related("instrument")
 
     context = {
         "page_obj": page_obj,
-        fk_field: master,
+        context_key: instrument,
         "total": total,
         "analytics": analytics,
         "asset_symbol": symbol,
@@ -169,76 +133,73 @@ def _detail_view(
     return render(request, template, context)
 
 
-def _add_view(
-    request, form_class, master_model, fk_field, template, detail_url, symbol=None
-):
+def _add_view(request, form_class, kind, context_key, template, detail_url, symbol=None):
     initial = {}
-    master = None
+    instrument = None
     if symbol:
-        master = get_object_or_404(master_model, symbol=symbol)
-        initial[fk_field] = master
+        instrument = get_object_or_404(Instrument, kind=kind, symbol=symbol)
+        initial[context_key] = instrument
 
     form = form_class(initial=initial)
 
     if request.method == "POST":
         form = form_class(request.POST)
         if form.is_valid():
-            transaction = form.save(commit=False)
-            transaction.user = request.user
-            transaction.save()
-            return redirect(detail_url, symbol=getattr(transaction, fk_field).symbol)
+            tx = form.save(commit=False)
+            tx.user = request.user
+            tx.save()
+            return redirect(detail_url, symbol=tx.instrument.symbol)
 
     return render(
         request,
         template,
         {
             "form": form,
-            fk_field: master,
+            context_key: instrument,
             "eur_usd_rate": get_eur_usd_rate(),
         },
     )
 
 
-def _edit_view(
-    request, pk, form_class, transaction_model, fk_field, template, detail_url
-):
-    transaction = get_object_or_404(transaction_model, pk=pk, user=request.user)
-    form = form_class(instance=transaction)
+def _edit_view(request, pk, form_class, kind, context_key, template, detail_url):
+    tx = get_object_or_404(
+        Transaction, pk=pk, user=request.user, instrument__kind=kind
+    )
+    form = form_class(instance=tx)
 
     if request.method == "POST":
-        form = form_class(request.POST, instance=transaction)
+        form = form_class(request.POST, instance=tx)
         if form.is_valid():
             form.save()
-            return redirect(detail_url, symbol=getattr(transaction, fk_field).symbol)
+            return redirect(detail_url, symbol=tx.instrument.symbol)
 
-    master = getattr(transaction, fk_field)
     return render(
         request,
         template,
         {
             "form": form,
-            "transaction": transaction,
-            fk_field: master,
+            "transaction": tx,
+            context_key: tx.instrument,
             "eur_usd_rate": get_eur_usd_rate(),
         },
     )
 
 
-def _delete_view(
-    request, pk, transaction_model, fk_field, template, list_url, detail_url
-):
-    transaction = get_object_or_404(transaction_model, pk=pk, user=request.user)
-    master = getattr(transaction, fk_field)
+def _delete_view(request, pk, kind, context_key, template, list_url, detail_url):
+    tx = get_object_or_404(
+        Transaction, pk=pk, user=request.user, instrument__kind=kind
+    )
+    instrument = tx.instrument
 
     if request.method == "POST":
-        transaction.delete()
-        if not transaction_model.objects.filter(
-            user=request.user, **{fk_field: master}
+        tx.delete()
+        if not Transaction.objects.filter(
+            user=request.user, instrument=instrument
         ).exists():
             return redirect(list_url)
-        return redirect(detail_url, symbol=master.symbol)
+        return redirect(detail_url, symbol=instrument.symbol)
 
-    return render(request, template, {"transaction": transaction, fk_field: master})
+    return render(request, template, {"transaction": tx, context_key: instrument})
 
 
 # ── Stock views ──────────────────────────────────────────────
@@ -246,14 +207,7 @@ def _delete_view(
 
 @login_required
 def stock_list_view(request):
-    return _list_view(
-        request,
-        StockAsset,
-        "stock__name",
-        "stock__symbol",
-        "assets/stock_list.html",
-        "stocks",
-    )
+    return _list_view(request, "stock", "assets/stock_list.html", "stocks")
 
 
 @login_required
@@ -262,11 +216,8 @@ def stock_detail_view(request, symbol):
     return _detail_view(
         request,
         symbol,
-        Stock,
-        StockAsset,
         "stock",
-        "stock__name",
-        "stock__symbol",
+        "stock",
         "assets/stock_detail.html",
         extra_context={"tax": tax},
     )
@@ -277,7 +228,7 @@ def stock_add_view(request, symbol=None):
     return _add_view(
         request,
         StockAssetForm,
-        Stock,
+        "stock",
         "stock",
         "assets/stock_add.html",
         "stock_detail",
@@ -291,7 +242,7 @@ def stock_edit_view(request, pk):
         request,
         pk,
         StockAssetForm,
-        StockAsset,
+        "stock",
         "stock",
         "assets/stock_edit.html",
         "stock_detail",
@@ -303,7 +254,7 @@ def stock_delete_view(request, pk):
     return _delete_view(
         request,
         pk,
-        StockAsset,
+        "stock",
         "stock",
         "assets/stock_delete.html",
         "stocks",
@@ -331,7 +282,7 @@ def etf_create_view(request):
 
 @login_required
 def etf_master_edit_view(request, symbol):
-    etf = get_object_or_404(ETF, symbol=symbol)
+    etf = get_object_or_404(Instrument, kind="etf", symbol=symbol)
     form = ETFForm(instance=etf)
     if request.method == "POST":
         form = ETFForm(request.POST, instance=etf)
@@ -354,7 +305,9 @@ def etf_master_edit_view(request, symbol):
 def etf_list_view(request):
     # Surface ETFs the user has a savings plan for (or that they just added
     # without any transactions yet) so the detail page stays reachable.
-    plan_etfs = ETF.objects.filter(savings_plans__user=request.user).distinct()
+    plan_etfs = Instrument.objects.filter(
+        kind="etf", savings_plans__user=request.user
+    ).distinct()
     extra_rows = [
         {
             "name": etf.name,
@@ -367,9 +320,7 @@ def etf_list_view(request):
     ]
     return _list_view(
         request,
-        ETFAsset,
-        "etf__name",
-        "etf__symbol",
+        "etf",
         "assets/etf_list.html",
         "etfs",
         extra_rows=extra_rows,
@@ -379,16 +330,13 @@ def etf_list_view(request):
 @login_required
 def etf_detail_view(request, symbol):
     tax = compute_etf_tax(request.user, current_symbol=symbol)
-    etf = get_object_or_404(ETF, symbol=symbol)
-    savings_plans = ETFSavingsPlan.objects.filter(user=request.user, etf=etf)
+    etf = get_object_or_404(Instrument, kind="etf", symbol=symbol)
+    savings_plans = ETFSavingsPlan.objects.filter(user=request.user, instrument=etf)
     return _detail_view(
         request,
         symbol,
-        ETF,
-        ETFAsset,
         "etf",
-        "etf__name",
-        "etf__symbol",
+        "etf",
         "assets/etf_detail.html",
         extra_context={"tax": tax, "savings_plans": savings_plans},
     )
@@ -402,7 +350,7 @@ def etf_plan_create_view(request, symbol=None):
     initial = {}
     etf = None
     if symbol:
-        etf = get_object_or_404(ETF, symbol=symbol)
+        etf = get_object_or_404(Instrument, kind="etf", symbol=symbol)
         initial["etf"] = etf
 
     form = ETFSavingsPlanForm(initial=initial)
@@ -414,7 +362,7 @@ def etf_plan_create_view(request, symbol=None):
             plan.user = request.user
             plan.next_execution_date = plan.start_date
             plan.save()
-            return redirect("etf_detail", symbol=plan.etf.symbol)
+            return redirect("etf_detail", symbol=plan.instrument.symbol)
 
     return render(
         request,
@@ -437,21 +385,20 @@ def etf_plan_edit_view(request, pk):
         form = ETFSavingsPlanForm(request.POST, instance=plan)
         if form.is_valid():
             updated = form.save(commit=False)
-            # If start_date changed and plan hasn't run yet, realign next_execution_date.
             if (
                 "start_date" in form.changed_data
                 and updated.last_executed_at is None
             ):
                 updated.next_execution_date = updated.start_date
             updated.save()
-            return redirect("etf_detail", symbol=updated.etf.symbol)
+            return redirect("etf_detail", symbol=updated.instrument.symbol)
 
     return render(
         request,
         "assets/etf_plan_form.html",
         {
             "form": form,
-            "etf": plan.etf,
+            "etf": plan.instrument,
             "plan": plan,
             "mode": "edit",
             "eur_usd_rate": get_eur_usd_rate(),
@@ -465,31 +412,17 @@ def etf_plan_toggle_view(request, pk):
     plan = get_object_or_404(ETFSavingsPlan, pk=pk, user=request.user)
     plan.active = not plan.active
     plan.save(update_fields=["active"])
-    return redirect("etf_detail", symbol=plan.etf.symbol)
+    return redirect("etf_detail", symbol=plan.instrument.symbol)
 
 
 @login_required
 def etf_plan_delete_view(request, pk):
     plan = get_object_or_404(ETFSavingsPlan, pk=pk, user=request.user)
-    etf = plan.etf
+    etf = plan.instrument
     if request.method == "POST":
         plan.delete()
         return redirect("etf_detail", symbol=etf.symbol)
     return render(request, "assets/etf_plan_delete.html", {"plan": plan, "etf": etf})
-
-
-def _refresh_etf_last_price(etf):
-    """
-    Mirror the most recent transaction's price onto the master ETF.
-
-    Picks the latest by (date, pk) across all users so historical inserts/edits
-    don't clobber a more recent price.
-    """
-    latest = etf.transactions.order_by("-date", "-pk").first()
-    new_price = latest.price if latest else None
-    if new_price != etf.last_price:
-        etf.last_price = new_price
-        etf.save(update_fields=["last_price"])
 
 
 @login_required
@@ -497,7 +430,7 @@ def etf_add_view(request, symbol=None):
     initial = {}
     etf = None
     if symbol:
-        etf = get_object_or_404(ETF, symbol=symbol)
+        etf = get_object_or_404(Instrument, kind="etf", symbol=symbol)
         initial["etf"] = etf
 
     form = ETFAssetForm(initial=initial)
@@ -505,11 +438,11 @@ def etf_add_view(request, symbol=None):
     if request.method == "POST":
         form = ETFAssetForm(request.POST)
         if form.is_valid():
-            transaction = form.save(commit=False)
-            transaction.user = request.user
-            transaction.save()
-            _refresh_etf_last_price(transaction.etf)
-            return redirect("etf_detail", symbol=transaction.etf.symbol)
+            tx = form.save(commit=False)
+            tx.user = request.user
+            tx.save()
+            refresh_instrument_last_price(tx.instrument)
+            return redirect("etf_detail", symbol=tx.instrument.symbol)
 
     return render(
         request,
@@ -520,23 +453,25 @@ def etf_add_view(request, symbol=None):
 
 @login_required
 def etf_edit_view(request, pk):
-    transaction = get_object_or_404(ETFAsset, pk=pk, user=request.user)
-    form = ETFAssetForm(instance=transaction)
+    tx = get_object_or_404(
+        Transaction, pk=pk, user=request.user, instrument__kind="etf"
+    )
+    form = ETFAssetForm(instance=tx)
 
     if request.method == "POST":
-        form = ETFAssetForm(request.POST, instance=transaction)
+        form = ETFAssetForm(request.POST, instance=tx)
         if form.is_valid():
-            transaction = form.save()
-            _refresh_etf_last_price(transaction.etf)
-            return redirect("etf_detail", symbol=transaction.etf.symbol)
+            tx = form.save()
+            refresh_instrument_last_price(tx.instrument)
+            return redirect("etf_detail", symbol=tx.instrument.symbol)
 
     return render(
         request,
         "assets/etf_edit.html",
         {
             "form": form,
-            "transaction": transaction,
-            "etf": transaction.etf,
+            "transaction": tx,
+            "etf": tx.instrument,
             "eur_usd_rate": get_eur_usd_rate(),
         },
     )
@@ -547,7 +482,7 @@ def etf_delete_view(request, pk):
     return _delete_view(
         request,
         pk,
-        ETFAsset,
+        "etf",
         "etf",
         "assets/etf_delete.html",
         "etfs",
@@ -560,14 +495,7 @@ def etf_delete_view(request, pk):
 
 @login_required
 def crypto_list_view(request):
-    return _list_view(
-        request,
-        CryptoAsset,
-        "crypto__name",
-        "crypto__symbol",
-        "assets/crypto_list.html",
-        "cryptos",
-    )
+    return _list_view(request, "crypto", "assets/crypto_list.html", "cryptos")
 
 
 @login_required
@@ -576,11 +504,8 @@ def crypto_detail_view(request, symbol):
     return _detail_view(
         request,
         symbol,
-        Crypto,
-        CryptoAsset,
         "crypto",
-        "crypto__name",
-        "crypto__symbol",
+        "crypto",
         "assets/crypto_detail.html",
         extra_context={"crypto_tax": crypto_tax},
     )
@@ -591,7 +516,7 @@ def crypto_add_view(request, symbol=None):
     return _add_view(
         request,
         CryptoAssetForm,
-        Crypto,
+        "crypto",
         "crypto",
         "assets/crypto_add.html",
         "crypto_detail",
@@ -605,7 +530,7 @@ def crypto_edit_view(request, pk):
         request,
         pk,
         CryptoAssetForm,
-        CryptoAsset,
+        "crypto",
         "crypto",
         "assets/crypto_edit.html",
         "crypto_detail",
@@ -617,7 +542,7 @@ def crypto_delete_view(request, pk):
     return _delete_view(
         request,
         pk,
-        CryptoAsset,
+        "crypto",
         "crypto",
         "assets/crypto_delete.html",
         "crypto",
@@ -660,7 +585,6 @@ def alert_create(request):
             {"error": "direction must be 'above' or 'below'"}, status=400
         )
 
-    # invest_amount is only meaningful for buy (below) alerts
     if direction == "below" and invest_amount is not None:
         try:
             invest_amount = float(invest_amount)
@@ -673,26 +597,16 @@ def alert_create(request):
     else:
         invest_amount = None
 
-    # Find the asset
-    stock = Stock.objects.filter(symbol=symbol).first()
-    etf = ETF.objects.filter(symbol=symbol).first() if not stock else None
-    crypto = (
-        Crypto.objects.filter(symbol=symbol).first()
-        if not stock and not etf
-        else None
-    )
-
-    if not stock and not etf and not crypto:
+    # Find the instrument (any kind) by symbol.
+    instrument = Instrument.objects.filter(symbol=symbol).first()
+    if instrument is None:
         return JsonResponse(
             {"error": f"No asset found for symbol '{symbol}'"}, status=404
         )
 
-    # Proximity check: any active alert within 1% of this price?
     existing = PriceAlert.objects.filter(
         user=request.user,
-        stock=stock,
-        etf=etf,
-        crypto=crypto,
+        instrument=instrument,
         direction=direction,
         email_sent=False,
     )
@@ -711,9 +625,7 @@ def alert_create(request):
 
     alert = PriceAlert.objects.create(
         user=request.user,
-        stock=stock,
-        etf=etf,
-        crypto=crypto,
+        instrument=instrument,
         target_price=target_price,
         direction=direction,
         invest_amount=invest_amount,

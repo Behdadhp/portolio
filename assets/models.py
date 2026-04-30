@@ -1,79 +1,10 @@
 import uuid
 
 from django.conf import settings
+from django.core.cache import cache
+from django.core.exceptions import ValidationError
 from django.db import models
 from django.utils import timezone
-
-
-class Crypto(models.Model):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    name = models.CharField(max_length=100, unique=True)
-    symbol = models.CharField(max_length=20, unique=True)
-    finnhub_symbol = models.CharField(
-        max_length=50,
-        blank=True,
-        default="",
-        help_text="Finnhub symbol (e.g. BINANCE:BTCUSDT). Leave blank to skip live tracking.",
-    )
-    date_added = models.DateTimeField(default=timezone.now)
-
-    class Meta:
-        verbose_name_plural = "Cryptos"
-        ordering = ["name"]
-
-    def __str__(self):
-        return f"{self.name} ({self.symbol})"
-
-
-class Stock(models.Model):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    name = models.CharField(max_length=100, unique=True)
-    symbol = models.CharField(max_length=20, unique=True)
-    finnhub_symbol = models.CharField(
-        max_length=50,
-        blank=True,
-        default="",
-        help_text="Finnhub symbol (e.g. AAPL). Leave blank to skip live tracking.",
-    )
-    date_added = models.DateTimeField(default=timezone.now)
-
-    class Meta:
-        ordering = ["name"]
-
-    def __str__(self):
-        return f"{self.name} ({self.symbol})"
-
-
-class ETF(models.Model):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    name = models.CharField(max_length=100, unique=True)
-    symbol = models.CharField(max_length=20, unique=True)
-    last_price = models.DecimalField(
-        max_digits=18,
-        decimal_places=2,
-        null=True,
-        blank=True,
-        help_text="User-maintained last known price (USD). Used for analytics and savings-plan auto-transactions.",
-    )
-    date_added = models.DateTimeField(default=timezone.now)
-
-    class Meta:
-        verbose_name = "ETF"
-        verbose_name_plural = "ETFs"
-        ordering = ["name"]
-
-    def save(self, *args, **kwargs):
-        super().save(*args, **kwargs)
-        # Mirror last_price into the shared price cache so analytics/list views
-        # transparently use it (same key shape as Finnhub-tracked assets).
-        from django.core.cache import cache
-        if self.last_price is not None:
-            cache.set(f"finnhub_{self.symbol}", float(self.last_price), timeout=None)
-        else:
-            cache.delete(f"finnhub_{self.symbol}")
-
-    def __str__(self):
-        return f"{self.name} ({self.symbol})"
 
 
 class Status(models.TextChoices):
@@ -81,61 +12,93 @@ class Status(models.TextChoices):
     SOLD = "sold", "Sold"
 
 
-class CryptoAsset(models.Model):
+class Instrument(models.Model):
+    """
+    A tradeable instrument (stock, crypto, or ETF). The `kind` field is the
+    discriminator; uniqueness is per-kind so a stock symbol may coexist with
+    a crypto symbol.
+    """
+
+    class Kind(models.TextChoices):
+        STOCK = "stock", "Stock"
+        CRYPTO = "crypto", "Crypto"
+        ETF = "etf", "ETF"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    kind = models.CharField(max_length=10, choices=Kind.choices)
+    name = models.CharField(max_length=100)
+    symbol = models.CharField(max_length=20)
+    finnhub_symbol = models.CharField(
+        max_length=50,
+        blank=True,
+        default="",
+        help_text=(
+            "Finnhub symbol (e.g. AAPL, BINANCE:BTCUSDT). Leave blank for "
+            "ETFs or any instrument without a live feed."
+        ),
+    )
+    last_price = models.DecimalField(
+        max_digits=18,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        help_text=(
+            "User-maintained last known price (USD). Primarily used for ETFs "
+            "where there is no live feed; mirrored into the price cache."
+        ),
+    )
+    date_added = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        ordering = ["name"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["kind", "symbol"], name="instrument_unique_kind_symbol"
+            ),
+            models.UniqueConstraint(
+                fields=["kind", "name"], name="instrument_unique_kind_name"
+            ),
+        ]
+
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        # ETFs have no Finnhub feed, so mirror last_price into the shared
+        # price cache. Stocks/crypto get their cache from the Finnhub WS.
+        if self.kind == self.Kind.ETF:
+            if self.last_price is not None:
+                cache.set(
+                    f"finnhub_{self.symbol}", float(self.last_price), timeout=None
+                )
+            else:
+                cache.delete(f"finnhub_{self.symbol}")
+
+    def __str__(self):
+        return f"{self.name} ({self.symbol})"
+
+
+class Transaction(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     user = models.ForeignKey(
-        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="crypto_assets"
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="transactions",
     )
-    crypto = models.ForeignKey(
-        Crypto, on_delete=models.CASCADE, related_name="transactions"
+    instrument = models.ForeignKey(
+        Instrument, on_delete=models.CASCADE, related_name="transactions"
     )
     price = models.DecimalField(max_digits=18, decimal_places=2)
-    amount = models.FloatField(default=0.0)
+    amount = models.DecimalField(max_digits=24, decimal_places=8)
     date = models.DateField()
     status = models.CharField(
         max_length=10, choices=Status.choices, default=Status.BOUGHT
     )
+    created_at = models.DateTimeField(auto_now_add=True, null=True)
+
+    class Meta:
+        ordering = ["-date", "-created_at"]
 
     def __str__(self):
-        return f"{self.crypto.name} - {self.user.email}"
-
-
-class StockAsset(models.Model):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    user = models.ForeignKey(
-        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="stock_assets"
-    )
-    stock = models.ForeignKey(
-        Stock, on_delete=models.CASCADE, related_name="transactions"
-    )
-    price = models.DecimalField(max_digits=18, decimal_places=2)
-    amount = models.FloatField(default=0.0)
-    date = models.DateField()
-    status = models.CharField(
-        max_length=10, choices=Status.choices, default=Status.BOUGHT
-    )
-
-    def __str__(self):
-        return f"{self.stock.name} - {self.user.email}"
-
-
-class ETFAsset(models.Model):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    user = models.ForeignKey(
-        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="etf_assets"
-    )
-    etf = models.ForeignKey(
-        ETF, on_delete=models.CASCADE, related_name="transactions"
-    )
-    price = models.DecimalField(max_digits=18, decimal_places=2)
-    amount = models.FloatField(default=0.0)
-    date = models.DateField()
-    status = models.CharField(
-        max_length=10, choices=Status.choices, default=Status.BOUGHT
-    )
-
-    def __str__(self):
-        return f"{self.etf.name} - {self.user.email}"
+        return f"{self.instrument.symbol} {self.status} {self.amount} ({self.user.email})"
 
 
 class ETFSavingsPlan(models.Model):
@@ -151,10 +114,12 @@ class ETFSavingsPlan(models.Model):
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     user = models.ForeignKey(
-        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="etf_savings_plans"
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="etf_savings_plans",
     )
-    etf = models.ForeignKey(
-        ETF, on_delete=models.CASCADE, related_name="savings_plans"
+    instrument = models.ForeignKey(
+        Instrument, on_delete=models.CASCADE, related_name="savings_plans"
     )
     amount = models.DecimalField(
         max_digits=18,
@@ -183,9 +148,16 @@ class ETFSavingsPlan(models.Model):
     class Meta:
         ordering = ["-created_at"]
 
+    def clean(self):
+        # Savings plans only make sense for ETFs (no live feed → manual price).
+        if self.instrument_id and self.instrument.kind != Instrument.Kind.ETF:
+            raise ValidationError(
+                {"instrument": "Savings plans can only target ETF instruments."}
+            )
+
     def __str__(self):
         sign = "€" if self.currency == "EUR" else "$"
-        return f"{self.etf.symbol} {sign}{self.amount} {self.interval} ({self.user.email})"
+        return f"{self.instrument.symbol} {sign}{self.amount} {self.interval} ({self.user.email})"
 
 
 class CashFlow(models.Model):
@@ -231,14 +203,8 @@ class PriceAlert(models.Model):
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="price_alerts"
     )
-    stock = models.ForeignKey(
-        Stock, on_delete=models.CASCADE, null=True, blank=True, related_name="alerts"
-    )
-    crypto = models.ForeignKey(
-        Crypto, on_delete=models.CASCADE, null=True, blank=True, related_name="alerts"
-    )
-    etf = models.ForeignKey(
-        ETF, on_delete=models.CASCADE, null=True, blank=True, related_name="alerts"
+    instrument = models.ForeignKey(
+        Instrument, on_delete=models.CASCADE, related_name="alerts"
     )
     target_price = models.DecimalField(max_digits=18, decimal_places=2)
     direction = models.CharField(
@@ -262,19 +228,11 @@ class PriceAlert(models.Model):
 
     @property
     def symbol(self):
-        if self.stock_id:
-            return self.stock.symbol
-        if self.etf_id:
-            return self.etf.symbol
-        return self.crypto.symbol
+        return self.instrument.symbol
 
     @property
     def asset_name(self):
-        if self.stock_id:
-            return self.stock.name
-        if self.etf_id:
-            return self.etf.name
-        return self.crypto.name
+        return self.instrument.name
 
     def __str__(self):
         direction = "above" if self.direction == "above" else "below"
