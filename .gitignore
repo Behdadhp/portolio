@@ -191,3 +191,6 @@ items_*/
 
 setup.sh
 dump.rdb
+
+# Local Claude context handoff (not for shared repo)
+PROJECT_CONTEXT.md
