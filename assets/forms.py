@@ -57,6 +57,42 @@ class ETFForm(forms.ModelForm):
         return instance
 
 
+class StockMasterForm(forms.Form):
+    """Symbol-only master form for stocks. Name + finnhub_symbol resolved server-side via Finnhub."""
+
+    symbol = forms.CharField(
+        max_length=20,
+        widget=forms.TextInput(
+            attrs={
+                "class": "form-control",
+                "placeholder": "e.g. AAPL",
+                "autocomplete": "off",
+            }
+        ),
+    )
+
+    def clean_symbol(self):
+        return self.cleaned_data["symbol"].strip().upper()
+
+
+class CryptoMasterForm(forms.Form):
+    """Symbol-only master form for crypto. Resolves to BINANCE:{symbol}USDT on Finnhub."""
+
+    symbol = forms.CharField(
+        max_length=20,
+        widget=forms.TextInput(
+            attrs={
+                "class": "form-control",
+                "placeholder": "e.g. BTC",
+                "autocomplete": "off",
+            }
+        ),
+    )
+
+    def clean_symbol(self):
+        return self.cleaned_data["symbol"].strip().upper()
+
+
 class _TransactionFormBase(forms.ModelForm):
     """
     Shared base for per-kind transaction forms. Subclasses set `kind` and

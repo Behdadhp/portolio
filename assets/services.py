@@ -662,6 +662,131 @@ def sync_alert_cache():
     cache.set("price_alerts_active", alert_data, timeout=None)
 
 
+def lookup_instrument(kind, symbol):
+    """
+    Probe Finnhub (and CoinGecko for crypto names) to verify that a symbol
+    exists and resolve its canonical name + current price.
+
+    Returns one of:
+      {"valid": True, "name": str, "symbol": str, "finnhub_symbol": str,
+       "current_price": float}
+      {"valid": False, "error": str}
+
+    Stocks: `/stock/profile2` + `/quote`. Both must return data.
+    Crypto: scoped to Binance USDT pairs (matches existing `BINANCE:XYZUSDT`
+    convention). Finnhub `/quote?symbol=BINANCE:{X}USDT` for the price;
+    CoinGecko `/coins/markets` for the human-readable name.
+    """
+    api_key = settings.FINNHUB_API_KEY
+    if not api_key:
+        return {"valid": False, "error": "FINNHUB_API_KEY not configured."}
+
+    symbol = symbol.strip().upper()
+    if not symbol:
+        return {"valid": False, "error": "Symbol is required."}
+
+    if kind == "stock":
+        try:
+            profile = requests.get(
+                f"{settings.FINNHUB_REST_URL}/stock/profile2",
+                params={"symbol": symbol, "token": api_key},
+                timeout=10,
+            )
+            profile.raise_for_status()
+            pdata = profile.json()
+        except Exception as e:
+            logger.warning("Finnhub profile lookup failed for %s: %s", symbol, e)
+            return {"valid": False, "error": "Couldn't reach Finnhub. Try again."}
+
+        name = pdata.get("name")
+        if not name:
+            return {
+                "valid": False,
+                "error": f"'{symbol}' not found on Finnhub. Check the ticker.",
+            }
+
+        try:
+            quote = requests.get(
+                f"{settings.FINNHUB_REST_URL}/quote",
+                params={"symbol": symbol, "token": api_key},
+                timeout=10,
+            )
+            quote.raise_for_status()
+            qdata = quote.json()
+        except Exception as e:
+            logger.warning("Finnhub quote lookup failed for %s: %s", symbol, e)
+            return {"valid": False, "error": "Couldn't reach Finnhub. Try again."}
+
+        price = qdata.get("c")
+        if not price or price <= 0:
+            return {
+                "valid": False,
+                "error": f"Finnhub has no live price for '{symbol}'.",
+            }
+
+        return {
+            "valid": True,
+            "name": name,
+            "symbol": symbol,
+            "finnhub_symbol": symbol,
+            "current_price": float(price),
+        }
+
+    if kind == "crypto":
+        finnhub_sym = f"BINANCE:{symbol}USDT"
+        try:
+            quote = requests.get(
+                f"{settings.FINNHUB_REST_URL}/quote",
+                params={"symbol": finnhub_sym, "token": api_key},
+                timeout=10,
+            )
+            quote.raise_for_status()
+            qdata = quote.json()
+        except Exception as e:
+            logger.warning("Finnhub crypto quote failed for %s: %s", finnhub_sym, e)
+            return {"valid": False, "error": "Couldn't reach Finnhub. Try again."}
+
+        price = qdata.get("c")
+        if not price or price <= 0:
+            return {
+                "valid": False,
+                "error": (
+                    f"'{symbol}' not found as a Binance USDT pair on Finnhub."
+                ),
+            }
+
+        # Resolve canonical name from CoinGecko (best-effort).
+        name = symbol
+        try:
+            cg = requests.get(
+                settings.COINGECKO_MARKETS_URL,
+                params={
+                    "vs_currency": "usd",
+                    "symbols": symbol.lower(),
+                    "per_page": 5,
+                    "page": 1,
+                },
+                timeout=10,
+            )
+            cg.raise_for_status()
+            for coin in cg.json():
+                if (coin.get("symbol") or "").upper() == symbol:
+                    name = coin.get("name") or symbol
+                    break
+        except Exception as e:
+            logger.warning("CoinGecko name lookup failed for %s: %s", symbol, e)
+
+        return {
+            "valid": True,
+            "name": name,
+            "symbol": symbol,
+            "finnhub_symbol": finnhub_sym,
+            "current_price": float(price),
+        }
+
+    return {"valid": False, "error": f"Unsupported kind '{kind}'."}
+
+
 def refresh_instrument_last_price(instrument):
     """
     Mirror the most recent transaction's price onto the master Instrument.

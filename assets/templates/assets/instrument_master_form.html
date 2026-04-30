@@ -1,0 +1,152 @@
+{% extends "base.html" %}
+
+{% block title %}{{ title }} — Folio{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h3>{{ title }}</h3>
+    <a href="{% url list_route %}" class="btn btn-ghost btn-sm">Cancel</a>
+</div>
+
+<div class="row">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-body p-4">
+                {% if error %}
+                <div class="alert alert-danger mb-3" id="serverError">{{ error }}</div>
+                {% endif %}
+
+                <form method="post" id="masterForm">
+                    {% csrf_token %}
+                    <div class="mb-3">
+                        <label for="id_symbol" class="form-label">Symbol</label>
+                        <div class="input-group">
+                            {{ form.symbol }}
+                            <button type="button" class="btn btn-ghost" id="verifyBtn">Verify</button>
+                        </div>
+                        <div class="form-text" style="font-size:0.72rem;color:var(--text-muted);">
+                            {% if kind == "crypto" %}
+                                Enter a Binance USDT-pair base symbol (e.g. <code>BTC</code>, <code>ETH</code>).
+                            {% else %}
+                                Enter a US stock ticker (e.g. <code>AAPL</code>, <code>NVDA</code>).
+                            {% endif %}
+                        </div>
+                        {% if form.symbol.errors %}
+                        <div class="form-text" style="color:#f87171;">{{ form.symbol.errors.0 }}</div>
+                        {% endif %}
+                    </div>
+
+                    <div id="lookupStatus" class="mb-3" style="display:none;"></div>
+
+                    <button type="submit" class="btn btn-accent w-100" id="submitBtn" disabled>
+                        {{ title }}
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function() {
+    const kind = "{{ kind }}";
+    const symbolInput = document.getElementById("id_symbol");
+    const verifyBtn = document.getElementById("verifyBtn");
+    const submitBtn = document.getElementById("submitBtn");
+    const status = document.getElementById("lookupStatus");
+    const form = document.getElementById("masterForm");
+    let lastVerifiedSymbol = null;
+
+    function setStatus(html, kind) {
+        status.style.display = "block";
+        status.className = "mb-3 alert alert-" + (kind === "ok" ? "success" : "danger");
+        status.innerHTML = html;
+    }
+
+    function clearStatus() {
+        status.style.display = "none";
+        status.innerHTML = "";
+    }
+
+    function disableSubmit() {
+        submitBtn.disabled = true;
+        lastVerifiedSymbol = null;
+    }
+
+    async function verify() {
+        const symbol = (symbolInput.value || "").trim().toUpperCase();
+        if (!symbol) {
+            setStatus("Enter a symbol first.", "err");
+            disableSubmit();
+            return;
+        }
+
+        verifyBtn.disabled = true;
+        verifyBtn.textContent = "Checking…";
+
+        try {
+            const resp = await fetch(
+                `{% url 'lookup_instrument' %}?kind=${encodeURIComponent(kind)}&symbol=${encodeURIComponent(symbol)}`
+            );
+            const data = await resp.json();
+
+            if (resp.status === 200 && data.valid) {
+                setStatus(
+                    `<strong>${escapeHtml(data.name)}</strong> ` +
+                    `<span style="opacity:0.75;">(${escapeHtml(data.symbol)})</span><br>` +
+                    `<span style="font-size:0.85rem;">Finnhub: <code>${escapeHtml(data.finnhub_symbol)}</code> · ` +
+                    `Current: $${data.current_price.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 8})}</span>`,
+                    "ok"
+                );
+                submitBtn.disabled = false;
+                lastVerifiedSymbol = symbol;
+            } else if (resp.status === 409 && data.exists_in_db) {
+                setStatus(
+                    `${escapeHtml(data.error)} ` +
+                    `<a href="${escapeHtml(data.existing_url)}" class="alert-link">Open ${escapeHtml(data.existing_name)}</a>`,
+                    "err"
+                );
+                disableSubmit();
+            } else {
+                setStatus(escapeHtml(data.error || "Lookup failed."), "err");
+                disableSubmit();
+            }
+        } catch (e) {
+            setStatus("Network error. Try again.", "err");
+            disableSubmit();
+        } finally {
+            verifyBtn.disabled = false;
+            verifyBtn.textContent = "Verify";
+        }
+    }
+
+    function escapeHtml(s) {
+        return String(s).replace(/[&<>"']/g, c => ({
+            "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+        })[c]);
+    }
+
+    verifyBtn.addEventListener("click", verify);
+
+    // Re-verifying is required if the user changes the symbol after verifying.
+    symbolInput.addEventListener("input", () => {
+        const current = (symbolInput.value || "").trim().toUpperCase();
+        if (current !== lastVerifiedSymbol) {
+            disableSubmit();
+            clearStatus();
+        }
+    });
+
+    // Submit posts to the same view; the server re-verifies as defense-in-depth.
+    form.addEventListener("submit", () => {
+        const current = (symbolInput.value || "").trim().toUpperCase();
+        if (current !== lastVerifiedSymbol) {
+            // Should be unreachable since the button is disabled, but guard anyway.
+            return false;
+        }
+    });
+})();
+</script>
+{% endblock %}

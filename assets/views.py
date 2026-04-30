@@ -9,10 +9,12 @@ from django.views.decorators.http import require_POST
 from .forms import (
     CashFlowForm,
     CryptoAssetForm,
+    CryptoMasterForm,
     ETFAssetForm,
     ETFForm,
     ETFSavingsPlanForm,
     StockAssetForm,
+    StockMasterForm,
 )
 from .models import (
     CashFlow,
@@ -34,6 +36,7 @@ from .services import (
     get_eur_usd_rate,
     get_filter_ranges,
     get_total_portfolio_worth_usd,
+    lookup_instrument,
     refresh_instrument_last_price,
     sort_and_paginate,
     sync_alert_cache,
@@ -202,12 +205,130 @@ def _delete_view(request, pk, kind, context_key, template, list_url, detail_url)
     return render(request, template, {"transaction": tx, context_key: instrument})
 
 
+# ── Instrument lookup API (Finnhub probe) ───────────────────
+
+
+@login_required
+def lookup_instrument_view(request):
+    """
+    GET /api/lookup-instrument/?kind=stock&symbol=AAPL
+
+    Probes Finnhub to verify the symbol exists and returns canonical
+    name + current price. Also flags if the user already has this
+    instrument in their portfolio (so the UI can offer a link).
+    """
+    kind = request.GET.get("kind", "").strip().lower()
+    symbol = request.GET.get("symbol", "").strip().upper()
+
+    if kind not in ("stock", "crypto"):
+        return JsonResponse(
+            {"valid": False, "error": "kind must be 'stock' or 'crypto'."},
+            status=400,
+        )
+    if not symbol:
+        return JsonResponse(
+            {"valid": False, "error": "Symbol is required."}, status=400
+        )
+
+    existing = Instrument.objects.filter(kind=kind, symbol=symbol).first()
+    if existing is not None:
+        detail_route = "stock_detail" if kind == "stock" else "crypto_detail"
+        from django.urls import reverse
+
+        return JsonResponse(
+            {
+                "valid": False,
+                "exists_in_db": True,
+                "error": f"'{symbol}' is already in your portfolio.",
+                "existing_url": reverse(detail_route, args=[symbol]),
+                "existing_name": existing.name,
+            },
+            status=409,
+        )
+
+    result = lookup_instrument(kind, symbol)
+    return JsonResponse(result, status=200 if result["valid"] else 404)
+
+
 # ── Stock views ──────────────────────────────────────────────
 
 
 @login_required
 def stock_list_view(request):
     return _list_view(request, "stock", "assets/stock_list.html", "stocks")
+
+
+@login_required
+def stock_create_view(request):
+    return _instrument_create_view(
+        request,
+        kind="stock",
+        form_class=StockMasterForm,
+        list_route="stocks",
+        detail_route="stock_detail",
+        title="Add Stock",
+    )
+
+
+@login_required
+def crypto_create_view(request):
+    return _instrument_create_view(
+        request,
+        kind="crypto",
+        form_class=CryptoMasterForm,
+        list_route="crypto",
+        detail_route="crypto_detail",
+        title="Add Crypto",
+    )
+
+
+def _instrument_create_view(request, kind, form_class, list_route, detail_route, title):
+    """
+    Shared create flow for Stock and Crypto masters. Re-verifies the symbol
+    against Finnhub on POST as defense-in-depth (the JS verify step in the
+    UI is the primary check).
+    """
+    form = form_class()
+    error = None
+
+    if request.method == "POST":
+        form = form_class(request.POST)
+        if form.is_valid():
+            symbol = form.cleaned_data["symbol"].strip().upper()
+
+            if Instrument.objects.filter(kind=kind, symbol=symbol).exists():
+                error = f"'{symbol}' is already in your portfolio."
+            else:
+                result = lookup_instrument(kind, symbol)
+                if not result["valid"]:
+                    error = result["error"]
+                else:
+                    instrument = Instrument.objects.create(
+                        kind=kind,
+                        name=result["name"],
+                        symbol=result["symbol"],
+                        finnhub_symbol=result["finnhub_symbol"],
+                    )
+                    # Prime the price cache so the UI doesn't show "—" until
+                    # the next WS tick (which may not arrive for a while).
+                    cache.set(
+                        f"finnhub_{instrument.symbol}",
+                        result["current_price"],
+                        timeout=None,
+                    )
+                    return redirect(detail_route, symbol=instrument.symbol)
+
+    return render(
+        request,
+        "assets/instrument_master_form.html",
+        {
+            "form": form,
+            "kind": kind,
+            "title": title,
+            "list_route": list_route,
+            "error": error,
+        },
+    )
 
 
 @login_required

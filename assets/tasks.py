@@ -123,6 +123,51 @@ def _stock_quote_loop():
         time.sleep(settings.STOCK_QUOTE_INTERVAL)
 
 
+def _poll_crypto_quotes():
+    """
+    REST-poll crypto symbols whose price is missing from the cache.
+
+    Finnhub's free-tier WebSocket only streams a curated subset of crypto
+    pairs. Symbols that are valid on REST `/quote` but not on the WS would
+    otherwise show "—" forever. This fills the gap without overwriting
+    live WS-streamed prices.
+    """
+    from assets.models import Instrument
+
+    api_key = settings.FINNHUB_API_KEY
+    for finnhub_sym, short in Instrument.objects.filter(
+        kind=Instrument.Kind.CRYPTO
+    ).exclude(finnhub_symbol="").values_list("finnhub_symbol", "symbol"):
+        if cache.get(f"finnhub_{short}") is not None:
+            # WS is delivering ticks for this symbol; don't clobber.
+            continue
+        try:
+            resp = requests.get(
+                f"{settings.FINNHUB_REST_URL}/quote",
+                params={"symbol": finnhub_sym, "token": api_key},
+                timeout=10,
+            )
+            resp.raise_for_status()
+            price = resp.json().get("c")
+            if price and price > 0:
+                cache.set(f"finnhub_{short}", price, timeout=None)
+                _check_price_alerts(short, price)
+                _broadcast(short, price)
+                logger.info("REST poll %s (%s): $%s", short, finnhub_sym, price)
+        except Exception as e:
+            logger.warning("Failed to poll crypto quote for %s: %s", short, e)
+
+
+def _crypto_quote_loop():
+    """Background thread that REST-polls WS-blind crypto symbols every 60s."""
+    while True:
+        try:
+            _poll_crypto_quotes()
+        except Exception as e:
+            logger.warning("Crypto quote poll error: %s", e)
+        time.sleep(60)
+
+
 def _market_cap_loop():
     """Background thread that refreshes market caps periodically."""
     while True:
@@ -290,6 +335,11 @@ def stream_prices():
     _poll_stock_quotes()
     stock_poll_thread = threading.Thread(target=_stock_quote_loop, daemon=True)
     stock_poll_thread.start()
+
+    # REST fallback for crypto symbols the WS doesn't stream (e.g. BCH, HYPE).
+    _poll_crypto_quotes()
+    crypto_poll_thread = threading.Thread(target=_crypto_quote_loop, daemon=True)
+    crypto_poll_thread.start()
 
     # Execute due ETF savings plans (idempotent; runs hourly)
     try:

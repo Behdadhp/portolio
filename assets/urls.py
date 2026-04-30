@@ -3,6 +3,7 @@ from . import views
 
 urlpatterns = [
     path("stocks/", views.stock_list_view, name="stocks"),
+    path("stocks/new/", views.stock_create_view, name="stock_create"),
     path("stocks/add/", views.stock_add_view, name="stock_add"),
     path("stocks/add/<str:symbol>/", views.stock_add_view, name="stock_add_for"),
     path("stocks/edit/<uuid:pk>/", views.stock_edit_view, name="stock_edit"),
@@ -38,6 +39,7 @@ urlpatterns = [
     ),
     path("etfs/<str:symbol>/", views.etf_detail_view, name="etf_detail"),
     path("crypto/", views.crypto_list_view, name="crypto"),
+    path("crypto/new/", views.crypto_create_view, name="crypto_create"),
     path("crypto/add/", views.crypto_add_view, name="crypto_add"),
     path("crypto/add/<str:symbol>/", views.crypto_add_view, name="crypto_add_for"),
     path("crypto/edit/<uuid:pk>/", views.crypto_edit_view, name="crypto_edit"),
@@ -51,4 +53,6 @@ urlpatterns = [
     # Price Alert API
     path("api/alerts/create/", views.alert_create, name="alert_create"),
     path("api/alerts/<uuid:pk>/delete/", views.alert_delete, name="alert_delete"),
+    # Instrument lookup (Finnhub probe)
+    path("api/lookup-instrument/", views.lookup_instrument_view, name="lookup_instrument"),
 ]
