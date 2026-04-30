@@ -90,11 +90,13 @@ def sort_and_paginate(request, queryset, allowed_sort_fields=None):
 def get_asset_summary(queryset):
     """
     Group a Transaction queryset by instrument and return rows with name,
-    symbol, and net total amount (bought=+, sold=−).
+    symbol, kind, and net total amount (bought=+, sold=−).
     """
     return (
         queryset.values(
-            name=F("instrument__name"), symbol=F("instrument__symbol")
+            name=F("instrument__name"),
+            symbol=F("instrument__symbol"),
+            kind=F("instrument__kind"),
         )
         .annotate(
             total=Coalesce(
@@ -436,17 +438,29 @@ def compute_crypto_tax(user, current_symbol=None):
     }
 
 
-def load_live_prices(kind):
-    """Load cached live prices and market caps for tracked symbols of a kind."""
+def load_live_prices(kind, watchlist_ids=None):
+    """
+    Load cached live prices and market caps for tracked symbols of a kind.
+
+    `watchlist_ids` (a set of UUIDs) lets the Market page mark each row as
+    already watched.
+    """
     from .models import Instrument
 
+    if watchlist_ids is None:
+        watchlist_ids = set()
+
     result = []
-    for symbol in Instrument.objects.filter(kind=kind).exclude(
-        finnhub_symbol=""
-    ).values_list("symbol", flat=True):
-        price = cache.get(f"finnhub_{symbol}")
-        mcap = cache.get(f"finnhub_{symbol}_mcap")
-        result.append({"short": symbol, "price": price, "market_cap": mcap or 0})
+    for inst in Instrument.objects.filter(kind=kind).exclude(finnhub_symbol=""):
+        price = cache.get(f"finnhub_{inst.symbol}")
+        mcap = cache.get(f"finnhub_{inst.symbol}_mcap")
+        result.append({
+            "id": str(inst.id),
+            "short": inst.symbol,
+            "price": price,
+            "market_cap": mcap or 0,
+            "watching": inst.id in watchlist_ids,
+        })
     result.sort(key=lambda x: x["market_cap"], reverse=True)
     return result
 
@@ -660,6 +674,88 @@ def sync_alert_cache():
             }
         )
     cache.set("price_alerts_active", alert_data, timeout=None)
+
+
+def get_portfolio_history(user):
+    """
+    Approximate portfolio worth and net invested over time.
+
+    Walks the user's CashFlow + Transaction events in chronological order.
+    For each event date we compute:
+      - net_invested: cumulative deposits − withdrawals
+      - est_worth: sum over instruments of (holdings × most-recent-known-price)
+
+    "Most recent known price" is the latest transaction price for that
+    instrument up to the event date — a rough approximation, but it's the
+    only historical price signal we have without an external time-series.
+    The final point is "today" using current cache prices, so the chart
+    converges on the live portfolio value.
+    """
+    from datetime import date as dt_date
+
+    from .models import CashFlow, Transaction
+
+    cash_flows = list(CashFlow.objects.filter(user=user).order_by("date", "created_at"))
+    txs = list(
+        Transaction.objects.filter(user=user)
+        .select_related("instrument")
+        .order_by("date", "created_at", "pk")
+    )
+    if not cash_flows and not txs:
+        return []
+
+    event_dates = sorted({c.date for c in cash_flows} | {t.date for t in txs})
+
+    cumulative_cash = 0.0
+    holdings = {}
+    last_price = {}
+    cash_idx = 0
+    tx_idx = 0
+    points = []
+
+    for d in event_dates:
+        while cash_idx < len(cash_flows) and cash_flows[cash_idx].date <= d:
+            c = cash_flows[cash_idx]
+            cumulative_cash += float(c.amount_usd) * (
+                1 if c.direction == "deposit" else -1
+            )
+            cash_idx += 1
+        while tx_idx < len(txs) and txs[tx_idx].date <= d:
+            t = txs[tx_idx]
+            sym = t.instrument.symbol
+            amt = float(t.amount)
+            holdings[sym] = holdings.get(sym, 0.0) + (
+                amt if t.status == "bought" else -amt
+            )
+            last_price[sym] = float(t.price)
+            tx_idx += 1
+        est = sum(
+            qty * last_price[sym]
+            for sym, qty in holdings.items()
+            if qty > 0 and sym in last_price
+        )
+        points.append({
+            "date": d.isoformat(),
+            "net_invested": round(cumulative_cash, 2),
+            "est_worth": round(est, 2),
+        })
+
+    # Today's snapshot using current cached prices.
+    today = dt_date.today()
+    if not points or points[-1]["date"] != today.isoformat():
+        est_now = 0.0
+        for sym, qty in holdings.items():
+            if qty <= 0:
+                continue
+            p = cache.get(f"finnhub_{sym}") or last_price.get(sym, 0)
+            est_now += qty * float(p)
+        points.append({
+            "date": today.isoformat(),
+            "net_invested": round(cumulative_cash, 2),
+            "est_worth": round(est_now, 2),
+        })
+
+    return points
 
 
 def lookup_instrument(kind, symbol):

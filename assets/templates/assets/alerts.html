@@ -1,0 +1,120 @@
+{% extends "base.html" %}
+
+{% block title %}Alerts — Folio{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h3 class="mb-1">Price Alerts</h3>
+        <p class="mb-0" style="color:var(--text-secondary); font-size:0.9rem;">All your active and triggered alerts in one place</p>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-body p-0">
+        {% if rows %}
+        <table class="table table-hover mb-0">
+            <thead>
+                <tr>
+                    <th style="padding-left:1.25rem;">Asset</th>
+                    <th>Direction</th>
+                    <th class="text-end">Target</th>
+                    <th class="text-end">Live</th>
+                    <th class="text-end">Distance</th>
+                    <th class="text-end">Spend (Buy)</th>
+                    <th>Status</th>
+                    <th class="text-end" style="padding-right:1.25rem;">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in rows %}
+                {% with a=row.alert %}
+                {% if row.kind == "stock" %}{% url 'stock_detail' a.instrument.symbol as detail_url %}
+                {% elif row.kind == "etf" %}{% url 'etf_detail' a.instrument.symbol as detail_url %}
+                {% else %}{% url 'crypto_detail' a.instrument.symbol as detail_url %}
+                {% endif %}
+                <tr>
+                    <td style="padding-left:1.25rem;">
+                        <a href="{{ detail_url }}" class="text-decoration-none" style="color:var(--text-primary);">
+                            <span class="fw-semibold">{{ a.instrument.name }}</span>
+                            <span style="background:rgba(79,70,229,0.12);color:var(--accent-light);padding:1px 6px;border-radius:4px;font-weight:600;font-size:0.75rem;margin-left:6px;">{{ a.instrument.symbol }}</span>
+                        </a>
+                    </td>
+                    <td>
+                        <span class="badge {% if a.direction == 'above' %}bg-success{% else %}bg-primary{% endif %}">
+                            {% if a.direction == 'above' %}Above (Sell){% else %}Below (Buy){% endif %}
+                        </span>
+                    </td>
+                    <td class="text-end fw-semibold" style="font-family:'SF Mono','Fira Code',monospace;">${{ a.target_price|floatformat:2 }}</td>
+                    <td class="text-end" style="font-family:'SF Mono','Fira Code',monospace;font-size:0.85rem;">
+                        {% if row.live_price != None %}${{ row.live_price|floatformat:2 }}{% else %}<span class="text-muted">—</span>{% endif %}
+                    </td>
+                    <td class="text-end" style="font-family:'SF Mono','Fira Code',monospace;font-size:0.85rem;">
+                        {% if row.distance_pct != None %}
+                            <span style="color: {% if row.distance_pct >= 0 %}var(--color-success){% else %}var(--color-danger){% endif %};">
+                                {% if row.distance_pct >= 0 %}+{% endif %}{{ row.distance_pct|floatformat:2 }}%
+                            </span>
+                        {% else %}<span class="text-muted">—</span>{% endif %}
+                    </td>
+                    <td class="text-end" style="font-family:'SF Mono','Fira Code',monospace;font-size:0.85rem;">
+                        {% if a.invest_amount != None %}${{ a.invest_amount|floatformat:2 }}{% else %}<span class="text-muted">—</span>{% endif %}
+                    </td>
+                    <td>
+                        {% if a.email_sent %}
+                            <span class="badge bg-success">Triggered</span>
+                        {% else %}
+                            <span class="badge bg-primary">Active</span>
+                        {% endif %}
+                    </td>
+                    <td class="text-end" style="padding-right:1.25rem;">
+                        <button type="button" class="btn btn-ghost btn-sm py-1 px-2" data-delete-alert="{{ a.id }}" style="font-size:0.75rem;border-color:rgba(248,113,113,0.3);color:var(--color-danger);">Delete</button>
+                    </td>
+                </tr>
+                {% endwith %}
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <div class="text-center py-5">
+            <div style="width:56px;height:56px;border-radius:16px;background:rgba(79,70,229,0.1);display:flex;align-items:center;justify-content:center;margin:0 auto 1rem;">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="var(--accent-light)" viewBox="0 0 16 16">
+                    <path d="M8 16a2 2 0 0 0 2-2H6a2 2 0 0 0 2 2M8 1.918l-.797.161A4.002 4.002 0 0 0 4 6c0 .628-.134 2.197-.459 3.742-.16.767-.376 1.566-.663 2.258h10.244c-.287-.692-.502-1.49-.663-2.258C12.134 8.197 12 6.628 12 6a4.002 4.002 0 0 0-3.203-3.92zM14.22 12c.223.447.481.801.78 1H1c.299-.199.557-.553.78-1C2.68 10.2 3 6.88 3 6c0-2.42 1.72-4.44 4.005-4.901a1 1 0 1 1 1.99 0A5.002 5.002 0 0 1 13 6c0 .88.32 4.2 1.22 6"/>
+                </svg>
+            </div>
+            <p class="text-muted mb-2">No alerts yet</p>
+            <p style="color:var(--text-secondary);font-size:0.85rem;">Create alerts from any asset's detail page — analytics → target prices → bell icon.</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function() {
+    function getCookie(name) {
+        var match = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
+        return match ? match[2] : '';
+    }
+    document.querySelectorAll('[data-delete-alert]').forEach(function(btn) {
+        btn.addEventListener('click', async function() {
+            if (!confirm('Delete this alert?')) return;
+            var id = btn.getAttribute('data-delete-alert');
+            try {
+                var resp = await fetch('/api/alerts/' + id + '/delete/', {
+                    method: 'POST',
+                    headers: { 'X-CSRFToken': getCookie('csrftoken') },
+                });
+                if (resp.ok) {
+                    btn.closest('tr').remove();
+                } else {
+                    alert('Failed to delete alert.');
+                }
+            } catch (e) {
+                alert('Network error.');
+            }
+        });
+    });
+})();
+</script>
+{% endblock %}

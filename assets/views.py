@@ -1,7 +1,9 @@
 import json
+from itertools import chain
 
 from django.contrib.auth.decorators import login_required
 from django.core.cache import cache
+from django.core.paginator import Paginator
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
@@ -22,6 +24,7 @@ from .models import (
     Instrument,
     PriceAlert,
     Transaction,
+    WatchlistEntry,
 )
 from .services import (
     DETAIL_COLUMNS,
@@ -288,7 +291,11 @@ def _instrument_create_view(request, kind, form_class, list_route, detail_route,
     against Finnhub on POST as defense-in-depth (the JS verify step in the
     UI is the primary check).
     """
-    form = form_class()
+    initial = {}
+    prefill_symbol = request.GET.get("symbol", "").strip().upper()
+    if prefill_symbol:
+        initial["symbol"] = prefill_symbol
+    form = form_class(initial=initial)
     error = None
 
     if request.method == "POST":
@@ -851,3 +858,287 @@ def cash_delete_view(request, pk):
         flow.delete()
         return redirect("cash")
     return render(request, "assets/cash_delete.html", {"flow": flow})
+
+
+# ── Unified Holdings / Transactions / Alerts pages ──────────
+
+
+KIND_CHOICES = [
+    ("all", "All"),
+    ("stock", "Stocks"),
+    ("etf", "ETFs"),
+    ("crypto", "Crypto"),
+]
+
+
+@login_required
+def holdings_view(request):
+    """Unified replacement for the per-kind list pages."""
+    kind = request.GET.get("kind", "all")
+    if kind not in {"all", "stock", "etf", "crypto"}:
+        kind = "all"
+
+    base_qs = Transaction.objects.filter(user=request.user)
+    if kind != "all":
+        base_qs = base_qs.filter(instrument__kind=kind)
+
+    summary = list(get_asset_summary(base_qs))
+
+    enriched = []
+    allocation = []
+    pnl_ranking = []
+    seen_symbols = set()
+
+    for row in summary:
+        symbol = row["symbol"]
+        seen_symbols.add(symbol)
+        price = cache.get(f"finnhub_{symbol}")
+        amt = float(row["total"])
+        worth = round(amt * float(price), 2) if price is not None and amt > 0 else None
+        enriched.append({
+            **row,
+            "price": price,
+            "worth": worth,
+        })
+        if price is not None and amt > 0:
+            allocation.append({
+                "label": row["name"],
+                "symbol": symbol,
+                "value": worth or 0,
+            })
+            cb = cost_basis_for(base_qs.filter(instrument__symbol=symbol))
+            value = worth or 0
+            pnl = round(value - cb, 2)
+            pnl_pct = round((pnl / cb) * 100, 2) if cb > 0 else 0.0
+            pnl_ranking.append({
+                "label": row["name"],
+                "symbol": symbol,
+                "value": value,
+                "pnl": pnl,
+                "pnl_pct": pnl_pct,
+            })
+
+    pnl_ranking.sort(key=lambda r: r["pnl_pct"], reverse=True)
+
+    # ETFs the user has a savings plan for but no transactions yet.
+    if kind in ("all", "etf"):
+        plan_etfs = Instrument.objects.filter(
+            kind="etf", savings_plans__user=request.user
+        ).distinct()
+        for etf in plan_etfs:
+            if etf.symbol in seen_symbols:
+                continue
+            enriched.append({
+                "name": etf.name,
+                "symbol": etf.symbol,
+                "kind": "etf",
+                "total": 0.0,
+                "price": cache.get(f"finnhub_{etf.symbol}"),
+                "worth": None,
+            })
+
+    return render(request, "assets/holdings.html", {
+        "rows": enriched,
+        "allocation_json": json.dumps(allocation),
+        "pnl_ranking": pnl_ranking,
+        "current_kind": kind,
+        "kind_choices": KIND_CHOICES,
+    })
+
+
+@login_required
+def transactions_view(request):
+    """Unified ledger across asset transactions and cash flows."""
+    kind = request.GET.get("kind", "all")
+    action = request.GET.get("action", "all")
+
+    asset_qs = Transaction.objects.filter(user=request.user).select_related("instrument")
+    cash_qs = CashFlow.objects.filter(user=request.user)
+
+    if kind in ("stock", "etf", "crypto"):
+        asset_qs = asset_qs.filter(instrument__kind=kind)
+        cash_qs = cash_qs.none()
+    elif kind == "cash":
+        asset_qs = asset_qs.none()
+    elif kind != "all":
+        kind = "all"
+
+    if action in ("bought", "sold"):
+        asset_qs = asset_qs.filter(status=action)
+        cash_qs = cash_qs.none()
+    elif action in ("deposit", "withdraw"):
+        asset_qs = asset_qs.none()
+        cash_qs = cash_qs.filter(direction=action)
+    elif action != "all":
+        action = "all"
+
+    rows = []
+    edit_route = {"stock": "stock_edit", "etf": "etf_edit", "crypto": "crypto_edit"}
+    detail_route = {"stock": "stock_detail", "etf": "etf_detail", "crypto": "crypto_detail"}
+    for tx in asset_qs:
+        rows.append({
+            "type": "asset",
+            "date": tx.date,
+            "kind": tx.instrument.kind,
+            "symbol": tx.instrument.symbol,
+            "name": tx.instrument.name,
+            "action": tx.status,
+            "amount": float(tx.amount),
+            "price": float(tx.price),
+            "value_usd": round(float(tx.amount) * float(tx.price), 2),
+            "edit_route": edit_route[tx.instrument.kind],
+            "detail_route": detail_route[tx.instrument.kind],
+            "pk": tx.pk,
+        })
+    for cf in cash_qs:
+        rows.append({
+            "type": "cash",
+            "date": cf.date,
+            "action": cf.direction,
+            "amount_usd": float(cf.amount_usd),
+            "note": cf.note,
+            "pk": cf.pk,
+        })
+
+    rows.sort(key=lambda r: r["date"], reverse=True)
+
+    paginator = Paginator(rows, 30)
+    page_obj = paginator.get_page(request.GET.get("page", 1))
+
+    return render(request, "assets/transactions.html", {
+        "page_obj": page_obj,
+        "current_kind": kind,
+        "current_action": action,
+        "kind_choices": KIND_CHOICES + [("cash", "Cash")],
+    })
+
+
+@login_required
+def alerts_view(request):
+    alerts = (
+        PriceAlert.objects.filter(user=request.user)
+        .select_related("instrument")
+        .order_by("email_sent", "-created_at")
+    )
+    # Annotate live price + distance to target.
+    rows = []
+    for a in alerts:
+        symbol = a.instrument.symbol
+        live = cache.get(f"finnhub_{symbol}")
+        distance_pct = None
+        if live is not None and a.target_price:
+            distance_pct = round(
+                (float(live) - float(a.target_price)) / float(a.target_price) * 100, 2
+            )
+        rows.append({
+            "alert": a,
+            "live_price": live,
+            "distance_pct": distance_pct,
+            "kind": a.instrument.kind,
+        })
+    return render(request, "assets/alerts.html", {"rows": rows})
+
+
+# ── Watchlist ───────────────────────────────────────────────
+
+
+@login_required
+def watchlist_view(request):
+    entries = (
+        WatchlistEntry.objects.filter(user=request.user)
+        .select_related("instrument")
+        .order_by("-added_at")
+    )
+    rows = []
+    for e in entries:
+        sym = e.instrument.symbol
+        live = cache.get(f"finnhub_{sym}")
+        rows.append({
+            "entry": e,
+            "live_price": live,
+        })
+    return render(request, "assets/watchlist.html", {"rows": rows})
+
+
+@login_required
+@require_POST
+def watchlist_toggle_view(request, instrument_id):
+    instrument = get_object_or_404(Instrument, pk=instrument_id)
+    entry = WatchlistEntry.objects.filter(
+        user=request.user, instrument=instrument
+    ).first()
+    if entry is not None:
+        entry.delete()
+        return JsonResponse({"watching": False})
+    WatchlistEntry.objects.create(user=request.user, instrument=instrument)
+    return JsonResponse({"watching": True})
+
+
+# ── Global search (Cmd-K) ───────────────────────────────────
+
+
+@login_required
+def search_view(request):
+    """JSON endpoint for the Cmd-K palette."""
+    q = request.GET.get("q", "").strip()
+    if not q:
+        return JsonResponse({"results": []})
+
+    from django.db.models import Q
+    from django.urls import reverse
+
+    results = []
+    detail_route = {"stock": "stock_detail", "etf": "etf_detail", "crypto": "crypto_detail"}
+
+    instruments = Instrument.objects.filter(
+        Q(symbol__icontains=q) | Q(name__icontains=q)
+    )[:8]
+    for inst in instruments:
+        results.append({
+            "kind": inst.kind,
+            "type": "instrument",
+            "label": inst.name,
+            "sub": inst.symbol,
+            "url": reverse(detail_route[inst.kind], args=[inst.symbol]),
+        })
+
+    # Quick-action shortcuts surfaced for likely queries.
+    shortcuts = [
+        ("dashboard", "Dashboard", "/dashboard/"),
+        ("holdings", "Holdings", "/holdings/"),
+        ("transactions", "Transactions", "/transactions/"),
+        ("alerts", "Alerts", "/alerts/"),
+        ("market", "Market", "/market/"),
+        ("watchlist", "Watchlist", "/watchlist/"),
+        ("cash", "Cash", "/cash/"),
+    ]
+    ql = q.lower()
+    for keyword, label, url in shortcuts:
+        if keyword.startswith(ql) or ql in keyword:
+            results.append({
+                "kind": "page",
+                "type": "shortcut",
+                "label": label,
+                "sub": "Open page",
+                "url": url,
+            })
+
+    return JsonResponse({"results": results[:12]})
+
+
+# ── Old list routes redirect to unified Holdings ────────────
+
+
+@login_required
+def stock_list_redirect(request):
+    return redirect(f"{request.path[:-7] if False else '/holdings/'}?kind=stock")
+
+
+@login_required
+def etf_list_redirect(request):
+    return redirect("/holdings/?kind=etf")
+
+
+@login_required
+def crypto_list_redirect(request):
+    return redirect("/holdings/?kind=crypto")

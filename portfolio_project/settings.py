@@ -73,6 +73,7 @@ TEMPLATES = [
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
                 "assets.context_processors.fx_status",
+                "assets.context_processors.topbar",
             ],
         },
     },

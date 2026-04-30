@@ -2,14 +2,29 @@ from django.urls import path
 from . import views
 
 urlpatterns = [
-    path("stocks/", views.stock_list_view, name="stocks"),
+    # Unified pages
+    path("holdings/", views.holdings_view, name="holdings"),
+    path("transactions/", views.transactions_view, name="transactions"),
+    path("alerts/", views.alerts_view, name="alerts"),
+    path("watchlist/", views.watchlist_view, name="watchlist"),
+    path(
+        "api/watchlist/<uuid:instrument_id>/toggle/",
+        views.watchlist_toggle_view,
+        name="watchlist_toggle",
+    ),
+    path("api/search/", views.search_view, name="search"),
+
+    # Old per-kind list routes redirect into Holdings (kept so any external
+    # bookmarks still resolve cleanly).
+    path("stocks/", views.stock_list_redirect, name="stocks"),
     path("stocks/new/", views.stock_create_view, name="stock_create"),
     path("stocks/add/", views.stock_add_view, name="stock_add"),
     path("stocks/add/<str:symbol>/", views.stock_add_view, name="stock_add_for"),
     path("stocks/edit/<uuid:pk>/", views.stock_edit_view, name="stock_edit"),
     path("stocks/delete/<uuid:pk>/", views.stock_delete_view, name="stock_delete"),
     path("stocks/<str:symbol>/", views.stock_detail_view, name="stock_detail"),
-    path("etfs/", views.etf_list_view, name="etfs"),
+
+    path("etfs/", views.etf_list_redirect, name="etfs"),
     path("etfs/new/", views.etf_create_view, name="etf_create"),
     path(
         "etfs/master/edit/<str:symbol>/",
@@ -38,18 +53,21 @@ urlpatterns = [
         name="etf_plan_delete",
     ),
     path("etfs/<str:symbol>/", views.etf_detail_view, name="etf_detail"),
-    path("crypto/", views.crypto_list_view, name="crypto"),
+
+    path("crypto/", views.crypto_list_redirect, name="crypto"),
     path("crypto/new/", views.crypto_create_view, name="crypto_create"),
     path("crypto/add/", views.crypto_add_view, name="crypto_add"),
     path("crypto/add/<str:symbol>/", views.crypto_add_view, name="crypto_add_for"),
     path("crypto/edit/<uuid:pk>/", views.crypto_edit_view, name="crypto_edit"),
     path("crypto/delete/<uuid:pk>/", views.crypto_delete_view, name="crypto_delete"),
     path("crypto/<str:symbol>/", views.crypto_detail_view, name="crypto_detail"),
+
     # Cash flow
     path("cash/", views.cash_list_view, name="cash"),
     path("cash/add/", views.cash_add_view, name="cash_add"),
     path("cash/edit/<uuid:pk>/", views.cash_edit_view, name="cash_edit"),
     path("cash/delete/<uuid:pk>/", views.cash_delete_view, name="cash_delete"),
+
     # Price Alert API
     path("api/alerts/create/", views.alert_create, name="alert_create"),
     path("api/alerts/<uuid:pk>/delete/", views.alert_delete, name="alert_delete"),

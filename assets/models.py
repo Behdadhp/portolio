@@ -160,6 +160,30 @@ class ETFSavingsPlan(models.Model):
         return f"{self.instrument.symbol} {sign}{self.amount} {self.interval} ({self.user.email})"
 
 
+class WatchlistEntry(models.Model):
+    """Per-user watchlist — track instruments without holding them."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="watchlist"
+    )
+    instrument = models.ForeignKey(
+        Instrument, on_delete=models.CASCADE, related_name="watchers"
+    )
+    added_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-added_at"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["user", "instrument"], name="watchlist_unique_user_instrument"
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.user.email} watches {self.instrument.symbol}"
+
+
 class CashFlow(models.Model):
     """
     External money moving in or out of the brokerage account.

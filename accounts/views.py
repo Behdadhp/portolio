@@ -61,45 +61,74 @@ def register_view(request):
 def dashboard_view(request):
     import json
     from django.core.cache import cache
-    from assets.models import PriceAlert, Transaction
+    from assets.models import CashFlow, PriceAlert, Transaction
     from assets.services import (
-        cost_basis_for,
-        get_asset_summary,
         get_cash_summary,
+        get_portfolio_history,
         get_total_portfolio_worth_usd,
     )
 
+    # Build the holdings & cost-basis maps the WS-driven hero needs.
+    # We don't render an allocation card on the dashboard anymore — that lives
+    # on /holdings/ — so we just need enough state for the live P&L number.
     holdings = {}
-    allocation = []  # [{label, symbol, value, type}]
-    cost_bases = {}  # {symbol: cost_basis} for P&L ranking
+    cost_bases = {}  # {symbol: cost_basis} for live P&L
 
-    for kind in ("stock", "crypto"):
-        qs = Transaction.objects.filter(user=request.user, instrument__kind=kind)
-        for row in get_asset_summary(qs):
-            amt = float(row["total"])
-            holdings[row["symbol"]] = amt
-            price = cache.get(f"finnhub_{row['symbol']}")
-            worth = (
-                round(amt * float(price), 2) if price is not None and amt > 0 else 0
-            )
-            allocation.append(
-                {
-                    "label": row["name"],
-                    "symbol": row["symbol"],
-                    "value": worth,
-                    "type": kind,
-                }
-            )
-            if amt > 0:
-                cost_bases[row["symbol"]] = cost_basis_for(
-                    qs.filter(instrument__symbol=row["symbol"])
-                )
+    for tx in Transaction.objects.filter(user=request.user).select_related("instrument"):
+        sym = tx.instrument.symbol
+        amt = float(tx.amount) if tx.status == "bought" else -float(tx.amount)
+        holdings[sym] = holdings.get(sym, 0.0) + amt
 
-    active_alerts = (
-        PriceAlert.objects.filter(user=request.user)
+    # Cost basis per symbol (weighted-average across all the user's txs).
+    from assets.services import cost_basis_for
+
+    for sym in [s for s, qty in holdings.items() if qty > 0]:
+        cost_bases[sym] = cost_basis_for(
+            Transaction.objects.filter(user=request.user, instrument__symbol=sym)
+        )
+
+    # Top 5 nearest active alerts (by % distance to target if we have a price).
+    all_active = list(
+        PriceAlert.objects.filter(user=request.user, email_sent=False)
         .select_related("instrument")
-        .order_by("-created_at")
     )
+    def _alert_distance(a):
+        live = cache.get(f"finnhub_{a.instrument.symbol}")
+        if live is None or not a.target_price:
+            return float("inf")
+        return abs(float(live) - float(a.target_price)) / float(a.target_price)
+    all_active.sort(key=_alert_distance)
+    active_alerts = all_active[:5]
+
+    # Recent activity: last 5 asset transactions + last 5 cash flows, merged.
+    recent_tx = list(
+        Transaction.objects.filter(user=request.user)
+        .select_related("instrument").order_by("-date", "-created_at")[:5]
+    )
+    recent_cash = list(CashFlow.objects.filter(user=request.user).order_by("-date", "-created_at")[:5])
+    recent_activity = []
+    for t in recent_tx:
+        recent_activity.append({
+            "type": "asset",
+            "date": t.date,
+            "kind": t.instrument.kind,
+            "symbol": t.instrument.symbol,
+            "name": t.instrument.name,
+            "action": t.status,
+            "amount": float(t.amount),
+            "price": float(t.price),
+            "value_usd": round(float(t.amount) * float(t.price), 2),
+        })
+    for c in recent_cash:
+        recent_activity.append({
+            "type": "cash",
+            "date": c.date,
+            "action": c.direction,
+            "amount_usd": float(c.amount_usd),
+            "note": c.note,
+        })
+    recent_activity.sort(key=lambda r: r["date"], reverse=True)
+    recent_activity = recent_activity[:7]
 
     cash_summary = get_cash_summary(request.user)
     portfolio_worth = get_total_portfolio_worth_usd(request.user)
@@ -110,14 +139,17 @@ def dashboard_view(request):
         else 0.0
     )
 
+    history = get_portfolio_history(request.user)
+
     return render(
         request,
         "accounts/dashboard.html",
         {
             "holdings_json": json.dumps(holdings),
-            "allocation_json": json.dumps(allocation),
             "cost_bases_json": json.dumps(cost_bases),
+            "history_json": json.dumps(history),
             "active_alerts": active_alerts,
+            "recent_activity": recent_activity,
             "cash_summary": cash_summary,
             "portfolio_worth": portfolio_worth,
             "real_pnl": real_pnl,
@@ -157,14 +189,21 @@ def edit_profile_view(request):
 
 @login_required
 def market_view(request):
+    from assets.models import WatchlistEntry
     from assets.services import load_live_prices
+
+    watchlist_ids = set(
+        WatchlistEntry.objects.filter(user=request.user).values_list(
+            "instrument_id", flat=True
+        )
+    )
 
     return render(
         request,
         "accounts/market.html",
         {
-            "stock_prices": load_live_prices("stock"),
-            "crypto_prices": load_live_prices("crypto"),
+            "stock_prices": load_live_prices("stock", watchlist_ids),
+            "crypto_prices": load_live_prices("crypto", watchlist_ids),
         },
     )
 

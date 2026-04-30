@@ -219,9 +219,9 @@ class StockListViewTest(TestDataMixin, TestCase):
         self.assertEqual(response.status_code, 302)
 
     def test_empty_list(self):
-        response = self.client.get(reverse("stocks"))
+        response = self.client.get(reverse("stocks"), follow=True)
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "No stock assets yet")
+        self.assertContains(response, "No holdings here yet")
 
     def test_shows_unique_stocks_with_totals(self):
         Transaction.objects.create(
@@ -240,7 +240,7 @@ class StockListViewTest(TestDataMixin, TestCase):
             date=date(2024, 2, 1),
             status="sold",
         )
-        response = self.client.get(reverse("stocks"))
+        response = self.client.get(reverse("stocks"), follow=True)
         self.assertContains(response, "AAPL")
         self.assertContains(response, "7.00")  # 10 - 3 = 7
 
@@ -253,8 +253,8 @@ class StockListViewTest(TestDataMixin, TestCase):
             date=date(2024, 1, 1),
             status="bought",
         )
-        response = self.client.get(reverse("stocks"))
-        self.assertContains(response, "No stock assets yet")
+        response = self.client.get(reverse("stocks"), follow=True)
+        self.assertContains(response, "No holdings here yet")
 
 
 class StockDetailViewTest(TestDataMixin, TestCase):
@@ -380,8 +380,8 @@ class StockDeleteViewTest(TestDataMixin, TestCase):
 
 class CryptoListViewTest(TestDataMixin, TestCase):
     def test_empty_list(self):
-        response = self.client.get(reverse("crypto"))
-        self.assertContains(response, "No crypto assets yet")
+        response = self.client.get(reverse("crypto"), follow=True)
+        self.assertContains(response, "No holdings here yet")
 
     def test_shows_unique_cryptos_with_totals(self):
         Transaction.objects.create(
@@ -400,7 +400,7 @@ class CryptoListViewTest(TestDataMixin, TestCase):
             date=date(2024, 2, 1),
             status="sold",
         )
-        response = self.client.get(reverse("crypto"))
+        response = self.client.get(reverse("crypto"), follow=True)
         self.assertContains(response, "BTC")
         self.assertContains(response, "1.50")  # 2.0 - 0.5
 

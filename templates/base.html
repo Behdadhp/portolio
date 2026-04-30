@@ -10,61 +10,236 @@
             --bg-body: #0f172a;
             --bg-card: #1e293b;
             --bg-card-hover: #263348;
+            --bg-sidebar: #0b1220;
             --border-color: #334155;
             --accent: #4f46e5;
             --accent-light: #818cf8;
             --text-primary: #f1f5f9;
             --text-secondary: #94a3b8;
             --text-muted: #64748b;
+            --color-success: #34d399;
+            --color-danger: #f87171;
+            --sidebar-width: 232px;
+            --sidebar-width-collapsed: 64px;
+            --topbar-height: 60px;
         }
 
+        * { box-sizing: border-box; }
         body {
             background: var(--bg-body);
             color: var(--text-primary);
             font-family: system-ui, -apple-system, sans-serif;
             min-height: 100vh;
+            margin: 0;
         }
 
-        /* ── Navbar ── */
-        .navbar-app {
-            background: rgba(15, 23, 42, 0.8);
-            backdrop-filter: blur(16px);
-            border-bottom: 1px solid var(--border-color);
-            padding: 0.75rem 0;
+        /* ── App shell ── */
+        .app-shell {
+            display: flex;
+            min-height: 100vh;
         }
-        .navbar-app .nav-logo {
-            font-size: 1.35rem;
+        .app-main {
+            flex: 1;
+            min-width: 0;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* ── Sidebar ── */
+        .sidebar {
+            width: var(--sidebar-width);
+            background: var(--bg-sidebar);
+            border-right: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            position: sticky;
+            top: 0;
+            height: 100vh;
+            transition: width 0.2s;
+            z-index: 100;
+        }
+        .sidebar.collapsed { width: var(--sidebar-width-collapsed); }
+        .sidebar-header {
+            padding: 1rem 1.25rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 1px solid var(--border-color);
+            min-height: var(--topbar-height);
+        }
+        .sidebar-logo {
+            font-size: 1.3rem;
             font-weight: 800;
             color: #fff;
             text-decoration: none;
             letter-spacing: -0.5px;
+            white-space: nowrap;
         }
-        .navbar-app .nav-logo span { color: var(--accent-light); }
-        .navbar-app .nav-links a {
+        .sidebar-logo span { color: var(--accent-light); }
+        .sidebar.collapsed .sidebar-logo .logo-text { display: none; }
+        .sidebar-toggle {
+            background: transparent;
+            border: 1px solid var(--border-color);
+            color: var(--text-secondary);
+            border-radius: 8px;
+            width: 28px;
+            height: 28px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            flex-shrink: 0;
+        }
+        .sidebar-toggle:hover { color: #fff; border-color: var(--accent-light); }
+        .sidebar.collapsed .sidebar-toggle svg { transform: rotate(180deg); }
+
+        .sidebar-nav {
+            flex: 1;
+            padding: 0.75rem 0.5rem;
+            overflow-y: auto;
+        }
+        .sidebar-nav .nav-item {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.6rem 0.85rem;
+            margin-bottom: 2px;
             color: var(--text-secondary);
             text-decoration: none;
+            border-radius: 8px;
             font-size: 0.9rem;
             font-weight: 500;
-            padding: 0.4rem 0.8rem;
-            border-radius: 8px;
-            transition: color 0.2s, background 0.2s;
+            transition: background 0.15s, color 0.15s;
+            white-space: nowrap;
         }
-        .navbar-app .nav-links a:hover,
-        .navbar-app .nav-links a.active {
+        .sidebar-nav .nav-item:hover {
+            background: rgba(255,255,255,0.04);
             color: #fff;
-            background: rgba(255,255,255,0.06);
         }
-        .btn-nav-logout {
+        .sidebar-nav .nav-item.active {
+            background: rgba(79,70,229,0.15);
+            color: var(--accent-light);
+        }
+        .sidebar-nav .nav-icon {
+            width: 18px;
+            height: 18px;
+            flex-shrink: 0;
+        }
+        .sidebar.collapsed .sidebar-nav .nav-label { display: none; }
+        .sidebar.collapsed .sidebar-nav .nav-item { justify-content: center; padding: 0.6rem; }
+
+        .sidebar-footer {
+            padding: 0.75rem 0.85rem;
+            border-top: 1px solid var(--border-color);
+        }
+        .sidebar-footer .user-row {
+            display: flex;
+            align-items: center;
+            gap: 0.7rem;
             color: var(--text-secondary);
-            border: 1px solid var(--border-color);
-            padding: 0.35rem 1rem;
-            border-radius: 8px;
-            font-size: 0.85rem;
-            font-weight: 500;
             text-decoration: none;
-            transition: border-color 0.2s, color 0.2s;
+            padding: 0.4rem 0;
+            font-size: 0.85rem;
         }
-        .btn-nav-logout:hover { border-color: var(--accent-light); color: #fff; }
+        .sidebar-footer .user-avatar {
+            width: 30px; height: 30px;
+            border-radius: 50%;
+            background: var(--accent);
+            display: flex; align-items: center; justify-content: center;
+            font-size: 0.72rem; font-weight: 700; color: #fff;
+            flex-shrink: 0;
+        }
+        .sidebar.collapsed .sidebar-footer .user-name,
+        .sidebar.collapsed .sidebar-footer .logout-link { display: none; }
+        .sidebar.collapsed .sidebar-footer { padding: 0.75rem 0; text-align: center; }
+        .logout-link {
+            color: var(--text-muted);
+            text-decoration: none;
+            font-size: 0.78rem;
+        }
+        .logout-link:hover { color: var(--accent-light); }
+
+        /* ── Topbar ── */
+        .topbar {
+            min-height: var(--topbar-height);
+            border-bottom: 1px solid var(--border-color);
+            background: rgba(15,23,42,0.85);
+            backdrop-filter: blur(12px);
+            position: sticky;
+            top: 0;
+            z-index: 50;
+            padding: 0.5rem 1.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 1rem;
+        }
+        .topbar-left { display: flex; align-items: center; gap: 1rem; }
+        .topbar-mobile-toggle {
+            display: none;
+            background: transparent;
+            border: 1px solid var(--border-color);
+            color: var(--text-secondary);
+            border-radius: 8px;
+            width: 34px; height: 34px;
+            align-items: center;
+            justify-content: center;
+        }
+        .topbar-portfolio-value {
+            display: flex;
+            flex-direction: column;
+            line-height: 1.1;
+        }
+        .topbar-portfolio-value .label {
+            font-size: 0.65rem;
+            text-transform: uppercase;
+            letter-spacing: 0.6px;
+            color: var(--text-muted);
+        }
+        .topbar-portfolio-value .value {
+            font-weight: 700;
+            font-size: 1rem;
+            color: var(--text-primary);
+            font-family: 'SF Mono', 'Fira Code', monospace;
+        }
+
+        /* ── Content area ── */
+        .app-content {
+            flex: 1;
+            padding: 1.5rem 2rem 4rem;
+            max-width: 1400px;
+            width: 100%;
+            margin: 0 auto;
+        }
+
+        /* ── Mobile ── */
+        @media (max-width: 991px) {
+            .sidebar {
+                position: fixed;
+                left: 0;
+                top: 0;
+                transform: translateX(-100%);
+                box-shadow: 0 0 24px rgba(0,0,0,0.5);
+            }
+            .sidebar.open { transform: translateX(0); }
+            .sidebar.collapsed { width: var(--sidebar-width); }
+            .sidebar.collapsed .sidebar-logo .logo-text,
+            .sidebar.collapsed .sidebar-nav .nav-label,
+            .sidebar.collapsed .sidebar-footer .user-name,
+            .sidebar.collapsed .sidebar-footer .logout-link { display: inline; }
+            .sidebar.collapsed .sidebar-nav .nav-item { justify-content: flex-start; padding: 0.6rem 0.85rem; }
+            .sidebar-toggle { display: none; }
+            .topbar-mobile-toggle { display: flex; }
+            .app-content { padding: 1rem; }
+            .sidebar-backdrop {
+                position: fixed;
+                inset: 0;
+                background: rgba(0,0,0,0.5);
+                z-index: 99;
+                display: none;
+            }
+            .sidebar-backdrop.open { display: block; }
+        }
 
         /* ── Cards ── */
         .card {
@@ -145,21 +320,21 @@
 
         /* ── Badges ── */
         .badge { font-weight: 600; border-radius: 6px; }
-        .bg-success { background: rgba(52,211,153,0.15) !important; color: #34d399 !important; }
-        .bg-danger { background: rgba(248,113,113,0.15) !important; color: #f87171 !important; }
+        .bg-success { background: rgba(52,211,153,0.15) !important; color: var(--color-success) !important; }
+        .bg-danger { background: rgba(248,113,113,0.15) !important; color: var(--color-danger) !important; }
         .bg-primary { background: rgba(79,70,229,0.15) !important; color: var(--accent-light) !important; }
 
         /* ── Alerts ── */
         .alert-danger {
             background: rgba(248,113,113,0.1);
             border: 1px solid rgba(248,113,113,0.25);
-            color: #f87171;
+            color: var(--color-danger);
             border-radius: 12px;
         }
         .alert-success {
             background: rgba(52,211,153,0.1);
             border: 1px solid rgba(52,211,153,0.25);
-            color: #34d399;
+            color: var(--color-success);
             border-radius: 12px;
         }
 
@@ -182,8 +357,8 @@
         }
 
         /* ── Text helpers ── */
-        .text-success { color: #34d399 !important; }
-        .text-danger { color: #f87171 !important; }
+        .text-success { color: var(--color-success) !important; }
+        .text-danger { color: var(--color-danger) !important; }
         .text-primary { color: var(--accent-light) !important; }
         .text-muted { color: var(--text-muted) !important; }
         a { color: var(--accent-light); }
@@ -194,13 +369,237 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 1.5rem 0 1rem;
+            padding: 0.5rem 0 1rem;
+            flex-wrap: wrap;
+            gap: 0.75rem;
         }
         .page-header h3 {
             font-weight: 800;
             letter-spacing: -0.5px;
             margin: 0;
         }
+
+        /* ── Filter pills (kind selector etc.) ── */
+        .filter-pills {
+            display: inline-flex;
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 4px;
+            gap: 2px;
+        }
+        .filter-pills a {
+            padding: 0.4rem 0.9rem;
+            border-radius: 8px;
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-size: 0.85rem;
+            font-weight: 500;
+        }
+        .filter-pills a:hover { color: #fff; }
+        .filter-pills a.active {
+            background: var(--accent);
+            color: #fff;
+        }
+
+        /* ── Stat card (reused: cash summary, hero tiles, etc.) ── */
+        .stat-card {
+            padding: 1rem 1.25rem;
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+        }
+        .stat-card .stat-label {
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.6px;
+            margin-bottom: 4px;
+        }
+        .stat-card .stat-value {
+            font-size: 1.3rem;
+            font-weight: 700;
+            font-family: 'SF Mono', 'Fira Code', monospace;
+        }
+
+        /* ── P&L ranking table (shared across dashboard, holdings) ── */
+        .pnl-table { width: 100%; }
+        .pnl-table td { padding: 0.45rem 0.25rem; border: none; font-size: 0.85rem; }
+        .pnl-table th {
+            padding: 0.25rem 0.25rem 0.5rem;
+            border: none;
+            font-size: 0.7rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--text-muted);
+        }
+        .pnl-table th.text-end { text-align: right; }
+        .pnl-table th.pnl-sortable { cursor: pointer; user-select: none; }
+        .pnl-table th.pnl-sortable:hover { color: var(--text-primary); }
+        .pnl-table th .sort-indicator {
+            display: inline-block;
+            margin-left: 4px;
+            font-size: 0.65rem;
+            opacity: 0.5;
+        }
+        .pnl-table th.sort-active .sort-indicator { opacity: 1; color: var(--accent-light); }
+        .pnl-table .pnl-rank { width: 24px; color: var(--text-muted); font-size: 0.8rem; text-align: center; }
+        .pnl-table .pnl-asset { font-weight: 600; }
+        .pnl-table .pnl-sym { color: var(--text-muted); font-weight: 400; font-size: 0.78rem; }
+        .pnl-table .pnl-value, .pnl-table .pnl-pnl, .pnl-table .pnl-pct {
+            text-align: right;
+            font-family: 'SF Mono', 'Fira Code', monospace;
+            font-size: 0.82rem;
+        }
+        .pnl-table .pnl-pnl, .pnl-table .pnl-pct { font-weight: 600; white-space: nowrap; }
+
+        /* ── Topbar search button + Cmd-K palette ── */
+        .topbar-search-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            color: var(--text-secondary);
+            padding: 0.4rem 0.7rem;
+            border-radius: 10px;
+            font-size: 0.85rem;
+            cursor: pointer;
+        }
+        .topbar-search-btn:hover { border-color: var(--accent-light); color: #fff; }
+        .topbar-search-btn kbd {
+            background: rgba(255,255,255,0.05);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            padding: 1px 6px;
+            font-size: 0.7rem;
+            color: var(--text-muted);
+        }
+        .palette-overlay {
+            position: fixed; inset: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 200;
+            display: none;
+            align-items: flex-start;
+            justify-content: center;
+            padding-top: 12vh;
+        }
+        .palette-overlay.open { display: flex; }
+        .palette {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 14px;
+            width: min(560px, 92vw);
+            box-shadow: 0 24px 48px rgba(0,0,0,0.5);
+            overflow: hidden;
+        }
+        .palette input {
+            width: 100%;
+            background: transparent;
+            border: none;
+            color: var(--text-primary);
+            font-size: 1rem;
+            padding: 1rem 1.25rem;
+            outline: none;
+            border-bottom: 1px solid var(--border-color);
+        }
+        .palette-results { max-height: 50vh; overflow-y: auto; }
+        .palette-empty { padding: 1.5rem; text-align: center; color: var(--text-muted); font-size: 0.9rem; }
+        .palette-item {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.7rem 1.25rem;
+            cursor: pointer;
+            color: var(--text-primary);
+            text-decoration: none;
+        }
+        .palette-item:hover, .palette-item.active {
+            background: rgba(79,70,229,0.12);
+            color: var(--text-primary);
+        }
+        .palette-item .palette-tag {
+            font-size: 0.65rem;
+            text-transform: uppercase;
+            letter-spacing: 0.6px;
+            color: var(--text-muted);
+            background: rgba(255,255,255,0.04);
+            padding: 2px 6px;
+            border-radius: 4px;
+            flex-shrink: 0;
+        }
+        .palette-item .palette-label { font-weight: 600; }
+        .palette-item .palette-sub { color: var(--text-muted); font-size: 0.78rem; margin-left: auto; }
+
+        /* ── Quick-add FAB ── */
+        .quick-fab {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            width: 56px; height: 56px;
+            border-radius: 50%;
+            background: var(--accent);
+            color: #fff;
+            border: none;
+            font-size: 1.6rem;
+            font-weight: 300;
+            box-shadow: 0 8px 24px rgba(79,70,229,0.4);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 90;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .quick-fab:hover { transform: translateY(-2px); box-shadow: 0 12px 32px rgba(79,70,229,0.5); }
+        .quick-fab.open { transform: rotate(45deg); }
+        .fab-menu {
+            position: fixed;
+            bottom: 96px;
+            right: 24px;
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 14px;
+            box-shadow: 0 16px 32px rgba(0,0,0,0.4);
+            min-width: 220px;
+            z-index: 90;
+            display: none;
+            overflow: hidden;
+        }
+        .fab-menu.open { display: block; }
+        .fab-menu a {
+            display: flex;
+            align-items: center;
+            gap: 0.7rem;
+            padding: 0.7rem 1rem;
+            color: var(--text-primary);
+            text-decoration: none;
+            font-size: 0.9rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+        .fab-menu a:last-child { border-bottom: none; }
+        .fab-menu a:hover { background: rgba(79,70,229,0.12); }
+        .fab-menu a .fab-icon {
+            width: 26px; height: 26px;
+            border-radius: 7px;
+            display: flex; align-items: center; justify-content: center;
+            font-weight: 700;
+            flex-shrink: 0;
+        }
+
+        /* ── Detail-page inline stat (used on detail headers) ── */
+        .detail-stat {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.5rem 1rem;
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+        }
+        .detail-stat .label { color: var(--text-muted); font-size: 0.8rem; }
+        .detail-stat .value { font-weight: 700; font-size: 1.1rem; }
 
         /* ── Misc ── */
         hr { border-color: var(--border-color); }
@@ -215,48 +614,288 @@
 </head>
 <body>
     {% if user.is_authenticated %}
-    <nav class="navbar-app sticky-top">
-        <div class="container d-flex justify-content-between align-items-center">
-            <div class="d-flex align-items-center gap-4">
-                <a class="nav-logo" href="{% url 'dashboard' %}">Folio<span>.</span></a>
-                <div class="nav-links d-none d-md-flex gap-1">
-                    <a href="{% url 'dashboard' %}">Dashboard</a>
-                    <a href="{% url 'market' %}">Market</a>
-                    <a href="{% url 'stocks' %}">Stocks</a>
-                    <a href="{% url 'etfs' %}">ETFs</a>
-                    <a href="{% url 'crypto' %}">Crypto</a>
-                    <a href="{% url 'cash' %}">Cash</a>
+    <div class="app-shell">
+        <div class="sidebar-backdrop" id="sidebarBackdrop"></div>
+
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <a class="sidebar-logo" href="{% url 'dashboard' %}">
+                    <span class="logo-text">Folio<span>.</span></span>
+                </a>
+                <button class="sidebar-toggle" id="sidebarToggle" type="button" title="Collapse sidebar">
+                    <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M11.354 1.646a.5.5 0 0 1 0 .708L5.707 8l5.647 5.646a.5.5 0 0 1-.708.708l-6-6a.5.5 0 0 1 0-.708l6-6a.5.5 0 0 1 .708 0z"/></svg>
+                </button>
+            </div>
+
+            <nav class="sidebar-nav">
+                {% url 'dashboard' as u %}<a class="nav-item {% if request.path == u %}active{% endif %}" href="{{ u }}">
+                    <svg class="nav-icon" viewBox="0 0 16 16" fill="currentColor"><path d="M6.5 1A1.5 1.5 0 0 0 5 2.5V3H1.5A1.5 1.5 0 0 0 0 4.5v8A1.5 1.5 0 0 0 1.5 14h13a1.5 1.5 0 0 0 1.5-1.5v-8A1.5 1.5 0 0 0 14.5 3H11v-.5A1.5 1.5 0 0 0 9.5 1zm0 1h3a.5.5 0 0 1 .5.5V3H6v-.5a.5.5 0 0 1 .5-.5"/></svg>
+                    <span class="nav-label">Dashboard</span>
+                </a>
+                {% url 'holdings' as u %}<a class="nav-item {% if request.path == u or request.path|slice:':10' == '/holdings/' %}active{% endif %}" href="{{ u }}">
+                    <svg class="nav-icon" viewBox="0 0 16 16" fill="currentColor"><path d="M4 11H2v3h2zm5-4H7v7h2zm5-5h-2v12h2zm-2-1a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1zM6 7a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v7a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1zm-5 4a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1z"/></svg>
+                    <span class="nav-label">Holdings</span>
+                </a>
+                {% url 'transactions' as u %}<a class="nav-item {% if request.path == u %}active{% endif %}" href="{{ u }}">
+                    <svg class="nav-icon" viewBox="0 0 16 16" fill="currentColor"><path d="M14.5 3a.5.5 0 0 1 .5.5v9a.5.5 0 0 1-.5.5h-13a.5.5 0 0 1-.5-.5v-9a.5.5 0 0 1 .5-.5zM1.5 2A1.5 1.5 0 0 0 0 3.5v9A1.5 1.5 0 0 0 1.5 14h13a1.5 1.5 0 0 0 1.5-1.5v-9A1.5 1.5 0 0 0 14.5 2z"/><path d="M3 5.5a.5.5 0 0 1 .5-.5h9a.5.5 0 0 1 0 1h-9a.5.5 0 0 1-.5-.5M3 8a.5.5 0 0 1 .5-.5h6a.5.5 0 0 1 0 1h-6A.5.5 0 0 1 3 8m0 2.5a.5.5 0 0 1 .5-.5h3a.5.5 0 0 1 0 1h-3a.5.5 0 0 1-.5-.5"/></svg>
+                    <span class="nav-label">Transactions</span>
+                </a>
+                {% url 'alerts' as u %}<a class="nav-item {% if request.path == u %}active{% endif %}" href="{{ u }}">
+                    <svg class="nav-icon" viewBox="0 0 16 16" fill="currentColor"><path d="M8 16a2 2 0 0 0 2-2H6a2 2 0 0 0 2 2M8 1.918l-.797.161A4.002 4.002 0 0 0 4 6c0 .628-.134 2.197-.459 3.742-.16.767-.376 1.566-.663 2.258h10.244c-.287-.692-.502-1.49-.663-2.258C12.134 8.197 12 6.628 12 6a4.002 4.002 0 0 0-3.203-3.92zM14.22 12c.223.447.481.801.78 1H1c.299-.199.557-.553.78-1C2.68 10.2 3 6.88 3 6c0-2.42 1.72-4.44 4.005-4.901a1 1 0 1 1 1.99 0A5.002 5.002 0 0 1 13 6c0 .88.32 4.2 1.22 6"/></svg>
+                    <span class="nav-label">Alerts</span>
+                </a>
+                {% url 'watchlist' as u %}<a class="nav-item {% if request.path == u %}active{% endif %}" href="{{ u }}">
+                    <svg class="nav-icon" viewBox="0 0 16 16" fill="currentColor"><path d="M3.612 15.443c-.386.198-.824-.149-.746-.592l.83-4.73L.173 6.765c-.329-.314-.158-.888.283-.95l4.898-.696L7.538.792c.197-.39.73-.39.927 0l2.184 4.327 4.898.696c.441.062.612.636.282.95l-3.522 3.356.83 4.73c.078.443-.36.79-.746.592L8 13.187l-4.389 2.256z"/></svg>
+                    <span class="nav-label">Watchlist</span>
+                </a>
+                {% url 'market' as u %}<a class="nav-item {% if request.path == u %}active{% endif %}" href="{{ u }}">
+                    <svg class="nav-icon" viewBox="0 0 16 16" fill="currentColor"><path d="M2 1a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1zm10.5 1.5a.5.5 0 0 1 1 0v9a.5.5 0 0 1-1 0zm-9 6a.5.5 0 0 1 1 0v3a.5.5 0 0 1-1 0zm5.5-4a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V5a.5.5 0 0 1 .5-.5"/></svg>
+                    <span class="nav-label">Market</span>
+                </a>
+                {% url 'cash' as u %}<a class="nav-item {% if request.path == u or request.path|slice:':6' == '/cash/' %}active{% endif %}" href="{{ u }}">
+                    <svg class="nav-icon" viewBox="0 0 16 16" fill="currentColor"><path d="M0 4a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2zm13 0a1 1 0 0 0 1 1V4zm-1 0H4a2 2 0 0 1-2 2v4a2 2 0 0 1 2 2h8a2 2 0 0 1 2-2V6a2 2 0 0 1-2-2zM2 4a1 1 0 0 0-1 1V4zm12 8v-1a1 1 0 0 0-1 1zM2 12h1a1 1 0 0 0-1-1z"/><path d="M8 10a2 2 0 1 1 0-4 2 2 0 0 1 0 4"/></svg>
+                    <span class="nav-label">Cash</span>
+                </a>
+                {% url 'edit_profile' as u %}<a class="nav-item {% if request.path == u %}active{% endif %}" href="{{ u }}">
+                    <svg class="nav-icon" viewBox="0 0 16 16" fill="currentColor"><path d="M9.405 1.05c-.413-1.4-2.397-1.4-2.81 0l-.1.34a1.464 1.464 0 0 1-2.105.872l-.31-.17c-1.283-.698-2.686.705-1.987 1.987l.169.311c.446.82.023 1.841-.872 2.105l-.34.1c-1.4.413-1.4 2.397 0 2.81l.34.1a1.464 1.464 0 0 1 .872 2.105l-.17.31c-.698 1.283.705 2.686 1.987 1.987l.311-.169a1.464 1.464 0 0 1 2.105.872l.1.34c.413 1.4 2.397 1.4 2.81 0l.1-.34a1.464 1.464 0 0 1 2.105-.872l.31.17c1.283.698 2.686-.705 1.987-1.987l-.169-.311a1.464 1.464 0 0 1 .872-2.105l.34-.1c1.4-.413 1.4-2.397 0-2.81l-.34-.1a1.464 1.464 0 0 1-.872-2.105l.17-.31c.698-1.283-.705-2.686-1.987-1.987l-.311.169a1.464 1.464 0 0 1-2.105-.872zM8 10.93a2.929 2.929 0 1 1 0-5.86 2.929 2.929 0 0 1 0 5.858z"/></svg>
+                    <span class="nav-label">Settings</span>
+                </a>
+            </nav>
+
+            <div class="sidebar-footer">
+                <div class="user-row">
+                    <div class="user-avatar">{{ user.first_name|first }}{{ user.last_name|first }}</div>
+                    <div style="flex:1;min-width:0;">
+                        <div class="user-name" style="color:var(--text-primary);font-size:0.85rem;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ user.first_name }}</div>
+                        <a class="logout-link" href="{% url 'logout' %}">Sign out</a>
+                    </div>
                 </div>
             </div>
-            <div class="d-flex align-items-center gap-3">
-                <a href="{% url 'edit_profile' %}" class="d-flex align-items-center gap-2 text-decoration-none">
-                    <div style="width:32px;height:32px;border-radius:50%;background:var(--accent);display:flex;align-items:center;justify-content:center;font-size:0.75rem;font-weight:700;color:#fff;">
-                        {{ user.first_name|first }}{{ user.last_name|first }}
+        </aside>
+
+        <div class="app-main">
+            <header class="topbar">
+                <div class="topbar-left">
+                    <button class="topbar-mobile-toggle" id="mobileToggle" type="button" aria-label="Open menu">
+                        <svg width="18" height="18" viewBox="0 0 16 16" fill="currentColor"><path fill-rule="evenodd" d="M2.5 12a.5.5 0 0 1 .5-.5h10a.5.5 0 0 1 0 1H3a.5.5 0 0 1-.5-.5m0-4a.5.5 0 0 1 .5-.5h10a.5.5 0 0 1 0 1H3a.5.5 0 0 1-.5-.5m0-4a.5.5 0 0 1 .5-.5h10a.5.5 0 0 1 0 1H3a.5.5 0 0 1-.5-.5"/></svg>
+                    </button>
+                    {% if topbar_portfolio_value is not None %}
+                    <div class="topbar-portfolio-value">
+                        <span class="label">Portfolio</span>
+                        <span class="value">${{ topbar_portfolio_value|floatformat:2 }}</span>
                     </div>
-                    <span class="d-none d-md-inline" style="color:var(--text-secondary);font-size:0.85rem;">{{ user.first_name }}</span>
-                </a>
-                <a href="{% url 'logout' %}" class="btn-nav-logout">Logout</a>
+                    {% endif %}
+                </div>
+                <div class="topbar-right d-flex align-items-center gap-2">
+                    <button class="topbar-search-btn" id="searchTrigger" type="button" title="Search (⌘K)">
+                        <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001q.044.06.098.115l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1 1 0 0 0-.115-.1zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0"/></svg>
+                        <span class="d-none d-md-inline">Search</span>
+                        <kbd class="d-none d-md-inline">⌘K</kbd>
+                    </button>
+                </div>
+            </header>
+
+            {% if eur_rate_unavailable %}
+            <div style="background:rgba(248,113,113,0.12);border-bottom:1px solid rgba(248,113,113,0.3);">
+                <div class="px-3 py-2 d-flex align-items-center" style="font-size:0.85rem;color:#fca5a5;">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16" class="me-2 flex-shrink-0">
+                        <path d="M8.982 1.566a1.13 1.13 0 0 0-1.96 0L.165 13.233c-.457.778.091 1.767.98 1.767h13.713c.889 0 1.438-.99.98-1.767zM8 5c.535 0 .954.462.9.995l-.35 3.507a.552.552 0 0 1-1.1 0L7.1 5.995A.905.905 0 0 1 8 5m.002 6a1 1 0 1 1 0 2 1 1 0 0 1 0-2"/>
+                    </svg>
+                    <span>EUR/USD conversion rate is currently unavailable. EUR-denominated savings plans will be skipped until the rate is restored.</span>
+                </div>
+            </div>
+            {% endif %}
+
+            <main class="app-content">
+{% endif %}
+        {% if not user.is_authenticated %}<div class="container pb-5">{% endif %}
+        {% block content %}{% endblock %}
+        {% if not user.is_authenticated %}</div>{% endif %}
+{% if user.is_authenticated %}
+            </main>
+        </div>
+
+        <!-- Cmd-K palette -->
+        <div class="palette-overlay" id="paletteOverlay">
+            <div class="palette" role="dialog" aria-modal="true">
+                <input type="text" id="paletteInput" placeholder="Search symbols, pages…" autocomplete="off">
+                <div class="palette-results" id="paletteResults">
+                    <div class="palette-empty">Start typing to search…</div>
+                </div>
             </div>
         </div>
-    </nav>
-    {% endif %}
 
-    {% if eur_rate_unavailable %}
-    <div style="background:rgba(248,113,113,0.12);border-bottom:1px solid rgba(248,113,113,0.3);">
-        <div class="container py-2 d-flex align-items-center" style="font-size:0.85rem;color:#fca5a5;">
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16" class="me-2 flex-shrink-0">
-                <path d="M8.982 1.566a1.13 1.13 0 0 0-1.96 0L.165 13.233c-.457.778.091 1.767.98 1.767h13.713c.889 0 1.438-.99.98-1.767zM8 5c.535 0 .954.462.9.995l-.35 3.507a.552.552 0 0 1-1.1 0L7.1 5.995A.905.905 0 0 1 8 5m.002 6a1 1 0 1 1 0 2 1 1 0 0 1 0-2"/>
-            </svg>
-            <span>EUR/USD conversion rate is currently unavailable. EUR-denominated savings plans will be skipped until the rate is restored.</span>
+        <!-- Quick-add FAB -->
+        <button class="quick-fab" id="quickFab" type="button" title="Quick add" aria-label="Quick add">+</button>
+        <div class="fab-menu" id="fabMenu">
+            <a href="{% url 'stock_create' %}"><span class="fab-icon" style="background:rgba(79,70,229,0.15);color:var(--accent-light);">S</span> Add Stock</a>
+            <a href="{% url 'crypto_create' %}"><span class="fab-icon" style="background:rgba(34,211,238,0.15);color:#22d3ee;">C</span> Add Crypto</a>
+            <a href="{% url 'etf_create' %}"><span class="fab-icon" style="background:rgba(168,85,247,0.15);color:#c084fc;">E</span> Add ETF</a>
+            <a href="{% url 'stock_add' %}"><span class="fab-icon" style="background:rgba(52,211,153,0.15);color:var(--color-success);">↑</span> Stock Transaction</a>
+            <a href="{% url 'crypto_add' %}"><span class="fab-icon" style="background:rgba(52,211,153,0.15);color:var(--color-success);">↑</span> Crypto Transaction</a>
+            <a href="{% url 'etf_add' %}"><span class="fab-icon" style="background:rgba(52,211,153,0.15);color:var(--color-success);">↑</span> ETF Transaction</a>
+            <a href="{% url 'cash_add' %}"><span class="fab-icon" style="background:rgba(251,191,36,0.15);color:#fbbf24;">$</span> Deposit / Withdraw</a>
+            <a href="{% url 'etf_plan_create' %}"><span class="fab-icon" style="background:rgba(168,85,247,0.15);color:#c084fc;">⟳</span> Savings Plan</a>
         </div>
     </div>
     {% endif %}
 
-    <div class="container pb-5">
-        {% block content %}{% endblock %}
-    </div>
-
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+    (function() {
+        const sidebar = document.getElementById('sidebar');
+        const toggle = document.getElementById('sidebarToggle');
+        const mobileToggle = document.getElementById('mobileToggle');
+        const backdrop = document.getElementById('sidebarBackdrop');
+        if (!sidebar) return;
+
+        // Persist collapse state on desktop.
+        const stored = localStorage.getItem('folio_sidebar_collapsed');
+        if (stored === '1') sidebar.classList.add('collapsed');
+
+        if (toggle) toggle.addEventListener('click', () => {
+            sidebar.classList.toggle('collapsed');
+            localStorage.setItem('folio_sidebar_collapsed', sidebar.classList.contains('collapsed') ? '1' : '0');
+        });
+
+        function openMobile() {
+            sidebar.classList.add('open');
+            backdrop.classList.add('open');
+        }
+        function closeMobile() {
+            sidebar.classList.remove('open');
+            backdrop.classList.remove('open');
+        }
+        if (mobileToggle) mobileToggle.addEventListener('click', openMobile);
+        if (backdrop) backdrop.addEventListener('click', closeMobile);
+
+        // Close mobile drawer on nav link click.
+        sidebar.querySelectorAll('.nav-item').forEach(a => {
+            a.addEventListener('click', () => {
+                if (window.matchMedia('(max-width: 991px)').matches) closeMobile();
+            });
+        });
+    })();
+
+    /* ── Cmd-K search palette ── */
+    (function() {
+        const overlay = document.getElementById('paletteOverlay');
+        const input = document.getElementById('paletteInput');
+        const results = document.getElementById('paletteResults');
+        const trigger = document.getElementById('searchTrigger');
+        if (!overlay || !input || !results) return;
+
+        let activeIndex = -1;
+        let currentResults = [];
+        let debounceTimer = null;
+
+        function escapeHtml(s) {
+            return String(s).replace(/[&<>"']/g, c => ({
+                "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+            })[c]);
+        }
+
+        function open() {
+            overlay.classList.add('open');
+            input.value = '';
+            results.innerHTML = '<div class="palette-empty">Start typing to search…</div>';
+            activeIndex = -1;
+            currentResults = [];
+            setTimeout(() => input.focus(), 30);
+        }
+        function close() {
+            overlay.classList.remove('open');
+        }
+
+        function render() {
+            if (currentResults.length === 0) {
+                results.innerHTML = '<div class="palette-empty">No matches.</div>';
+                return;
+            }
+            results.innerHTML = currentResults.map((r, i) =>
+                `<a class="palette-item${i === activeIndex ? ' active' : ''}" href="${escapeHtml(r.url)}" data-index="${i}">
+                    <span class="palette-tag">${escapeHtml(r.kind)}</span>
+                    <span class="palette-label">${escapeHtml(r.label)}</span>
+                    <span class="palette-sub">${escapeHtml(r.sub)}</span>
+                </a>`
+            ).join('');
+        }
+
+        async function search(q) {
+            if (!q.trim()) {
+                currentResults = [];
+                render();
+                return;
+            }
+            try {
+                const resp = await fetch('/api/search/?q=' + encodeURIComponent(q));
+                const data = await resp.json();
+                currentResults = data.results || [];
+                activeIndex = currentResults.length > 0 ? 0 : -1;
+                render();
+            } catch (e) { /* ignore */ }
+        }
+
+        input.addEventListener('input', () => {
+            clearTimeout(debounceTimer);
+            debounceTimer = setTimeout(() => search(input.value), 120);
+        });
+
+        input.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                if (currentResults.length === 0) return;
+                activeIndex = (activeIndex + 1) % currentResults.length;
+                render();
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                if (currentResults.length === 0) return;
+                activeIndex = (activeIndex - 1 + currentResults.length) % currentResults.length;
+                render();
+            } else if (e.key === 'Enter') {
+                e.preventDefault();
+                if (activeIndex >= 0 && currentResults[activeIndex]) {
+                    window.location.href = currentResults[activeIndex].url;
+                }
+            } else if (e.key === 'Escape') {
+                close();
+            }
+        });
+
+        overlay.addEventListener('click', (e) => {
+            if (e.target === overlay) close();
+        });
+
+        if (trigger) trigger.addEventListener('click', open);
+
+        document.addEventListener('keydown', (e) => {
+            const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
+            if ((isMac ? e.metaKey : e.ctrlKey) && e.key.toLowerCase() === 'k') {
+                e.preventDefault();
+                if (overlay.classList.contains('open')) close();
+                else open();
+            }
+        });
+    })();
+
+    /* ── Quick-add FAB ── */
+    (function() {
+        const fab = document.getElementById('quickFab');
+        const menu = document.getElementById('fabMenu');
+        if (!fab || !menu) return;
+        fab.addEventListener('click', (e) => {
+            e.stopPropagation();
+            fab.classList.toggle('open');
+            menu.classList.toggle('open');
+        });
+        document.addEventListener('click', (e) => {
+            if (!menu.contains(e.target) && e.target !== fab) {
+                fab.classList.remove('open');
+                menu.classList.remove('open');
+            }
+        });
+    })();
+    </script>
     {% block extra_js %}{% endblock %}
 </body>
 </html>

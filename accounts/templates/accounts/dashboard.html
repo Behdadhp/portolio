@@ -14,19 +14,17 @@
         -webkit-background-clip: text; -webkit-text-fill-color: transparent;
         background-clip: text;
     }
-    /* ── Hero summary ── */
     .hero-summary {
         display: flex;
         align-items: flex-end;
         gap: 2rem;
         flex-wrap: wrap;
-        padding: 1.5rem 0 1rem;
+        padding: 0.5rem 0 1rem;
     }
     .hero-summary .hero-value {
         font-size: clamp(2rem, 5vw, 2.8rem);
         font-weight: 800;
         letter-spacing: -1px;
-        font-family: system-ui, -apple-system, sans-serif;
         background: linear-gradient(135deg, #f1f5f9, var(--accent-light));
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
@@ -56,111 +54,76 @@
         font-weight: 600;
         margin-left: 6px;
     }
-
-    /* ── P&L ranking inside portfolio card ── */
-    .pnl-table { width: 100%; }
-    .pnl-table td { padding: 0.45rem 0.25rem; border: none; font-size: 0.85rem; }
-    .pnl-table th {
-        padding: 0.25rem 0.25rem 0.5rem;
-        border: none;
-        font-size: 0.7rem;
-        font-weight: 600;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-        color: var(--text-muted);
-    }
-    .pnl-table th.text-end { text-align: right; }
-    .pnl-table th.text-center { text-align: center; }
-    .pnl-table th.pnl-sortable { cursor: pointer; user-select: none; }
-    .pnl-table th.pnl-sortable:hover { color: var(--text-primary); }
-    .pnl-table th .sort-indicator {
-        display: inline-block;
-        margin-left: 4px;
-        font-size: 0.65rem;
-        opacity: 0.5;
-    }
-    .pnl-table th.sort-active .sort-indicator { opacity: 1; color: var(--accent-light); }
-
-    /* Type badges for ranking rows */
-    .pnl-table .type-badge {
-        display: inline-block;
-        padding: 2px 8px;
-        border-radius: 6px;
-        font-weight: 600;
-        font-size: 0.75rem;
-        margin-right: 6px;
-    }
-    .pnl-table .type-badge.stock { background: rgba(79, 70, 229, 0.12); color: var(--accent-light); }
-    .pnl-table .type-badge.crypto { background: rgba(6, 182, 212, 0.12); color: #22d3ee; }
-
-    /* Stocks vs Crypto breakdown under donut */
-    .type-breakdown {
-        margin-top: 0.75rem;
-        width: 100%;
-        display: flex;
-        flex-direction: column;
-        gap: 0.35rem;
-    }
-    .type-breakdown-row {
+    .activity-row {
         display: flex;
         align-items: center;
-        font-size: 0.82rem;
-        gap: 0.5rem;
+        gap: 0.75rem;
+        padding: 0.65rem 1rem;
+        border-bottom: 1px solid var(--border-color);
     }
-    .type-dot {
-        width: 10px;
-        height: 10px;
-        border-radius: 50%;
-        display: inline-block;
+    .activity-row:last-child { border-bottom: none; }
+    .activity-icon {
+        width: 32px; height: 32px;
+        border-radius: 8px;
+        display: flex; align-items: center; justify-content: center;
+        flex-shrink: 0;
     }
-    .type-dot-stock { background: var(--accent-light); }
-    .type-dot-crypto { background: #22d3ee; }
-    .type-label { color: var(--text-secondary); flex: 1; }
-    .type-pct {
+    .activity-meta { flex: 1; min-width: 0; }
+    .activity-title { font-weight: 600; font-size: 0.9rem; }
+    .activity-sub { font-size: 0.75rem; color: var(--text-muted); }
+    .activity-value {
         font-family: 'SF Mono', 'Fira Code', monospace;
-        font-weight: 700;
+        font-size: 0.85rem;
+        font-weight: 600;
+    }
+    .history-chart-wrap { position: relative; }
+    .history-chart-wrap canvas { width: 100%; height: 220px; display: block; cursor: crosshair; }
+    .history-tooltip {
+        position: absolute;
+        pointer-events: none;
+        background: var(--bg-sidebar);
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        padding: 0.5rem 0.7rem;
+        font-size: 0.78rem;
         color: var(--text-primary);
+        box-shadow: 0 6px 20px rgba(0,0,0,0.4);
+        opacity: 0;
+        transition: opacity 0.1s;
+        white-space: nowrap;
+        z-index: 5;
     }
-    .pnl-table .pnl-rank {
-        width: 24px;
-        color: var(--text-muted);
-        font-size: 0.8rem;
-        text-align: center;
-    }
-    .pnl-table .pnl-asset { font-weight: 600; }
-    .pnl-table .pnl-sym { color: var(--text-muted); font-weight: 400; font-size: 0.78rem; }
-    .pnl-table .pnl-value {
-        text-align: right;
-        font-family: 'SF Mono', 'Fira Code', monospace;
-        font-size: 0.82rem;
+    .history-tooltip.visible { opacity: 1; }
+    .history-tooltip .tt-date { color: var(--text-muted); margin-bottom: 4px; font-size: 0.7rem; }
+    .history-tooltip .tt-row { display: flex; justify-content: space-between; gap: 1rem; font-family: 'SF Mono', 'Fira Code', monospace; }
+    .history-tooltip .tt-label { display: inline-flex; align-items: center; gap: 6px; color: var(--text-secondary); font-family: system-ui; }
+    .history-tooltip .tt-swatch { display: inline-block; width: 8px; height: 8px; border-radius: 2px; }
+    .history-legend {
+        display: flex;
+        gap: 1.5rem;
+        margin-top: 0.75rem;
+        font-size: 0.78rem;
         color: var(--text-secondary);
     }
-    .pnl-table .pnl-pnl {
-        text-align: right;
-        font-family: 'SF Mono', 'Fira Code', monospace;
-        font-size: 0.82rem;
-        font-weight: 600;
-        white-space: nowrap;
-    }
-    .pnl-table .pnl-pct {
-        text-align: right;
-        font-family: 'SF Mono', 'Fira Code', monospace;
-        font-size: 0.82rem;
-        font-weight: 600;
-        white-space: nowrap;
+    .history-legend .swatch {
+        display: inline-block;
+        width: 10px; height: 10px;
+        border-radius: 2px;
+        margin-right: 6px;
+        vertical-align: middle;
     }
 </style>
 {% endblock %}
 
 {% block content %}
-<!-- Greeting + Summary -->
-<div class="greeting pt-4 pb-1">
+<div class="greeting pt-2 pb-1">
     <h2>Good {% now "H" as hour %}{% if hour|add:"0" < 12 %}morning{% elif hour|add:"0" < 18 %}afternoon{% else %}evening{% endif %}, <span>{{ user.first_name }}</span></h2>
 </div>
+
 <div class="hero-summary">
     <div>
         <div class="hero-label">Portfolio Value</div>
-        <div class="hero-value loading" id="total-wealth">—</div>
+        <div class="hero-value loading" id="total-wealth">${{ portfolio_worth|floatformat:2 }}</div>
     </div>
     <div id="hero-pnl-wrap" style="display:none;">
         <div class="hero-label">Overall P&L</div>
@@ -171,7 +134,7 @@
     </div>
 </div>
 
-<!-- Real money invested vs portfolio worth -->
+<!-- Real-money widget -->
 <div class="card shadow-sm mb-4">
     <div class="card-body py-3">
         <div class="row g-3 align-items-center">
@@ -180,331 +143,250 @@
                 <div style="font-weight:700;font-size:1.25rem;font-family:'SF Mono','Fira Code',monospace;">
                     ${{ cash_summary.net_invested_usd|floatformat:2 }}
                 </div>
-                <div style="color:var(--text-muted);font-size:0.72rem;">Cash you put in − cash you took out</div>
+                <div style="color:var(--text-muted);font-size:0.72rem;">Cash in − cash out</div>
             </div>
             <div class="col-md-3">
                 <div class="hero-label">Portfolio Worth</div>
                 <div style="font-weight:700;font-size:1.25rem;font-family:'SF Mono','Fira Code',monospace;">
                     ${{ portfolio_worth|floatformat:2 }}
                 </div>
-                <div style="color:var(--text-muted);font-size:0.72rem;">Stocks + ETFs + Crypto at last price</div>
+                <div style="color:var(--text-muted);font-size:0.72rem;">All holdings at last price</div>
             </div>
             <div class="col-md-3">
                 <div class="hero-label">Real P&L</div>
-                <div style="font-weight:700;font-size:1.25rem;font-family:'SF Mono','Fira Code',monospace;color:{% if real_pnl >= 0 %}#34d399{% else %}#f87171{% endif %};">
+                <div style="font-weight:700;font-size:1.25rem;font-family:'SF Mono','Fira Code',monospace;color:{% if real_pnl >= 0 %}var(--color-success){% else %}var(--color-danger){% endif %};">
                     {% if real_pnl >= 0 %}+{% endif %}${{ real_pnl|floatformat:2 }}
                 </div>
-                <div style="color:{% if real_pnl_pct >= 0 %}#34d399{% else %}#f87171{% endif %};font-size:0.72rem;">
+                <div style="color:{% if real_pnl_pct >= 0 %}var(--color-success){% else %}var(--color-danger){% endif %};font-size:0.72rem;">
                     {% if real_pnl_pct >= 0 %}+{% endif %}{{ real_pnl_pct|floatformat:2 }}% vs invested
                 </div>
             </div>
             <div class="col-md-3 text-md-end">
-                <a href="{% url 'cash' %}" class="btn btn-ghost btn-sm">Manage Cash</a>
+                <a href="{% url 'holdings' %}" class="btn btn-accent btn-sm">View Holdings</a>
             </div>
         </div>
     </div>
 </div>
 
-<!-- Portfolio Overview: Allocation + Ranking -->
-<div class="card shadow-sm mb-4">
-    <div class="card-header d-flex align-items-center" role="button"
-         id="overviewHeader" style="cursor: pointer;">
-        <h5 class="mb-0 me-2">Portfolio Overview</h5>
-        <svg id="overviewChevron" xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="currentColor"
-             class="text-muted" viewBox="0 0 16 16" style="transition: transform 0.3s; transform: rotate(180deg);">
-            <path fill-rule="evenodd" d="M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z"/>
-        </svg>
+<!-- Portfolio history -->
+<div class="card shadow-sm mb-4" id="historyCard" style="display:none;">
+    <div class="card-header d-flex align-items-center justify-content-between">
+        <h5 class="mb-0">Portfolio Over Time</h5>
+        <small class="text-muted">Estimated · last known prices</small>
     </div>
-    <div class="collapse show" id="overviewBody">
-        <div class="card-body">
-            <div class="row g-4">
-                <!-- Donut chart -->
-                <div class="col-lg-5">
-                    <h6 class="text-muted text-uppercase small fw-bold mb-3">Allocation</h6>
-                    <div class="d-flex flex-column align-items-center">
-                        <div class="donut-wrap">
-                            <canvas id="dashAllocationChart"></canvas>
-                            <div class="donut-center">
-                                <div class="donut-total-label">Total</div>
-                                <div class="donut-total-value">—</div>
-                            </div>
+    <div class="card-body">
+        <div class="history-chart-wrap">
+            <canvas id="historyChart"></canvas>
+        </div>
+        <div class="history-legend">
+            <span><span class="swatch" style="background:var(--accent-light);"></span>Estimated worth</span>
+            <span><span class="swatch" style="background:#fbbf24;"></span>Net invested</span>
+        </div>
+    </div>
+</div>
+
+<div class="row g-4">
+    <!-- Recent activity -->
+    <div class="col-lg-7">
+        <div class="card shadow-sm">
+            <div class="card-header d-flex align-items-center justify-content-between">
+                <h5 class="mb-0">Recent Activity</h5>
+                <a href="{% url 'transactions' %}" class="text-decoration-none" style="font-size:0.85rem;">View all →</a>
+            </div>
+            <div class="card-body p-0">
+                {% if recent_activity %}
+                {% for row in recent_activity %}
+                <div class="activity-row">
+                    {% if row.type == "asset" %}
+                    <div class="activity-icon" style="background: {% if row.action == 'bought' %}rgba(52,211,153,0.15);color:var(--color-success){% else %}rgba(248,113,113,0.15);color:var(--color-danger){% endif %};">
+                        {% if row.action == 'bought' %}↑{% else %}↓{% endif %}
+                    </div>
+                    <div class="activity-meta">
+                        <div class="activity-title">{{ row.action|capfirst }} {{ row.symbol }}
+                            <span class="text-muted" style="font-weight:400;font-size:0.78rem;">· {{ row.kind }}</span>
                         </div>
-                        <div id="dashAllocationLegend" class="donut-legend"></div>
-                        <div id="type-breakdown" class="type-breakdown" style="display:none;">
-                            <div class="type-breakdown-row">
-                                <span class="type-dot type-dot-stock"></span>
-                                <span class="type-label">Stocks</span>
-                                <span class="type-pct" id="stock-pct">—</span>
-                            </div>
-                            <div class="type-breakdown-row">
-                                <span class="type-dot type-dot-crypto"></span>
-                                <span class="type-label">Crypto</span>
-                                <span class="type-pct" id="crypto-pct">—</span>
-                            </div>
+                        <div class="activity-sub">{{ row.date }} · {{ row.amount|floatformat:6 }} @ ${{ row.price|floatformat:2 }}</div>
+                    </div>
+                    <div class="activity-value">${{ row.value_usd|floatformat:2 }}</div>
+                    {% else %}
+                    <div class="activity-icon" style="background: {% if row.action == 'deposit' %}rgba(52,211,153,0.15);color:var(--color-success){% else %}rgba(248,113,113,0.15);color:var(--color-danger){% endif %};">$</div>
+                    <div class="activity-meta">
+                        <div class="activity-title">{{ row.action|capfirst }}{% if row.note %} — {{ row.note }}{% endif %}</div>
+                        <div class="activity-sub">{{ row.date }} · Cash flow</div>
+                    </div>
+                    <div class="activity-value {% if row.action == 'deposit' %}text-success{% else %}text-danger{% endif %}">
+                        {% if row.action == 'deposit' %}+{% else %}-{% endif %}${{ row.amount_usd|floatformat:2 }}
+                    </div>
+                    {% endif %}
+                </div>
+                {% endfor %}
+                {% else %}
+                <div class="text-center py-5">
+                    <p class="text-muted mb-0">No activity yet — <a href="{% url 'market' %}">browse the market</a> or <a href="{% url 'cash_add' %}">log a deposit</a>.</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Active alerts (top 5 nearest) -->
+    <div class="col-lg-5">
+        <div class="card shadow-sm">
+            <div class="card-header d-flex align-items-center justify-content-between">
+                <h5 class="mb-0">Closest Alerts</h5>
+                <a href="{% url 'alerts' %}" class="text-decoration-none" style="font-size:0.85rem;">Manage →</a>
+            </div>
+            <div class="card-body p-0">
+                {% if active_alerts %}
+                {% for alert in active_alerts %}
+                <div class="activity-row">
+                    <div class="activity-icon" style="background: {% if alert.direction == 'above' %}rgba(52,211,153,0.15);color:var(--color-success){% else %}rgba(79,70,229,0.15);color:var(--accent-light){% endif %};">
+                        {% if alert.direction == 'above' %}↑{% else %}↓{% endif %}
+                    </div>
+                    <div class="activity-meta">
+                        <div class="activity-title">{{ alert.instrument.symbol }}
+                            <span class="text-muted" style="font-weight:400;font-size:0.78rem;">· {{ alert.instrument.kind }}</span>
+                        </div>
+                        <div class="activity-sub">
+                            {% if alert.direction == 'above' %}Sell{% else %}Buy{% endif %} @ ${{ alert.target_price|floatformat:2 }}
+                            {% if alert.invest_amount %} · ${{ alert.invest_amount|floatformat:2 }} spend{% endif %}
                         </div>
                     </div>
                 </div>
-                <!-- P&L Ranking -->
-                <div class="col-lg-7">
-                    <h6 class="text-muted text-uppercase small fw-bold mb-3">P&L Ranking</h6>
-                    <table class="pnl-table" id="pnl-ranking-table">
-                        <thead>
-                            <tr>
-                                <th class="text-center">#</th>
-                                <th>Asset</th>
-                                <th class="text-end">Value</th>
-                                <th class="text-end pnl-sortable" data-sort="pnl">P&L <span class="sort-indicator"></span></th>
-                                <th class="text-end pnl-sortable" data-sort="pnlPct">P&L % <span class="sort-indicator"></span></th>
-                            </tr>
-                        </thead>
-                        <tbody id="pnl-ranking-body">
-                            <tr><td colspan="5" class="text-muted" style="font-size:0.85rem;">Waiting for live prices...</td></tr>
-                        </tbody>
-                    </table>
+                {% endfor %}
+                {% else %}
+                <div class="text-center py-4">
+                    <p class="text-muted mb-0" style="font-size:0.85rem;">No active alerts.</p>
                 </div>
+                {% endif %}
             </div>
         </div>
     </div>
 </div>
-
-<!-- Active Alerts -->
-{% if active_alerts %}
-<div class="card shadow-sm mb-4">
-    <div class="card-header d-flex align-items-center" role="button"
-         id="alertsHeader" style="cursor: pointer;">
-        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16" style="margin-right:6px;">
-            <path d="M8 16a2 2 0 0 0 2-2H6a2 2 0 0 0 2 2m.995-14.901a1 1 0 1 0-1.99 0A5 5 0 0 0 3 6c0 1.098-.5 6-2 7h14c-1.5-1-2-5.902-2-7 0-2.42-1.72-4.44-4.005-4.901"/>
-        </svg>
-        <h5 class="mb-0 me-2">Price Alerts</h5>
-        <span class="badge" style="background:rgba(79,70,229,0.15);color:var(--accent-light);font-size:0.72rem;font-weight:600;margin-right:auto;">
-            {{ active_alerts|length }}
-        </span>
-        <svg id="alertsChevron" xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="currentColor"
-             class="text-muted" viewBox="0 0 16 16" style="transition: transform 0.3s; transform: rotate(180deg);">
-            <path fill-rule="evenodd" d="M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z"/>
-        </svg>
-    </div>
-    <div class="collapse show" id="alertsBody">
-        <div class="card-body p-0">
-            <table class="table price-table mb-0">
-                <thead>
-                    <tr>
-                        <th style="padding-left:1.25rem;">Asset</th>
-                        <th class="text-end">Target</th>
-                        <th class="text-end">Direction</th>
-                        <th class="text-end" title="Dollar amount to spend when a buy alert triggers">Spend</th>
-                        <th class="text-end" style="padding-right:1.25rem;">Status</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for alert in active_alerts %}
-                    <tr>
-                        <td style="padding-left:1.25rem;">
-                            <a href="{% if alert.stock_id %}/stocks/{{ alert.symbol }}/{% else %}/crypto/{{ alert.symbol }}/{% endif %}"
-                               style="text-decoration:none;color:var(--text-primary);font-weight:600;">
-                                {{ alert.asset_name }}
-                                <span style="color:var(--text-muted);font-weight:400;font-size:0.8rem;">({{ alert.symbol }})</span>
-                            </a>
-                        </td>
-                        <td class="text-end price-cell">${{ alert.target_price|floatformat:2 }}</td>
-                        <td class="text-end">
-                            <span class="badge {% if alert.direction == 'above' %}bg-success{% else %}bg-primary{% endif %}" style="font-size:0.7rem;">
-                                {% if alert.direction == 'above' %}Above{% else %}Below{% endif %}
-                            </span>
-                        </td>
-                        <td class="text-end price-cell" style="color:#818cf8;">
-                            {% if alert.invest_amount %}${{ alert.invest_amount|floatformat:2 }}{% else %}<span class="text-muted">—</span>{% endif %}
-                        </td>
-                        <td class="text-end" style="padding-right:1.25rem;">
-                            {% if alert.email_sent %}
-                            <span class="badge" style="background:rgba(251,191,36,0.15);color:#fbbf24;font-size:0.7rem;">Triggered</span>
-                            {% else %}
-                            <span class="badge" style="background:rgba(52,211,153,0.15);color:#34d399;font-size:0.7rem;">Active</span>
-                            {% endif %}
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-    </div>
-</div>
-{% endif %}
-
-{% include "includes/donut_chart.html" %}
-
 {% endblock %}
 
 {% block extra_js %}
 <script>
+(function() {
     const currentPrices = {};
     const holdings = {{ holdings_json|safe }};
-    const allocData = {{ allocation_json|safe }};
     const costBases = {{ cost_bases_json|safe }};
     const wealthEl = document.getElementById("total-wealth");
-    const pnlBody = document.getElementById("pnl-ranking-body");
     const heroPnlEl = document.getElementById("hero-pnl");
     const heroPnlPctEl = document.getElementById("hero-pnl-pct");
     const heroPnlWrap = document.getElementById("hero-pnl-wrap");
-
-    /* Allocation chart */
-    var updateAllocationChart = drawDonutChart("dashAllocationChart", allocData, {
-        centerLabel: "Total",
-        prefix: "$",
-        legendId: "dashAllocationLegend",
-    });
-
-    /* Collapse chevrons — manual (no data-bs-toggle so we control it) */
-    (function() {
-        [["overviewChevron", "overviewBody", "overviewHeader"],
-         ["alertsChevron", "alertsBody", "alertsHeader"]].forEach(function(t) {
-            var ch = document.getElementById(t[0]);
-            var co = document.getElementById(t[1]);
-            var hd = document.getElementById(t[2]);
-            if (ch && co && hd) {
-                var bsc = new bootstrap.Collapse(co, { toggle: false });
-                hd.addEventListener("click", function() { bsc.toggle(); });
-                co.addEventListener("show.bs.collapse", function(){ ch.style.transform = "rotate(180deg)"; });
-                co.addEventListener("hide.bs.collapse", function(){ ch.style.transform = "rotate(0deg)"; });
-            }
-        });
-    })();
 
     function fmtDollar(v) {
         return v.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     }
 
-    var pnlSort = { key: "pnlPct", dir: "desc" };
-
-    function updatePnlRanking() {
-        var rows = [];
-        var totalValue = 0, totalCost = 0;
-        var stockValue = 0, cryptoValue = 0;
-
-        for (var i = 0; i < allocData.length; i++) {
-            var item = allocData[i];
-            var sym = item.symbol;
-            var amt = holdings[sym] || 0;
-            var price = currentPrices[sym];
-            if (price === undefined || amt <= 0) continue;
-            var value = amt * price;
-            var cb = costBases[sym] || 0;
-            var pnl = value - cb;
-            var pnlPct = cb > 0 ? (pnl / cb) * 100 : 0;
-            totalValue += value;
-            totalCost += cb;
-            if (item.type === "stock") stockValue += value;
-            else if (item.type === "crypto") cryptoValue += value;
-            rows.push({ label: item.label, symbol: sym, type: item.type, value: value, pnl: pnl, pnlPct: pnlPct });
+    function recompute() {
+        let totalValue = 0, totalCost = 0;
+        for (const [symbol, amount] of Object.entries(holdings)) {
+            if (amount <= 0) continue;
+            const price = currentPrices[symbol];
+            if (price === undefined) continue;
+            totalValue += amount * price;
+            totalCost += costBases[symbol] || 0;
         }
-
-        /* Stock vs crypto breakdown */
-        var breakdownEl = document.getElementById("type-breakdown");
         if (totalValue > 0) {
-            var stockPct = (stockValue / totalValue) * 100;
-            var cryptoPct = (cryptoValue / totalValue) * 100;
-            document.getElementById("stock-pct").textContent = stockPct.toFixed(1) + "%";
-            document.getElementById("crypto-pct").textContent = cryptoPct.toFixed(1) + "%";
-            breakdownEl.style.display = "";
+            wealthEl.classList.remove("loading");
+            wealthEl.textContent = "$" + fmtDollar(totalValue);
         }
-        rows.sort(function(a, b) {
-            var diff = a[pnlSort.key] - b[pnlSort.key];
-            return pnlSort.dir === "desc" ? -diff : diff;
-        });
-
-        /* Overall P&L in hero */
         if (totalCost > 0) {
-            var totalPnl = totalValue - totalCost;
-            var totalPnlPct = (totalPnl / totalCost) * 100;
-            var isUp = totalPnl >= 0;
-            heroPnlEl.textContent = (isUp ? "+$" : "-$") + fmtDollar(Math.abs(totalPnl));
-            heroPnlEl.style.color = isUp ? "#34d399" : "#f87171";
-            heroPnlPctEl.textContent = "(" + (isUp ? "+" : "") + totalPnlPct.toFixed(2) + "%)";
-            heroPnlPctEl.style.color = isUp ? "#34d399" : "#f87171";
+            const pnl = totalValue - totalCost;
+            const pct = (pnl / totalCost) * 100;
+            const up = pnl >= 0;
+            heroPnlEl.textContent = (up ? "+$" : "-$") + fmtDollar(Math.abs(pnl));
+            heroPnlEl.style.color = up ? "var(--color-success)" : "var(--color-danger)";
+            heroPnlPctEl.textContent = "(" + (up ? "+" : "") + pct.toFixed(2) + "%)";
+            heroPnlPctEl.style.color = up ? "var(--color-success)" : "var(--color-danger)";
             heroPnlWrap.style.display = "";
         }
-
-        if (rows.length === 0) {
-            pnlBody.innerHTML = '<tr><td colspan="5" class="text-muted" style="font-size:0.85rem;">No holdings with live prices</td></tr>';
-            return;
-        }
-        var html = "";
-        for (var j = 0; j < rows.length; j++) {
-            var r = rows[j];
-            var isProfit = r.pnl >= 0;
-            var pnlColor = isProfit ? "#34d399" : "#f87171";
-            var pnlSign = isProfit ? "+$" : "-$";
-            var pctSign = r.pnlPct >= 0 ? "+" : "";
-            var badgeClass = r.type === "crypto" ? "crypto" : "stock";
-            html += '<tr>'
-                + '<td class="pnl-rank">' + (j + 1) + '</td>'
-                + '<td class="pnl-asset"><span class="type-badge ' + badgeClass + '">' + r.symbol + '</span>' + r.label + '</td>'
-                + '<td class="pnl-value">$' + fmtDollar(r.value) + '</td>'
-                + '<td class="pnl-pnl" style="color:' + pnlColor + ';">' + pnlSign + fmtDollar(Math.abs(r.pnl)) + '</td>'
-                + '<td class="pnl-pct" style="color:' + pnlColor + ';">' + pctSign + r.pnlPct.toFixed(2) + '%</td>'
-                + '</tr>';
-        }
-        pnlBody.innerHTML = html;
-        updateSortIndicators();
     }
 
-    function updateSortIndicators() {
-        var headers = document.querySelectorAll("#pnl-ranking-table th.pnl-sortable");
-        headers.forEach(function(th) {
-            var key = th.getAttribute("data-sort");
-            var ind = th.querySelector(".sort-indicator");
-            if (key === pnlSort.key) {
-                th.classList.add("sort-active");
-                ind.textContent = pnlSort.dir === "desc" ? "▼" : "▲";
-            } else {
-                th.classList.remove("sort-active");
-                ind.textContent = "▼";
-            }
-        });
-    }
+    /* Portfolio history chart */
+    (function() {
+        const history = {{ history_json|safe }};
+        if (!history || history.length < 2) return;
 
-    document.querySelectorAll("#pnl-ranking-table th.pnl-sortable").forEach(function(th) {
-        th.addEventListener("click", function() {
-            var key = th.getAttribute("data-sort");
-            if (pnlSort.key === key) {
-                pnlSort.dir = pnlSort.dir === "desc" ? "asc" : "desc";
-            } else {
-                pnlSort.key = key;
-                pnlSort.dir = "desc";
-            }
-            updatePnlRanking();
-        });
-    });
-    updateSortIndicators();
+        const card = document.getElementById("historyCard");
+        const canvas = document.getElementById("historyChart");
+        if (!card || !canvas) return;
+        card.style.display = "";
 
-    function updateWealth() {
-        let total = 0;
-        let hasPrice = false;
-        for (const [symbol, amount] of Object.entries(holdings)) {
-            if (currentPrices[symbol] !== undefined) {
-                total += amount * currentPrices[symbol];
-                hasPrice = true;
+        function draw() {
+            const ctx = canvas.getContext("2d");
+            const dpr = window.devicePixelRatio || 1;
+            const w = canvas.clientWidth;
+            const h = canvas.clientHeight;
+            canvas.width = w * dpr;
+            canvas.height = h * dpr;
+            ctx.scale(dpr, dpr);
+            ctx.clearRect(0, 0, w, h);
+
+            const padL = 56, padR = 16, padT = 12, padB = 28;
+            const innerW = w - padL - padR;
+            const innerH = h - padT - padB;
+
+            const allValues = history.flatMap(p => [p.est_worth, p.net_invested]);
+            const minV = 0;
+            const maxV = Math.max.apply(null, allValues) * 1.05 || 1;
+            const stepX = innerW / Math.max(history.length - 1, 1);
+
+            // Y grid
+            ctx.strokeStyle = "rgba(255,255,255,0.05)";
+            ctx.lineWidth = 1;
+            ctx.font = "10px system-ui";
+            ctx.fillStyle = "#64748b";
+            for (let i = 0; i <= 4; i++) {
+                const y = padT + (innerH * i) / 4;
+                const v = maxV - ((maxV - minV) * i) / 4;
+                ctx.beginPath();
+                ctx.moveTo(padL, y);
+                ctx.lineTo(padL + innerW, y);
+                ctx.stroke();
+                ctx.fillText("$" + Math.round(v).toLocaleString(), 6, y + 3);
             }
+            // X labels: first, middle, last
+            const labelIdx = [0, Math.floor(history.length / 2), history.length - 1];
+            labelIdx.forEach(i => {
+                const x = padL + stepX * i;
+                const d = history[i].date;
+                ctx.fillText(d, x - 28, padT + innerH + 18);
+            });
+
+            function plot(key, color, fillAlpha) {
+                ctx.beginPath();
+                history.forEach((p, i) => {
+                    const x = padL + stepX * i;
+                    const y = padT + innerH * (1 - (p[key] - minV) / (maxV - minV));
+                    if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+                });
+                if (fillAlpha) {
+                    const lastX = padL + stepX * (history.length - 1);
+                    ctx.lineTo(lastX, padT + innerH);
+                    ctx.lineTo(padL, padT + innerH);
+                    ctx.closePath();
+                    ctx.fillStyle = color + fillAlpha;
+                    ctx.fill();
+                }
+                ctx.beginPath();
+                history.forEach((p, i) => {
+                    const x = padL + stepX * i;
+                    const y = padT + innerH * (1 - (p[key] - minV) / (maxV - minV));
+                    if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+                });
+                ctx.strokeStyle = color;
+                ctx.lineWidth = 2;
+                ctx.stroke();
+            }
+            plot("est_worth", "#818cf8", "33");
+            plot("net_invested", "#fbbf24", "");
         }
-        if (hasPrice) {
-            wealthEl.classList.remove("loading");
-            wealthEl.textContent = "$" + fmtDollar(total);
-            updatePnlRanking();
-        }
-
-        /* Update allocation chart with live prices */
-        var updated = allocData.map(function(item) {
-            var p = currentPrices[item.symbol];
-            var amt = holdings[item.symbol] || 0;
-            return {
-                label: item.label,
-                symbol: item.symbol,
-                value: (p !== undefined && amt > 0) ? amt * p : item.value,
-                color: item.color,
-            };
-        });
-        if (updateAllocationChart) updateAllocationChart(updated);
-    }
+        draw();
+        window.addEventListener("resize", draw);
+    })();
 
     const ws = new WebSocket(
         (location.protocol === "https:" ? "wss://" : "ws://") + location.host + "/ws/prices/"
@@ -515,8 +397,9 @@
             for (const [symbol, price] of Object.entries(data.prices)) {
                 currentPrices[symbol] = parseFloat(price);
             }
-            updateWealth();
+            recompute();
         }
     };
+})();
 </script>
 {% endblock %}
