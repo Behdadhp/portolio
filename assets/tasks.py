@@ -9,7 +9,7 @@ from celery import shared_task
 from django.conf import settings
 from django.core.cache import cache
 
-from .services import execute_due_savings_plans, sync_alert_cache
+from .services import execute_due_savings_plans, run_price_snapshot_catchup, sync_alert_cache
 
 logger = logging.getLogger(__name__)
 
@@ -191,6 +191,25 @@ def _savings_plan_loop():
         time.sleep(SAVINGS_PLAN_CHECK_INTERVAL)
 
 
+SNAPSHOT_CATCHUP_INTERVAL = 3600  # 1 hour; idempotent + cheap when no gap
+
+
+def _snapshot_catchup_loop():
+    """Background thread that fills missing daily price snapshots.
+
+    Runs hourly. The first run after the machine boots will catch up any
+    days the PC was off (best-effort backfill from Finnhub for stocks /
+    CoinGecko for crypto). Subsequent runs are no-ops once today is
+    snapshotted, until the date rolls over.
+    """
+    while True:
+        try:
+            run_price_snapshot_catchup()
+        except Exception as e:
+            logger.warning("Price snapshot catchup error: %s", e)
+        time.sleep(SNAPSHOT_CATCHUP_INTERVAL)
+
+
 def _send_alert_email(alert, current_price):
     """Send price alert email to the user. Runs in a thread to avoid blocking price ticks."""
     try:
@@ -348,6 +367,15 @@ def stream_prices():
         logger.warning("Initial savings plan run failed: %s", e)
     savings_plan_thread = threading.Thread(target=_savings_plan_loop, daemon=True)
     savings_plan_thread.start()
+
+    # Daily-price snapshot catchup. Runs once at boot to fill any gap that
+    # accumulated while the machine was off, then hourly thereafter.
+    try:
+        run_price_snapshot_catchup()
+    except Exception as e:
+        logger.warning("Initial snapshot catchup failed: %s", e)
+    snapshot_thread = threading.Thread(target=_snapshot_catchup_loop, daemon=True)
+    snapshot_thread.start()
 
     # Clear any stale flag
     cache.delete(SYMBOLS_CHANGED_KEY)

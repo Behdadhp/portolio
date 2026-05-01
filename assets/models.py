@@ -160,6 +160,43 @@ class ETFSavingsPlan(models.Model):
         return f"{self.instrument.symbol} {sign}{self.amount} {self.interval} ({self.user.email})"
 
 
+class PriceSnapshot(models.Model):
+    """
+    Daily close-price snapshot per instrument. Written by a catchup task
+    that runs whenever the app is alive and fills any missing days,
+    optionally backfilled from Finnhub/CoinGecko historical APIs.
+
+    `source` records where the price came from so we know which rows are
+    authoritative (API close) vs best-effort (live cache snapshot).
+    """
+
+    class Source(models.TextChoices):
+        CACHE = "cache", "Live cache"
+        FINNHUB = "finnhub", "Finnhub candle"
+        COINGECKO = "coingecko", "CoinGecko market chart"
+        MANUAL = "manual", "Manual / ETF last_price"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    instrument = models.ForeignKey(
+        Instrument, on_delete=models.CASCADE, related_name="snapshots"
+    )
+    date = models.DateField()
+    price = models.DecimalField(max_digits=18, decimal_places=8)
+    source = models.CharField(max_length=12, choices=Source.choices, default=Source.CACHE)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["instrument", "date"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["instrument", "date"], name="snapshot_unique_instrument_date"
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.instrument.symbol} @ {self.date}: ${self.price}"
+
+
 class WatchlistEntry(models.Model):
     """Per-user watchlist — track instruments without holding them."""
 

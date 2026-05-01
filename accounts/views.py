@@ -147,7 +147,8 @@ def dashboard_view(request):
         {
             "holdings_json": json.dumps(holdings),
             "cost_bases_json": json.dumps(cost_bases),
-            "history_json": json.dumps(history),
+            "history_json": json.dumps(history["points"]),
+            "history_fallback_days": history["fallback_days"],
             "active_alerts": active_alerts,
             "recent_activity": recent_activity,
             "cash_summary": cash_summary,

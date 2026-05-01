@@ -2,6 +2,21 @@
 
 {% block title %}Watchlist — Folio{% endblock %}
 
+{% block extra_css %}
+<style>
+    @keyframes flash-green {
+        0%, 40% { background-color: rgba(52, 211, 153, 0.12); }
+        100%    { background-color: transparent; }
+    }
+    @keyframes flash-red {
+        0%, 40% { background-color: rgba(248, 113, 113, 0.12); }
+        100%    { background-color: transparent; }
+    }
+    .price-up   { animation: flash-green 2s ease-out; }
+    .price-down { animation: flash-red 2s ease-out; }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="page-header">
     <div>
@@ -40,7 +55,9 @@
                     </td>
                     <td><span class="text-muted" style="font-size:0.78rem;text-transform:uppercase;letter-spacing:0.5px;">{{ e.instrument.kind }}</span></td>
                     <td class="text-end" style="font-family:'SF Mono','Fira Code',monospace;font-size:0.9rem;">
-                        {% if row.live_price != None %}${{ row.live_price|floatformat:2 }}{% else %}<span class="text-muted">—</span>{% endif %}
+                        <span id="watchlist-price-{{ e.instrument.symbol }}" data-symbol="{{ e.instrument.symbol }}">
+                            {% if row.live_price != None %}${{ row.live_price|floatformat:2 }}{% else %}<span class="text-muted">—</span>{% endif %}
+                        </span>
                     </td>
                     <td class="text-muted" style="font-size:0.85rem;">{{ e.added_at|date:"Y-m-d" }}</td>
                     <td class="text-end" style="padding-right:1.25rem;">
@@ -85,6 +102,32 @@
             } catch (e) { /* ignore */ }
         });
     });
+
+    /* Live price stream — same channel the dashboard/market use. */
+    const prevPrices = {};
+    const ws = new WebSocket(
+        (location.protocol === "https:" ? "wss://" : "ws://") + location.host + "/ws/prices/"
+    );
+    ws.onmessage = function(event) {
+        const data = JSON.parse(event.data);
+        if (!data.prices) return;
+        for (const [symbol, price] of Object.entries(data.prices)) {
+            const cell = document.getElementById("watchlist-price-" + symbol);
+            if (!cell) continue;
+            const newPrice = parseFloat(price);
+            const oldPrice = prevPrices[symbol];
+            cell.textContent = "$" + newPrice.toLocaleString("en-US", {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+            });
+            if (oldPrice !== undefined && newPrice !== oldPrice) {
+                cell.classList.remove("price-up", "price-down");
+                void cell.offsetWidth;
+                cell.classList.add(newPrice > oldPrice ? "price-up" : "price-down");
+            }
+            prevPrices[symbol] = newPrice;
+        }
+    };
 })();
 </script>
 {% endblock %}

@@ -5,7 +5,9 @@ from .models import (
     ETFSavingsPlan,
     Instrument,
     PriceAlert,
+    PriceSnapshot,
     Transaction,
+    WatchlistEntry,
 )
 
 
@@ -62,3 +64,21 @@ class PriceAlertAdmin(admin.ModelAdmin):
     list_filter = ("direction", "email_sent")
     search_fields = ("user__email", "instrument__symbol", "instrument__name")
     readonly_fields = ("created_at",)
+
+
+@admin.register(PriceSnapshot)
+class PriceSnapshotAdmin(admin.ModelAdmin):
+    list_display = ("instrument", "date", "price", "source", "created_at")
+    list_filter = ("source", "instrument__kind", "date")
+    search_fields = ("instrument__symbol", "instrument__name")
+    date_hierarchy = "date"
+    readonly_fields = ("created_at",)
+    ordering = ("-date", "instrument__symbol")
+
+
+@admin.register(WatchlistEntry)
+class WatchlistEntryAdmin(admin.ModelAdmin):
+    list_display = ("user", "instrument", "added_at")
+    list_filter = ("instrument__kind",)
+    search_fields = ("user__email", "instrument__symbol", "instrument__name")
+    readonly_fields = ("added_at",)

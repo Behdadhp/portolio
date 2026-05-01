@@ -172,11 +172,28 @@
 <div class="card shadow-sm mb-4" id="historyCard" style="display:none;">
     <div class="card-header d-flex align-items-center justify-content-between">
         <h5 class="mb-0">Portfolio Over Time</h5>
-        <small class="text-muted">Estimated · last known prices</small>
+        <small class="text-muted">
+            {% if history_fallback_days == 0 %}
+                Daily snapshots
+            {% else %}
+                {{ history_fallback_days }} day{{ history_fallback_days|pluralize }} estimated · backfill in progress
+            {% endif %}
+        </small>
     </div>
     <div class="card-body">
         <div class="history-chart-wrap">
             <canvas id="historyChart"></canvas>
+            <div class="history-tooltip" id="historyTooltip">
+                <div class="tt-date" id="ttDate"></div>
+                <div class="tt-row">
+                    <span class="tt-label"><span class="tt-swatch" style="background:#818cf8;"></span>Worth</span>
+                    <span id="ttWorth">—</span>
+                </div>
+                <div class="tt-row">
+                    <span class="tt-label"><span class="tt-swatch" style="background:#fbbf24;"></span>Invested</span>
+                    <span id="ttInvested">—</span>
+                </div>
+            </div>
         </div>
         <div class="history-legend">
             <span><span class="swatch" style="background:var(--accent-light);"></span>Estimated worth</span>
@@ -312,27 +329,51 @@
 
         const card = document.getElementById("historyCard");
         const canvas = document.getElementById("historyChart");
+        const tooltip = document.getElementById("historyTooltip");
+        const ttDate = document.getElementById("ttDate");
+        const ttWorth = document.getElementById("ttWorth");
+        const ttInvested = document.getElementById("ttInvested");
         if (!card || !canvas) return;
         card.style.display = "";
 
-        function draw() {
-            const ctx = canvas.getContext("2d");
-            const dpr = window.devicePixelRatio || 1;
+        let layout = null; // {padL, padT, innerW, innerH, stepX, minV, maxV, w, h}
+
+        function fmt(v) {
+            return "$" + v.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        }
+
+        function computeLayout() {
             const w = canvas.clientWidth;
             const h = canvas.clientHeight;
-            canvas.width = w * dpr;
-            canvas.height = h * dpr;
-            ctx.scale(dpr, dpr);
-            ctx.clearRect(0, 0, w, h);
-
             const padL = 56, padR = 16, padT = 12, padB = 28;
             const innerW = w - padL - padR;
             const innerH = h - padT - padB;
-
             const allValues = history.flatMap(p => [p.est_worth, p.net_invested]);
             const minV = 0;
             const maxV = Math.max.apply(null, allValues) * 1.05 || 1;
             const stepX = innerW / Math.max(history.length - 1, 1);
+            return { w, h, padL, padT, padR, padB, innerW, innerH, stepX, minV, maxV };
+        }
+
+        function pointXY(p, idx, L) {
+            const x = L.padL + L.stepX * idx;
+            return {
+                x,
+                yWorth: L.padT + L.innerH * (1 - (p.est_worth - L.minV) / (L.maxV - L.minV)),
+                yInvested: L.padT + L.innerH * (1 - (p.net_invested - L.minV) / (L.maxV - L.minV)),
+            };
+        }
+
+        function draw(hoverIdx) {
+            const ctx = canvas.getContext("2d");
+            const dpr = window.devicePixelRatio || 1;
+            const L = computeLayout();
+            layout = L;
+
+            canvas.width = L.w * dpr;
+            canvas.height = L.h * dpr;
+            ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+            ctx.clearRect(0, 0, L.w, L.h);
 
             // Y grid
             ctx.strokeStyle = "rgba(255,255,255,0.05)";
@@ -340,41 +381,40 @@
             ctx.font = "10px system-ui";
             ctx.fillStyle = "#64748b";
             for (let i = 0; i <= 4; i++) {
-                const y = padT + (innerH * i) / 4;
-                const v = maxV - ((maxV - minV) * i) / 4;
+                const y = L.padT + (L.innerH * i) / 4;
+                const v = L.maxV - ((L.maxV - L.minV) * i) / 4;
                 ctx.beginPath();
-                ctx.moveTo(padL, y);
-                ctx.lineTo(padL + innerW, y);
+                ctx.moveTo(L.padL, y);
+                ctx.lineTo(L.padL + L.innerW, y);
                 ctx.stroke();
                 ctx.fillText("$" + Math.round(v).toLocaleString(), 6, y + 3);
             }
             // X labels: first, middle, last
             const labelIdx = [0, Math.floor(history.length / 2), history.length - 1];
             labelIdx.forEach(i => {
-                const x = padL + stepX * i;
-                const d = history[i].date;
-                ctx.fillText(d, x - 28, padT + innerH + 18);
+                const x = L.padL + L.stepX * i;
+                ctx.fillText(history[i].date, x - 28, L.padT + L.innerH + 18);
             });
 
             function plot(key, color, fillAlpha) {
                 ctx.beginPath();
                 history.forEach((p, i) => {
-                    const x = padL + stepX * i;
-                    const y = padT + innerH * (1 - (p[key] - minV) / (maxV - minV));
+                    const x = L.padL + L.stepX * i;
+                    const y = L.padT + L.innerH * (1 - (p[key] - L.minV) / (L.maxV - L.minV));
                     if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
                 });
                 if (fillAlpha) {
-                    const lastX = padL + stepX * (history.length - 1);
-                    ctx.lineTo(lastX, padT + innerH);
-                    ctx.lineTo(padL, padT + innerH);
+                    const lastX = L.padL + L.stepX * (history.length - 1);
+                    ctx.lineTo(lastX, L.padT + L.innerH);
+                    ctx.lineTo(L.padL, L.padT + L.innerH);
                     ctx.closePath();
                     ctx.fillStyle = color + fillAlpha;
                     ctx.fill();
                 }
                 ctx.beginPath();
                 history.forEach((p, i) => {
-                    const x = padL + stepX * i;
-                    const y = padT + innerH * (1 - (p[key] - minV) / (maxV - minV));
+                    const x = L.padL + L.stepX * i;
+                    const y = L.padT + L.innerH * (1 - (p[key] - L.minV) / (L.maxV - L.minV));
                     if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
                 });
                 ctx.strokeStyle = color;
@@ -383,9 +423,87 @@
             }
             plot("est_worth", "#818cf8", "33");
             plot("net_invested", "#fbbf24", "");
+
+            if (hoverIdx != null && hoverIdx >= 0 && hoverIdx < history.length) {
+                const p = pointXY(history[hoverIdx], hoverIdx, L);
+                // Vertical crosshair
+                ctx.strokeStyle = "rgba(255,255,255,0.2)";
+                ctx.lineWidth = 1;
+                ctx.setLineDash([3, 3]);
+                ctx.beginPath();
+                ctx.moveTo(p.x, L.padT);
+                ctx.lineTo(p.x, L.padT + L.innerH);
+                ctx.stroke();
+                ctx.setLineDash([]);
+                // Markers on each line
+                [{ y: p.yWorth, c: "#818cf8" }, { y: p.yInvested, c: "#fbbf24" }].forEach(m => {
+                    ctx.beginPath();
+                    ctx.arc(p.x, m.y, 4, 0, Math.PI * 2);
+                    ctx.fillStyle = m.c;
+                    ctx.fill();
+                    ctx.strokeStyle = "#0b1220";
+                    ctx.lineWidth = 2;
+                    ctx.stroke();
+                });
+            }
         }
-        draw();
-        window.addEventListener("resize", draw);
+
+        function nearestIndex(mouseX) {
+            if (!layout) return null;
+            const rel = mouseX - layout.padL;
+            const idx = Math.round(rel / layout.stepX);
+            if (idx < 0 || idx >= history.length) return null;
+            return idx;
+        }
+
+        function showTooltip(idx) {
+            if (idx == null || !layout) {
+                tooltip.classList.remove("visible");
+                return;
+            }
+            const p = history[idx];
+            const xy = pointXY(p, idx, layout);
+            ttDate.textContent = p.date;
+            ttWorth.textContent = fmt(p.est_worth);
+            ttInvested.textContent = fmt(p.net_invested);
+            tooltip.classList.add("visible");
+
+            // Position: anchor below+right of the point, flip if near edges
+            const ttW = tooltip.offsetWidth || 160;
+            const ttH = tooltip.offsetHeight || 70;
+            let left = xy.x + 12;
+            let top = Math.min(xy.yWorth, xy.yInvested) - ttH - 12;
+            if (left + ttW > layout.w - 4) left = xy.x - ttW - 12;
+            if (top < 4) top = Math.max(xy.yWorth, xy.yInvested) + 12;
+            tooltip.style.left = left + "px";
+            tooltip.style.top = top + "px";
+        }
+
+        let lastIdx = null;
+        canvas.addEventListener("mousemove", (e) => {
+            const rect = canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const idx = nearestIndex(x);
+            if (idx === lastIdx) return;
+            lastIdx = idx;
+            draw(idx);
+            showTooltip(idx);
+        });
+        canvas.addEventListener("mouseleave", () => {
+            lastIdx = null;
+            draw(null);
+            showTooltip(null);
+        });
+        canvas.addEventListener("touchstart", (e) => {
+            const rect = canvas.getBoundingClientRect();
+            const x = e.touches[0].clientX - rect.left;
+            const idx = nearestIndex(x);
+            draw(idx);
+            showTooltip(idx);
+        });
+
+        draw(null);
+        window.addEventListener("resize", () => draw(lastIdx));
     })();
 
     const ws = new WebSocket(

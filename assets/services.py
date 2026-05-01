@@ -676,24 +676,263 @@ def sync_alert_cache():
     cache.set("price_alerts_active", alert_data, timeout=None)
 
 
-def get_portfolio_history(user):
+def snapshot_today_from_cache(instrument):
     """
-    Approximate portfolio worth and net invested over time.
-
-    Walks the user's CashFlow + Transaction events in chronological order.
-    For each event date we compute:
-      - net_invested: cumulative deposits − withdrawals
-      - est_worth: sum over instruments of (holdings × most-recent-known-price)
-
-    "Most recent known price" is the latest transaction price for that
-    instrument up to the event date — a rough approximation, but it's the
-    only historical price signal we have without an external time-series.
-    The final point is "today" using current cache prices, so the chart
-    converges on the live portfolio value.
+    Persist today's price for an instrument from the live cache, if today
+    isn't already snapshotted. Returns the PriceSnapshot or None.
     """
     from datetime import date as dt_date
+    from decimal import Decimal
 
-    from .models import CashFlow, Transaction
+    from .models import PriceSnapshot
+
+    today = dt_date.today()
+    if PriceSnapshot.objects.filter(instrument=instrument, date=today).exists():
+        return None
+
+    if instrument.kind == "etf":
+        # ETFs use last_price (which is the cache mirror anyway).
+        if instrument.last_price is None:
+            return None
+        price = instrument.last_price
+        source = PriceSnapshot.Source.MANUAL
+    else:
+        live = cache.get(f"finnhub_{instrument.symbol}")
+        if live is None:
+            return None
+        price = Decimal(str(live))
+        source = PriceSnapshot.Source.CACHE
+
+    return PriceSnapshot.objects.create(
+        instrument=instrument,
+        date=today,
+        price=price,
+        source=source,
+    )
+
+
+def _coingecko_id_for(symbol):
+    """Best-effort symbol → CoinGecko coin id lookup, with cache."""
+    cache_key = f"cg_id_{symbol.upper()}"
+    cached = cache.get(cache_key)
+    if cached:
+        return cached
+    try:
+        resp = requests.get(
+            settings.COINGECKO_MARKETS_URL,
+            params={"vs_currency": "usd", "symbols": symbol.lower(), "per_page": 5, "page": 1},
+            timeout=10,
+        )
+        resp.raise_for_status()
+        for coin in resp.json():
+            if (coin.get("symbol") or "").upper() == symbol.upper():
+                cache.set(cache_key, coin["id"], timeout=24 * 3600)
+                return coin["id"]
+    except Exception as e:
+        logger.warning("CoinGecko id lookup failed for %s: %s", symbol, e)
+    return None
+
+
+def backfill_finnhub_stock_candles(instrument, days=365):
+    """
+    Pull daily OHLC from Finnhub for a stock instrument and write
+    PriceSnapshot rows. Returns count written.
+
+    Finnhub free tier may reject /stock/candle; we log and skip on 4xx.
+    """
+    import time
+    from datetime import date as dt_date, timedelta
+    from decimal import Decimal
+
+    from .models import PriceSnapshot
+
+    api_key = settings.FINNHUB_API_KEY
+    if not api_key:
+        return 0
+
+    end = dt_date.today()
+    start = end - timedelta(days=days)
+    try:
+        resp = requests.get(
+            f"{settings.FINNHUB_REST_URL}/stock/candle",
+            params={
+                "symbol": instrument.finnhub_symbol or instrument.symbol,
+                "resolution": "D",
+                "from": int(time.mktime(start.timetuple())),
+                "to": int(time.mktime(end.timetuple())),
+                "token": api_key,
+            },
+            timeout=20,
+        )
+        if resp.status_code == 403 or resp.status_code == 401:
+            logger.warning(
+                "Finnhub /stock/candle denied for %s (likely free-tier limitation)",
+                instrument.symbol,
+            )
+            return 0
+        resp.raise_for_status()
+        data = resp.json()
+    except Exception as e:
+        logger.warning("Finnhub candle fetch failed for %s: %s", instrument.symbol, e)
+        return 0
+
+    if data.get("s") != "ok":
+        return 0
+
+    closes = data.get("c", [])
+    timestamps = data.get("t", [])
+    if len(closes) != len(timestamps):
+        return 0
+
+    written = 0
+    for ts, close in zip(timestamps, closes):
+        d = dt_date.fromtimestamp(ts)
+        try:
+            _, created = PriceSnapshot.objects.update_or_create(
+                instrument=instrument,
+                date=d,
+                defaults={
+                    "price": Decimal(str(close)),
+                    "source": PriceSnapshot.Source.FINNHUB,
+                },
+            )
+            if created:
+                written += 1
+        except Exception as e:
+            logger.warning("Snapshot write failed for %s @ %s: %s", instrument.symbol, d, e)
+    return written
+
+
+def backfill_coingecko_crypto(instrument, days=365):
+    """
+    Pull daily prices from CoinGecko for a crypto instrument. Returns count
+    written. Free tier supports up to 365 days.
+    """
+    from datetime import date as dt_date, datetime, timezone as dt_tz
+    from decimal import Decimal
+
+    from .models import PriceSnapshot
+
+    coin_id = _coingecko_id_for(instrument.symbol)
+    if not coin_id:
+        return 0
+
+    try:
+        resp = requests.get(
+            f"https://api.coingecko.com/api/v3/coins/{coin_id}/market_chart",
+            params={"vs_currency": "usd", "days": min(days, 365), "interval": "daily"},
+            timeout=20,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+    except Exception as e:
+        logger.warning("CoinGecko chart fetch failed for %s: %s", instrument.symbol, e)
+        return 0
+
+    written = 0
+    seen_dates = set()
+    for ts_ms, price in data.get("prices", []):
+        d = datetime.fromtimestamp(ts_ms / 1000, tz=dt_tz.utc).date()
+        if d in seen_dates:
+            continue
+        seen_dates.add(d)
+        try:
+            _, created = PriceSnapshot.objects.update_or_create(
+                instrument=instrument,
+                date=d,
+                defaults={
+                    "price": Decimal(str(price)),
+                    "source": PriceSnapshot.Source.COINGECKO,
+                },
+            )
+            if created:
+                written += 1
+        except Exception as e:
+            logger.warning("Snapshot write failed for %s @ %s: %s", instrument.symbol, d, e)
+    return written
+
+
+def run_price_snapshot_catchup(backfill_days=30, throttle_seconds=6):
+    """
+    Idempotent catchup task. For every instrument, ensure today is
+    snapshotted. If recent days are missing (PC was off), try to backfill
+    from the appropriate API.
+
+    `throttle_seconds` controls the pause between API calls so we don't
+    trip CoinGecko's free-tier rate limit (~10-30 req/min).
+
+    Called periodically from the Celery price-stream worker so a missed
+    midnight gets caught up the next time the machine is alive.
+    """
+    import time
+    from datetime import date as dt_date, timedelta
+
+    from .models import Instrument, PriceSnapshot
+
+    today = dt_date.today()
+    written = 0
+    api_calls = 0  # how many backfill API requests we've issued
+
+    for inst in Instrument.objects.all():
+        # 1. Today's snapshot from cache (no network).
+        snap = snapshot_today_from_cache(inst)
+        if snap:
+            written += 1
+
+        # 2. Backfill any historical gap. Skip ETFs (no API source).
+        if inst.kind == "etf":
+            continue
+
+        latest = (
+            PriceSnapshot.objects.filter(instrument=inst, date__lt=today)
+            .order_by("-date")
+            .first()
+        )
+        oldest_needed = today - timedelta(days=backfill_days)
+        gap_start = (latest.date + timedelta(days=1)) if latest else oldest_needed
+        if gap_start > today - timedelta(days=1):
+            continue
+
+        gap_days = (today - gap_start).days
+        if gap_days <= 0:
+            continue
+
+        if api_calls > 0:
+            time.sleep(throttle_seconds)
+
+        if inst.kind == "stock":
+            written += backfill_finnhub_stock_candles(inst, days=min(gap_days + 5, 365))
+        elif inst.kind == "crypto":
+            written += backfill_coingecko_crypto(inst, days=min(gap_days + 5, 365))
+        api_calls += 1
+
+    if written:
+        logger.info("Price snapshot catchup wrote %d rows", written)
+    return written
+
+
+def get_portfolio_history(user):
+    """
+    Portfolio worth and net invested over time, at daily resolution.
+
+    Returns ``{"points": [...], "fallback_days": int}`` so the caller
+    knows how many days had to fall back to last-transaction-price (i.e.
+    weren't covered by a PriceSnapshot for at least one held instrument).
+    When ``fallback_days == 0`` the chart is fully DB-backed.
+
+    Strategy:
+      - Walk every day from the first event to today (inclusive).
+      - On each day, advance holdings + net-invested as cash flows and
+        transactions occur.
+      - For each held instrument with positive quantity, look up the
+        day's PriceSnapshot; fall back to the most recent known price
+        for that instrument (transactions or earlier snapshots) if
+        missing. A day is counted as "fallback" if any held symbol on
+        that day had no snapshot for that exact date.
+    """
+    from datetime import date as dt_date, timedelta
+
+    from .models import CashFlow, PriceSnapshot, Transaction
 
     cash_flows = list(CashFlow.objects.filter(user=user).order_by("date", "created_at"))
     txs = list(
@@ -702,18 +941,37 @@ def get_portfolio_history(user):
         .order_by("date", "created_at", "pk")
     )
     if not cash_flows and not txs:
-        return []
+        return {"points": [], "fallback_days": 0}
 
-    event_dates = sorted({c.date for c in cash_flows} | {t.date for t in txs})
+    first_event = min(
+        ([c.date for c in cash_flows] or [dt_date.today()])
+        + ([t.date for t in txs] or [dt_date.today()])
+    )
+    today = dt_date.today()
+
+    # Pre-fetch all snapshots for the period, indexed by (symbol, date).
+    held_symbols = {t.instrument.symbol for t in txs}
+    snapshot_map = {}
+    if held_symbols:
+        snaps = PriceSnapshot.objects.filter(
+            instrument__symbol__in=held_symbols,
+            date__gte=first_event,
+            date__lte=today,
+        ).values_list("instrument__symbol", "date", "price")
+        for sym, d, p in snaps:
+            snapshot_map[(sym, d)] = float(p)
 
     cumulative_cash = 0.0
     holdings = {}
-    last_price = {}
+    last_price = {}  # rolling fallback per symbol
     cash_idx = 0
     tx_idx = 0
     points = []
+    fallback_days = 0
 
-    for d in event_dates:
+    d = first_event
+    while d <= today:
+        # Apply events landing on or before this date.
         while cash_idx < len(cash_flows) and cash_flows[cash_idx].date <= d:
             c = cash_flows[cash_idx]
             cumulative_cash += float(c.amount_usd) * (
@@ -729,33 +987,64 @@ def get_portfolio_history(user):
             )
             last_price[sym] = float(t.price)
             tx_idx += 1
-        est = sum(
-            qty * last_price[sym]
-            for sym, qty in holdings.items()
-            if qty > 0 and sym in last_price
-        )
+
+        # Roll any snapshots into last_price so subsequent gaps still
+        # benefit from the most recent known price.
+        for sym in list(holdings.keys()):
+            snap = snapshot_map.get((sym, d))
+            if snap is not None:
+                last_price[sym] = snap
+
+        # Compute estimated worth + flag fallback usage on this day.
+        est = 0.0
+        used_fallback_today = False
+        for sym, qty in holdings.items():
+            if qty <= 0:
+                continue
+            snap = snapshot_map.get((sym, d))
+            if snap is not None:
+                est += qty * snap
+            else:
+                price = last_price.get(sym)
+                if price is None:
+                    continue
+                est += qty * price
+                used_fallback_today = True
+
+        if used_fallback_today:
+            fallback_days += 1
+
         points.append({
             "date": d.isoformat(),
             "net_invested": round(cumulative_cash, 2),
             "est_worth": round(est, 2),
         })
 
-    # Today's snapshot using current cached prices.
-    today = dt_date.today()
-    if not points or points[-1]["date"] != today.isoformat():
-        est_now = 0.0
-        for sym, qty in holdings.items():
-            if qty <= 0:
-                continue
-            p = cache.get(f"finnhub_{sym}") or last_price.get(sym, 0)
-            est_now += qty * float(p)
-        points.append({
-            "date": today.isoformat(),
-            "net_invested": round(cumulative_cash, 2),
-            "est_worth": round(est_now, 2),
-        })
+        d += timedelta(days=1)
 
-    return points
+    # Today: if no snapshot landed yet, use the live cache as the
+    # closest-to-realtime value.
+    if points and points[-1]["date"] == today.isoformat():
+        snap_today_full = all(
+            snapshot_map.get((sym, today)) is not None
+            for sym, qty in holdings.items()
+            if qty > 0
+        )
+        if not snap_today_full:
+            est_now = 0.0
+            for sym, qty in holdings.items():
+                if qty <= 0:
+                    continue
+                p = (
+                    snapshot_map.get((sym, today))
+                    or cache.get(f"finnhub_{sym}")
+                    or last_price.get(sym)
+                    or 0
+                )
+                est_now += qty * float(p)
+            points[-1]["est_worth"] = round(est_now, 2)
+
+    return {"points": points, "fallback_days": fallback_days}
 
 
 def lookup_instrument(kind, symbol):

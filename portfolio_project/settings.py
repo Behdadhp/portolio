@@ -85,13 +85,31 @@ ASGI_APPLICATION = "portfolio_project.asgi.application"
 
 # Database
 # https://docs.djangoproject.com/en/6.0/ref/settings/#databases
+#
+# Driven by env vars. Defaults to local Postgres so dev and prod share an
+# engine. To run against SQLite (e.g. ephemeral CI sandbox) set
+# `DB_ENGINE=sqlite`.
 
-DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.sqlite3",
-        "NAME": BASE_DIR / "db.sqlite3",
+DB_ENGINE = os.getenv("DB_ENGINE", "postgresql").lower()
+if DB_ENGINE in ("postgres", "postgresql"):
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.postgresql",
+            "NAME": os.getenv("DB_NAME", "folio"),
+            "USER": os.getenv("DB_USER", "folio"),
+            "PASSWORD": os.getenv("DB_PASSWORD", "folio_dev"),
+            "HOST": os.getenv("DB_HOST", "localhost"),
+            "PORT": os.getenv("DB_PORT", "5432"),
+            "CONN_MAX_AGE": int(os.getenv("DB_CONN_MAX_AGE", "60")),
+        }
     }
-}
+else:
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.sqlite3",
+            "NAME": BASE_DIR / "db.sqlite3",
+        }
+    }
 
 
 # Password validation
