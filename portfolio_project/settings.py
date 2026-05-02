@@ -30,8 +30,23 @@ SECRET_KEY = os.getenv("SECRET_KEY")
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.getenv("DEBUG", "False").lower() in ("true", "1", "yes")
 
-ALLOWED_HOSTS = [
+# Always-permitted hosts (loopback + Tailscale MagicDNS suffix). Extra
+# entries can be appended via the ALLOWED_HOSTS env var (comma-separated)
+# — e.g. your specific Tailscale 100.x.y.z IP.
+ALLOWED_HOSTS = ["localhost", "127.0.0.1", ".ts.net"] + [
     h.strip() for h in os.getenv("ALLOWED_HOSTS", "").split(",") if h.strip()
+]
+
+# CSRF requires the full origin (scheme://host[:port]). Include Tailscale's
+# MagicDNS subdomain wildcard for both http and https. Add additional
+# origins via the CSRF_TRUSTED_ORIGINS env var (comma-separated).
+CSRF_TRUSTED_ORIGINS = [
+    "http://*.ts.net",
+    "https://*.ts.net",
+    "http://localhost:8000",
+    "http://127.0.0.1:8000",
+] + [
+    o.strip() for o in os.getenv("CSRF_TRUSTED_ORIGINS", "").split(",") if o.strip()
 ]
 
 
@@ -97,7 +112,7 @@ if DB_ENGINE in ("postgres", "postgresql"):
             "ENGINE": "django.db.backends.postgresql",
             "NAME": os.getenv("DB_NAME", "folio"),
             "USER": os.getenv("DB_USER", "folio"),
-            "PASSWORD": os.getenv("DB_PASSWORD", "folio_dev"),
+            "PASSWORD": os.getenv("DB_PASSWORD", ""),
             "HOST": os.getenv("DB_HOST", "localhost"),
             "PORT": os.getenv("DB_PORT", "5432"),
             "CONN_MAX_AGE": int(os.getenv("DB_CONN_MAX_AGE", "60")),

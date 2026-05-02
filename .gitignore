@@ -191,6 +191,7 @@ items_*/
 *.json
 
 setup.sh
+start-tailscale.sh
 dump.rdb
 
 # Local Claude context handoff (not for shared repo)
