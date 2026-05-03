@@ -242,7 +242,10 @@ def _compute_freibetrag_tax(user, kind, current_symbol, key_prefix):
     current_year = date.today().year
 
     qs = Transaction.objects.filter(user=user, instrument__kind=kind)
-    instrument_ids = qs.values_list("instrument_id", flat=True).distinct()
+    # Strip default ordering before DISTINCT — Transaction.Meta.ordering leaks
+    # into the SELECT and yields duplicate instrument_ids, double-counting
+    # gains for any user who has more than one transaction per instrument.
+    instrument_ids = qs.order_by().values_list("instrument_id", flat=True).distinct()
 
     total_gains = 0.0
     total_losses = 0.0
@@ -350,7 +353,8 @@ def compute_crypto_tax(user, current_symbol=None):
     today = date.today()
 
     qs = Transaction.objects.filter(user=user, instrument__kind="crypto")
-    instrument_ids = qs.values_list("instrument_id", flat=True).distinct()
+    # See _compute_freibetrag_tax for why .order_by() is needed before .distinct().
+    instrument_ids = qs.order_by().values_list("instrument_id", flat=True).distinct()
 
     total_short_term_gains = 0.0
     total_short_term_losses = 0.0

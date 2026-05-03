@@ -1,0 +1,322 @@
+{% extends "base.html" %}
+
+{% block title %}Tax Report — {{ report.period_label }} — Folio{% endblock %}
+
+{% block extra_css %}
+<style>
+    .rep-header {
+        display: flex; align-items: center; justify-content: space-between;
+        gap: 1rem; flex-wrap: wrap; margin-bottom: 1.25rem;
+    }
+    .rep-header h3 { margin: 0; }
+    .rep-header .rep-period {
+        color: var(--text-muted); font-size: 0.85rem;
+        font-family: 'SF Mono','Fira Code',monospace;
+    }
+    .rep-section { margin-top: 1.5rem; }
+    .rep-section h5 {
+        color: var(--accent-light); font-size: 1rem; font-weight: 700;
+        text-transform: uppercase; letter-spacing: 0.5px;
+        margin-bottom: 0.75rem;
+    }
+    .rep-summary-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+        gap: 0.65rem;
+    }
+    .rep-summary-grid .stat {
+        background: rgba(255,255,255,0.02);
+        border: 1px solid var(--border-color);
+        border-radius: 10px;
+        padding: 0.65rem 0.85rem;
+    }
+    .rep-summary-grid .stat .lbl {
+        color: var(--text-muted); font-size: 0.7rem; font-weight: 600;
+        text-transform: uppercase; letter-spacing: 0.4px;
+    }
+    .rep-summary-grid .stat .val {
+        font-family: 'SF Mono','Fira Code',monospace;
+        font-weight: 700; font-size: 1rem; margin-top: 2px;
+    }
+    .rep-table { font-size: 0.82rem; }
+    .rep-table th {
+        font-weight: 700; color: var(--text-muted); font-size: 0.72rem;
+        text-transform: uppercase; letter-spacing: 0.5px;
+        border-bottom-color: var(--border-color);
+    }
+    .rep-table td {
+        font-family: 'SF Mono','Fira Code',monospace;
+        border-bottom-color: var(--border-color);
+        padding-top: 6px; padding-bottom: 6px;
+    }
+    .rep-table td.col-name {
+        font-family: system-ui, sans-serif;
+        color: var(--text-secondary);
+    }
+    .rep-table .pos { color: var(--color-success); }
+    .rep-table .neg { color: var(--color-danger); }
+    .rep-table .badge { font-family: system-ui, sans-serif; }
+    .rep-empty {
+        background: rgba(255,255,255,0.02);
+        border: 1px dashed var(--border-color);
+        border-radius: 10px;
+        padding: 1.25rem;
+        text-align: center;
+        color: var(--text-muted);
+        font-size: 0.85rem;
+    }
+    .rep-class-totals {
+        margin-top: 0.75rem;
+        background: rgba(79,70,229,0.06);
+        border: 1px solid rgba(79,70,229,0.15);
+        border-radius: 10px;
+        padding: 0.65rem 0.9rem;
+        display: flex; gap: 1.5rem; flex-wrap: wrap;
+        font-size: 0.83rem;
+    }
+    .rep-class-totals span strong { color: var(--text-primary); }
+    .freibetrag-bar {
+        height: 8px; background: var(--border-color);
+        border-radius: 4px; overflow: hidden; margin-top: 6px;
+    }
+    .freibetrag-bar .fill {
+        height: 100%;
+        background: linear-gradient(90deg, #34d399, #06b6d4);
+        transition: width 0.5s;
+    }
+    .freibetrag-bar .fill.over {
+        background: linear-gradient(90deg, #f87171, #fb923c);
+    }
+    .rep-notes {
+        background: rgba(251,191,36,0.05);
+        border: 1px solid rgba(251,191,36,0.15);
+        border-radius: 10px;
+        padding: 1rem 1.25rem;
+        font-size: 0.82rem;
+        color: var(--text-secondary);
+        line-height: 1.55;
+    }
+    .rep-notes p { margin-bottom: 0.6rem; }
+    .rep-notes p:last-child { margin-bottom: 0; }
+    .rep-notes strong { color: var(--text-primary); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="rep-header">
+    <div>
+        <h3>Capital-Gains Tax Report</h3>
+        <div class="rep-period">{{ report.period_label }} · generated {{ report.generated_at|date:"Y-m-d H:i" }}</div>
+    </div>
+    <div class="d-flex gap-2">
+        <a href="{% url 'reports' %}" class="btn btn-ghost btn-sm">← Back</a>
+        <a href="{% url 'report_tax' %}?{{ download_qs }}" class="btn btn-accent btn-sm">
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16" style="margin-right:6px;vertical-align:-1px;">
+                <path d="M8.5 6.5a.5.5 0 0 0-1 0v3.793L5.354 8.146a.5.5 0 1 0-.708.708l3 3a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293z"/>
+                <path d="M2 9.5A1.5 1.5 0 0 1 3.5 8h9A1.5 1.5 0 0 1 14 9.5v3a1.5 1.5 0 0 1-1.5 1.5h-9A1.5 1.5 0 0 1 2 12.5z"/>
+            </svg>
+            Download PDF
+        </a>
+    </div>
+</div>
+
+<div class="card shadow-sm mb-4">
+    <div class="card-body p-4">
+        <div class="row g-3 align-items-center mb-3">
+            <div class="col-md-4">
+                <div style="font-size:0.7rem;color:var(--text-muted);font-weight:600;text-transform:uppercase;">Account</div>
+                <div style="font-weight:700;">{{ report.user.first_name }} {{ report.user.last_name }}</div>
+                <div style="color:var(--text-muted);font-size:0.78rem;">{{ report.user.email }}</div>
+            </div>
+            <div class="col-md-4">
+                <div style="font-size:0.7rem;color:var(--text-muted);font-weight:600;text-transform:uppercase;">Period</div>
+                <div style="font-family:'SF Mono','Fira Code',monospace;font-weight:700;">{{ report.start_date }} → {{ report.end_date }}</div>
+            </div>
+            <div class="col-md-4">
+                <div style="font-size:0.7rem;color:var(--text-muted);font-weight:600;text-transform:uppercase;">EUR/USD rate</div>
+                <div style="font-family:'SF Mono','Fira Code',monospace;font-weight:700;">{{ report.eur_usd_rate }}</div>
+            </div>
+        </div>
+
+        <!-- Summary -->
+        <div class="rep-section">
+            <h5>Summary</h5>
+            <div class="rep-summary-grid">
+                <div class="stat">
+                    <div class="lbl">Stocks net</div>
+                    <div class="val {% if report.stocks.net >= 0 %}pos{% else %}neg{% endif %}">${{ report.stocks.net|floatformat:2 }}</div>
+                </div>
+                <div class="stat">
+                    <div class="lbl">ETFs net</div>
+                    <div class="val {% if report.etfs.net >= 0 %}pos{% else %}neg{% endif %}">${{ report.etfs.net|floatformat:2 }}</div>
+                </div>
+                <div class="stat">
+                    <div class="lbl">Capital-gains net (S+E)</div>
+                    <div class="val {% if report.capital_gains_net >= 0 %}pos{% else %}neg{% endif %}">${{ report.capital_gains_net|floatformat:2 }}</div>
+                </div>
+                <div class="stat">
+                    <div class="lbl">Crypto short-term net</div>
+                    <div class="val {% if report.crypto.short_term_net >= 0 %}pos{% else %}neg{% endif %}">${{ report.crypto.short_term_net|floatformat:2 }}</div>
+                </div>
+                <div class="stat">
+                    <div class="lbl">Crypto long-term gains</div>
+                    <div class="val pos">${{ report.crypto.long_term_gains|floatformat:2 }}</div>
+                </div>
+                {% if report.is_full_year %}
+                <div class="stat">
+                    <div class="lbl">Freibetrag (allowance)</div>
+                    <div class="val">${{ report.freibetrag|floatformat:2 }}</div>
+                </div>
+                <div class="stat">
+                    <div class="lbl">Freibetrag used</div>
+                    <div class="val" style="color:#fbbf24;">${{ report.freibetrag_used|floatformat:2 }}</div>
+                </div>
+                <div class="stat">
+                    <div class="lbl">Taxable capital gains</div>
+                    <div class="val">${{ report.taxable_capital|floatformat:2 }}</div>
+                </div>
+                <div class="stat">
+                    <div class="lbl">Estimated tax @ {{ report.tax_rate_pct }}%</div>
+                    <div class="val neg">${{ report.estimated_tax|floatformat:2 }}</div>
+                </div>
+                <div class="stat">
+                    <div class="lbl">Net after tax</div>
+                    <div class="val {% if report.net_after_tax >= 0 %}pos{% else %}neg{% endif %}">${{ report.net_after_tax|floatformat:2 }}</div>
+                </div>
+                {% endif %}
+            </div>
+
+            {% if report.is_full_year %}
+            <div class="mt-3">
+                <div class="d-flex justify-content-between" style="font-size:0.78rem;color:var(--text-muted);">
+                    <span>Freibetrag usage</span>
+                    <span>${{ report.freibetrag_used|floatformat:2 }} / ${{ report.freibetrag|floatformat:2 }}</span>
+                </div>
+                <div class="freibetrag-bar">
+                    <div class="fill {% if report.capital_gains_net >= report.freibetrag %}over{% endif %}"
+                         style="width: {% if report.capital_gains_net >= report.freibetrag %}100{% else %}{% widthratio report.freibetrag_used report.freibetrag 100 %}{% endif %}%;"></div>
+                </div>
+            </div>
+
+            <div class="mt-3" style="font-size:0.85rem;">
+                <strong>Crypto Freigrenze status:</strong>
+                {% if report.crypto_exceeds_freigrenze %}
+                <span class="text-danger">Freigrenze EXCEEDED — entire short-term net (${{ report.crypto_taxable_short_term|floatformat:2 }}) is taxable at your personal income-tax rate.</span>
+                {% else %}
+                <span class="text-success">Within €1,000 limit — short-term gains are tax-free.</span>
+                {% endif %}
+            </div>
+            {% else %}
+            <div class="alert alert-info mt-3 mb-0" style="font-size:0.85rem;">
+                Custom range — Freibetrag and tax-owed estimates only apply to full calendar years.
+                Use a quick-year preset on the Reports page for a full tax computation.
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Stocks -->
+        <div class="rep-section">
+            <h5>Stocks — Realized events</h5>
+            {% if report.stocks.events %}
+            {% include "assets/_report_freibetrag_table.html" with events=report.stocks.events %}
+            <div class="rep-class-totals">
+                <span><strong>Gains:</strong> <span class="text-success">${{ report.stocks.gains|floatformat:2 }}</span></span>
+                <span><strong>Losses:</strong> <span class="text-danger">${{ report.stocks.losses|floatformat:2 }}</span></span>
+                <span><strong>Net:</strong> <span class="{% if report.stocks.net >= 0 %}text-success{% else %}text-danger{% endif %}">${{ report.stocks.net|floatformat:2 }}</span></span>
+                <span><strong>Sells:</strong> {{ report.stocks.count }}</span>
+            </div>
+            {% else %}
+            <div class="rep-empty">No stock sells recorded in this period.</div>
+            {% endif %}
+        </div>
+
+        <!-- ETFs -->
+        <div class="rep-section">
+            <h5>ETFs — Realized events</h5>
+            {% if report.etfs.events %}
+            {% include "assets/_report_freibetrag_table.html" with events=report.etfs.events %}
+            <div class="rep-class-totals">
+                <span><strong>Gains:</strong> <span class="text-success">${{ report.etfs.gains|floatformat:2 }}</span></span>
+                <span><strong>Losses:</strong> <span class="text-danger">${{ report.etfs.losses|floatformat:2 }}</span></span>
+                <span><strong>Net:</strong> <span class="{% if report.etfs.net >= 0 %}text-success{% else %}text-danger{% endif %}">${{ report.etfs.net|floatformat:2 }}</span></span>
+                <span><strong>Sells:</strong> {{ report.etfs.count }}</span>
+            </div>
+            {% else %}
+            <div class="rep-empty">No ETF sells recorded in this period.</div>
+            {% endif %}
+        </div>
+
+        <!-- Crypto -->
+        <div class="rep-section">
+            <h5>Crypto — FIFO-matched lot events</h5>
+            {% if report.crypto.events %}
+            <div class="table-responsive">
+                <table class="table rep-table mb-0">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Symbol</th>
+                            <th class="text-end">Amount</th>
+                            <th class="text-end">Sell ($)</th>
+                            <th class="text-end">Lot ($)</th>
+                            <th class="text-end">Held</th>
+                            <th>Type</th>
+                            <th class="text-end">Proceeds</th>
+                            <th class="text-end">P&amp;L</th>
+                            <th class="text-end">ST running</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for e in report.crypto.events %}
+                        <tr>
+                            <td>{{ e.date|date:"Y-m-d" }}</td>
+                            <td>{{ e.symbol }}</td>
+                            <td class="text-end">{{ e.amount|floatformat:8 }}</td>
+                            <td class="text-end">${{ e.sell_price|floatformat:2 }}</td>
+                            <td class="text-end">${{ e.lot_price|floatformat:2 }}</td>
+                            <td class="text-end">{{ e.holding_days }}d</td>
+                            <td>
+                                {% if e.is_long_term %}
+                                <span class="badge bg-success" style="font-size:0.7rem;">Long</span>
+                                {% else %}
+                                <span class="badge" style="background:rgba(251,191,36,0.15);color:#fbbf24;font-size:0.7rem;">Short</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-end">${{ e.proceeds|floatformat:2 }}</td>
+                            <td class="text-end {% if e.pnl >= 0 %}pos{% else %}neg{% endif %}">
+                                {% if e.pnl >= 0 %}+{% endif %}${{ e.pnl|floatformat:2 }}
+                            </td>
+                            <td class="text-end {% if e.short_term_running >= 0 %}pos{% else %}neg{% endif %}">
+                                {% if e.short_term_running >= 0 %}+{% endif %}${{ e.short_term_running|floatformat:2 }}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            <div class="rep-class-totals">
+                <span><strong>Short-term gains:</strong> <span class="text-success">${{ report.crypto.short_term_gains|floatformat:2 }}</span></span>
+                <span><strong>Short-term losses:</strong> <span class="text-danger">${{ report.crypto.short_term_losses|floatformat:2 }}</span></span>
+                <span><strong>Short-term net:</strong> <span class="{% if report.crypto.short_term_net >= 0 %}text-success{% else %}text-danger{% endif %}">${{ report.crypto.short_term_net|floatformat:2 }}</span></span>
+                <span><strong>Long-term gains (tax-free):</strong> <span class="text-success">${{ report.crypto.long_term_gains|floatformat:2 }}</span></span>
+                <span><strong>Lot events:</strong> {{ report.crypto.count }}</span>
+            </div>
+            {% else %}
+            <div class="rep-empty">No crypto sells recorded in this period.</div>
+            {% endif %}
+        </div>
+
+        <!-- Notes -->
+        <div class="rep-section">
+            <h5>German tax notes</h5>
+            <div class="rep-notes">
+                <p><strong>Sparer-Pauschbetrag (Freibetrag).</strong> Annual tax-free allowance on capital gains: €1,000 single, €2,000 joint. Applied to combined Net of stocks and ETFs. Remainder taxed at 25% Kapitalertragsteuer + 5.5% Soli = 26.375%. Church tax not included.</p>
+                <p><strong>ETF Teilfreistellung.</strong> This estimate does NOT apply the partial-exemption (typically 30% for equity ETFs / 15% for mixed). Your real tax is usually lower than what's shown here.</p>
+                <p><strong>Crypto (§23 EStG).</strong> Lots held longer than 365 days are 100% tax-free regardless of size. Lots sold inside 365 days fall under the €1,000 Freigrenze: at or under the limit it's tax-free; once you cross it, the ENTIRE short-term net is taxable at your personal income-tax rate.</p>
+                <p><strong>Loss-offset rules.</strong> Stock losses offset stock gains; ETF losses offset ETF gains; crypto short-term losses offset crypto short-term gains. Cross-class offsetting is generally not allowed.</p>
+                <p><strong>Estimate only.</strong> Always cross-check with your Steuerberater or your broker's annual Steuerbescheinigung before filing.</p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,37 @@
+{# Reusable per-event table for stocks and ETFs (weighted-average cost basis). #}
+<div class="table-responsive">
+    <table class="table rep-table mb-0">
+        <thead>
+            <tr>
+                <th>Date</th>
+                <th>Symbol</th>
+                <th class="text-end">Amount</th>
+                <th class="text-end">Sell ($)</th>
+                <th class="text-end">Avg cost ($)</th>
+                <th class="text-end">Fee</th>
+                <th class="text-end">Proceeds</th>
+                <th class="text-end">P&amp;L</th>
+                <th class="text-end">Running</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for e in events %}
+            <tr>
+                <td>{{ e.date|date:"Y-m-d" }}</td>
+                <td>{{ e.symbol }}</td>
+                <td class="text-end">{{ e.amount|floatformat:6 }}</td>
+                <td class="text-end">${{ e.sell_price|floatformat:2 }}</td>
+                <td class="text-end">${{ e.avg_cost|floatformat:2 }}</td>
+                <td class="text-end">${{ e.fee|floatformat:2 }}</td>
+                <td class="text-end">${{ e.proceeds|floatformat:2 }}</td>
+                <td class="text-end {% if e.pnl >= 0 %}pos{% else %}neg{% endif %}">
+                    {% if e.pnl >= 0 %}+{% endif %}${{ e.pnl|floatformat:2 }}
+                </td>
+                <td class="text-end {% if e.running_total >= 0 %}pos{% else %}neg{% endif %}">
+                    {% if e.running_total >= 0 %}+{% endif %}${{ e.running_total|floatformat:2 }}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>

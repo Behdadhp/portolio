@@ -68,6 +68,11 @@ urlpatterns = [
     path("cash/edit/<uuid:pk>/", views.cash_edit_view, name="cash_edit"),
     path("cash/delete/<uuid:pk>/", views.cash_delete_view, name="cash_delete"),
 
+    # Reports (tax + analytics, HTML preview + PDF download)
+    path("reports/", views.reports_index_view, name="reports"),
+    path("reports/tax/", views.tax_report_view, name="report_tax"),
+    path("reports/analytics/", views.analytics_report_view, name="report_analytics"),
+
     # Price Alert API
     path("api/alerts/create/", views.alert_create, name="alert_create"),
     path("api/alerts/<uuid:pk>/delete/", views.alert_delete, name="alert_delete"),

@@ -409,3 +409,134 @@ class CryptoDetailViewTest(TestDataMixin, TestCase):
     def test_invalid_symbol_returns_404(self):
         response = self.client.get(reverse("crypto_detail", args=["FAKE"]))
         self.assertEqual(response.status_code, 404)
+
+
+# ── Reports (tax + analytics) ──────────────────────────────────────────
+
+
+class ReportsTest(TestDataMixin, TestCase):
+    """End-to-end smoke tests covering the report builders, HTML preview
+    pages, and PDF download endpoints. Asserts that the math survives both
+    the Freibetrag (stocks/ETFs) and FIFO (crypto) walks, that a custom
+    date range is honoured, and that PDFs come back with the expected
+    Content-Type."""
+
+    def setUp(self):
+        super().setUp()
+        # Stock: buy 10 @ $100 in 2024, sell 5 @ $150 in 2025-03 (in window)
+        Transaction.objects.create(
+            user=self.user, instrument=self.stock,
+            price=Decimal("100.00"), amount=Decimal("10"),
+            date=date(2024, 6, 1), status="bought",
+        )
+        Transaction.objects.create(
+            user=self.user, instrument=self.stock,
+            price=Decimal("150.00"), amount=Decimal("5"),
+            date=date(2025, 3, 1), status="sold",
+            fee=Decimal("5.00"),
+        )
+        # Crypto: buy 1 BTC @ $20k in 2023, sell 0.5 @ $40k in 2025-04
+        # (>365d held = long-term, tax-free).
+        Transaction.objects.create(
+            user=self.user, instrument=self.crypto,
+            price=Decimal("20000.00"), amount=Decimal("1"),
+            date=date(2023, 1, 15), status="bought",
+        )
+        Transaction.objects.create(
+            user=self.user, instrument=self.crypto,
+            price=Decimal("40000.00"), amount=Decimal("0.5"),
+            date=date(2025, 4, 1), status="sold",
+        )
+
+    def test_build_tax_report_year(self):
+        from .reports import build_tax_report
+        report = build_tax_report(self.user, year=2025)
+        # Stocks: 5 units sold at $150, avg cost $100, fee $5 → P&L = 245
+        self.assertEqual(len(report["stocks"]["events"]), 1)
+        self.assertAlmostEqual(report["stocks"]["events"][0]["pnl"], 245.0, places=2)
+        # Crypto: held > 365d, classified long-term → 0 short-term net,
+        # 10000 long-term gain.
+        self.assertEqual(len(report["crypto"]["events"]), 1)
+        self.assertTrue(report["crypto"]["events"][0]["is_long_term"])
+        self.assertAlmostEqual(report["crypto"]["short_term_net"], 0.0, places=2)
+        self.assertAlmostEqual(report["crypto"]["long_term_gains"], 10000.0, places=2)
+        # Full-year flag → tax fields populated.
+        self.assertTrue(report["is_full_year"])
+        self.assertIsNotNone(report["estimated_tax"])
+
+    def test_build_tax_report_custom_range(self):
+        from .reports import build_tax_report
+        # Range that excludes the crypto sell (April) but includes the stock sell.
+        report = build_tax_report(
+            self.user, start=date(2025, 1, 1), end=date(2025, 3, 31),
+        )
+        self.assertEqual(len(report["stocks"]["events"]), 1)
+        self.assertEqual(len(report["crypto"]["events"]), 0)
+        self.assertFalse(report["is_full_year"])
+        # Custom range → no tax-owed estimate.
+        self.assertIsNone(report["estimated_tax"])
+
+    def test_build_analytics_report(self):
+        from .reports import build_analytics_report
+        report = build_analytics_report(self.user)
+        # 2 distinct symbols (AAPL + BTC).
+        symbols = {r["symbol"] for r in report["rows"]}
+        self.assertEqual(symbols, {"AAPL", "BTC"})
+        # Per-kind summary buckets exist.
+        for kind in ("stock", "etf", "crypto"):
+            self.assertIn(kind, report["summary"])
+
+    def test_reports_index_page_loads(self):
+        response = self.client.get(reverse("reports"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Tax Report")
+        self.assertContains(response, "Analytics Report")
+        # Quick-year buttons include the current and last year.
+        from datetime import date as _d
+        self.assertContains(response, str(_d.today().year))
+
+    def test_tax_report_preview_html(self):
+        response = self.client.get(reverse("report_tax") + "?year=2025")
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "AAPL")
+        self.assertContains(response, "BTC")
+        # Long-term lot is rendered.
+        self.assertContains(response, "Long")
+
+    def test_tax_report_pdf_download(self):
+        response = self.client.get(reverse("report_tax") + "?year=2025&format=pdf")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["Content-Type"], "application/pdf")
+        self.assertIn("folio-tax-report-2025.pdf", response["Content-Disposition"])
+        # PDF magic header.
+        self.assertTrue(response.content.startswith(b"%PDF"))
+
+    def test_tax_report_custom_range_pdf(self):
+        response = self.client.get(
+            reverse("report_tax")
+            + "?start=2025-01-01&end=2025-03-31&format=pdf"
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["Content-Type"], "application/pdf")
+        self.assertIn(
+            "folio-tax-report-2025-01-01-to-2025-03-31.pdf",
+            response["Content-Disposition"],
+        )
+
+    def test_tax_report_invalid_input_redirects(self):
+        # Neither year nor a complete custom range.
+        response = self.client.get(reverse("report_tax"))
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response["Location"], reverse("reports"))
+
+    def test_analytics_report_preview_html(self):
+        response = self.client.get(reverse("report_analytics"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Portfolio Analytics Report")
+        self.assertContains(response, "AAPL")
+
+    def test_analytics_report_pdf_download(self):
+        response = self.client.get(reverse("report_analytics") + "?format=pdf")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["Content-Type"], "application/pdf")
+        self.assertTrue(response.content.startswith(b"%PDF"))

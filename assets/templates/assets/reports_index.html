@@ -1,0 +1,187 @@
+{% extends "base.html" %}
+
+{% block title %}Reports — Folio{% endblock %}
+
+{% block extra_css %}
+<style>
+    .report-card {
+        height: 100%;
+    }
+    .report-icon {
+        width: 44px; height: 44px;
+        border-radius: 12px;
+        display: inline-flex; align-items: center; justify-content: center;
+        margin-bottom: 12px;
+    }
+    .report-card h4 {
+        font-weight: 700;
+        margin-bottom: 6px;
+        color: var(--text-primary);
+    }
+    .report-card p.lead {
+        color: var(--text-secondary);
+        font-size: 0.88rem;
+        margin-bottom: 18px;
+    }
+    .quick-year-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+        gap: 6px;
+        margin-bottom: 14px;
+    }
+    .quick-year-btn {
+        padding: 6px 10px;
+        border-radius: 8px;
+        background: rgba(255,255,255,0.03);
+        border: 1px solid var(--border-color);
+        color: var(--text-secondary);
+        font-weight: 700;
+        font-size: 0.85rem;
+        text-align: center;
+        text-decoration: none;
+        cursor: pointer;
+        transition: background-color 0.15s, color 0.15s, border-color 0.15s;
+    }
+    .quick-year-btn:hover {
+        background: rgba(79,70,229,0.12);
+        border-color: rgba(79,70,229,0.4);
+        color: var(--accent-light);
+    }
+    .quick-year-btn.current { color: var(--accent-light); border-color: rgba(79,70,229,0.4); }
+
+    .range-form .form-label { font-size: 0.78rem; color: var(--text-muted); font-weight: 600; }
+    .form-divider {
+        text-align: center; color: var(--text-muted);
+        font-size: 0.72rem; font-weight: 700;
+        text-transform: uppercase; letter-spacing: 1px;
+        margin: 1.25rem 0 1rem;
+        position: relative;
+    }
+    .form-divider::before, .form-divider::after {
+        content: ""; position: absolute; top: 50%;
+        width: calc(50% - 28px); height: 1px;
+        background: var(--border-color);
+    }
+    .form-divider::before { left: 0; } .form-divider::after { right: 0; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h3>Reports</h3>
+</div>
+
+<p class="text-muted mb-4" style="max-width:680px;">
+    Generate a printable PDF of your tax events for any time frame, or a snapshot
+    of your overall portfolio analytics. Tax reports follow German rules
+    (Sparer-Pauschbetrag €1,000, Kapitalertragsteuer 26.375%, crypto §23 EStG with
+    one-year holding period and €1,000 Freigrenze).
+</p>
+
+{% if messages %}
+{% for message in messages %}
+<div class="alert alert-{{ message.tags|default:'danger' }} mb-3">{{ message }}</div>
+{% endfor %}
+{% endif %}
+
+<div class="row g-4">
+
+    <!-- Tax report card -->
+    <div class="col-lg-7">
+        <div class="card shadow-sm report-card">
+            <div class="card-body p-4">
+                <div class="report-icon" style="background:rgba(251,191,36,0.12);color:#fbbf24;">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" fill="currentColor" viewBox="0 0 16 16">
+                        <path d="M14 14V4.5L9.5 0H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2M9.5 3A1.5 1.5 0 0 0 11 4.5h2V14a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1h5.5z"/>
+                        <path d="M5 11.5a.5.5 0 0 1 .5-.5h2a.5.5 0 0 1 0 1h-2a.5.5 0 0 1-.5-.5m0-2a.5.5 0 0 1 .5-.5h5a.5.5 0 0 1 0 1h-5a.5.5 0 0 1-.5-.5m0-2a.5.5 0 0 1 .5-.5h5a.5.5 0 0 1 0 1h-5a.5.5 0 0 1-.5-.5"/>
+                    </svg>
+                </div>
+                <h4>Tax Report</h4>
+                <p class="lead">
+                    Per-event ledger of every realized gain and loss in the chosen window
+                    — running Freibetrag tally, FIFO crypto matching, short-/long-term
+                    split, and an estimated capital-gains tax line for full calendar years.
+                </p>
+
+                <div class="form-divider">Quick year</div>
+                <div class="quick-year-grid">
+                    {% for y in quick_years %}
+                    <a class="quick-year-btn{% if y == today.year %} current{% endif %}"
+                       href="{% url 'report_tax' %}?year={{ y }}">
+                        {{ y }}{% if y == today.year %} <small style="opacity:0.6;font-weight:400;">(YTD)</small>{% endif %}
+                    </a>
+                    {% endfor %}
+                </div>
+
+                <div class="form-divider">or pick a custom range</div>
+
+                <form method="get" action="{% url 'report_tax' %}" class="range-form">
+                    <div class="row g-2">
+                        <div class="col-md-5">
+                            <label for="rangeStart" class="form-label">Start date</label>
+                            <input type="date" name="start" id="rangeStart" class="form-control"
+                                   max="{{ today|date:'Y-m-d' }}" required>
+                        </div>
+                        <div class="col-md-5">
+                            <label for="rangeEnd" class="form-label">End date</label>
+                            <input type="date" name="end" id="rangeEnd" class="form-control"
+                                   max="{{ today|date:'Y-m-d' }}" required>
+                        </div>
+                        <div class="col-md-2 d-flex align-items-end">
+                            <button type="submit" class="btn btn-accent w-100">Build</button>
+                        </div>
+                    </div>
+                    <div class="form-text mt-2" style="font-size:0.72rem;">
+                        Custom ranges show events &amp; totals only. Freibetrag and tax
+                        estimates apply to full calendar years.
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Analytics report card -->
+    <div class="col-lg-5">
+        <div class="card shadow-sm report-card">
+            <div class="card-body p-4">
+                <div class="report-icon" style="background:rgba(79,70,229,0.15);color:var(--accent-light);">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" fill="currentColor" viewBox="0 0 16 16">
+                        <path d="M4 11H2v3h2zm5-4H7v7h2zm5-5h-2v12h2zm-2-1a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1zM6 7a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v7a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1zm-5 4a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1z"/>
+                    </svg>
+                </div>
+                <h4>Analytics Report</h4>
+                <p class="lead">
+                    Snapshot of every owned asset right now — holdings, cost basis, current
+                    value, realized and unrealized P&amp;L — plus per-asset-class summary
+                    and overall portfolio totals.
+                </p>
+
+                <div class="d-flex flex-column gap-2 mt-3">
+                    <a href="{% url 'report_analytics' %}" class="btn btn-accent">
+                        Preview report
+                    </a>
+                    <a href="{% url 'report_analytics' %}?format=pdf" class="btn btn-ghost">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16" style="margin-right:6px;vertical-align:-1px;">
+                            <path d="M8.5 6.5a.5.5 0 0 0-1 0v3.793L5.354 8.146a.5.5 0 1 0-.708.708l3 3a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293z"/>
+                            <path d="M2 9.5A1.5 1.5 0 0 1 3.5 8h9A1.5 1.5 0 0 1 14 9.5v3a1.5 1.5 0 0 1-1.5 1.5h-9A1.5 1.5 0 0 1 2 12.5z"/>
+                        </svg>
+                        Download PDF
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function() {
+    // Sensible defaults for the custom-range form: full current year.
+    const startEl = document.getElementById("rangeStart");
+    const endEl = document.getElementById("rangeEnd");
+    if (startEl && !startEl.value) startEl.value = "{{ today.year }}-01-01";
+    if (endEl && !endEl.value) endEl.value = "{{ today|date:'Y-m-d' }}";
+})();
+</script>
+{% endblock %}

@@ -8,3 +8,4 @@ channels-redis==4.2.1
 daphne==4.1.2
 requests==2.33.1
 psycopg[binary]==3.3.3
+reportlab==4.5.0
