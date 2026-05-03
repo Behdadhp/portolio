@@ -196,3 +196,6 @@ dump.rdb
 
 # Local Claude context handoff (not for shared repo)
 PROJECT_CONTEXT.md
+
+# Local enhancement backlog / brainstorm (not for shared repo)
+FUTURE_IDEAS.md

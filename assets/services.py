@@ -12,11 +12,12 @@ logger = logging.getLogger(__name__)
 
 ALLOWED_PER_PAGE = [20, 40]
 DEFAULT_PER_PAGE = 20
-DETAIL_SORT_FIELDS = ["date", "price", "amount", "status"]
+DETAIL_SORT_FIELDS = ["date", "price", "amount", "fee", "status"]
 DETAIL_COLUMNS = [
     ("date", "Date"),
     ("price", "Price ($)"),
     ("amount", "Amount"),
+    ("fee", "Fee ($)"),
     ("status", "Status"),
 ]
 
@@ -119,8 +120,9 @@ def compute_analytics(transactions, symbol):
     """
     Compute portfolio analytics from a chronologically ordered list of transactions.
 
-    Uses weighted-average cost basis: buys increase cost basis, sells reduce
-    units but do NOT change the average (cost basis reduced proportionally).
+    Uses weighted-average cost basis: buys increase cost basis (price × amount
+    + buy fee), sells reduce units but do NOT change the average (cost basis
+    reduced proportionally). Sell fees come off the realized proceeds.
 
     Returns a dict with all analytics, or None if no holdings.
     """
@@ -134,17 +136,18 @@ def compute_analytics(transactions, symbol):
     for tx in transactions.order_by("date", "status", "pk"):
         amt = float(tx.amount)
         px = float(tx.price)
+        fee = float(tx.fee or 0)
 
         if tx.status == "bought":
-            cost_basis += amt * px
+            cost_basis += amt * px + fee
             units += amt
-            total_invested += amt * px
+            total_invested += amt * px + fee
         elif tx.status == "sold":
             if units > 0:
                 avg = cost_basis / units
                 cost_basis -= amt * avg
                 units -= amt
-            total_sold_value += amt * px
+            total_sold_value += amt * px - fee
             total_sold_units += amt
 
     if units <= 0:
@@ -262,13 +265,14 @@ def _compute_freibetrag_tax(user, kind, current_symbol, key_prefix):
                 symbol = tx.instrument.symbol
             amt = float(tx.amount)
             px = float(tx.price)
+            fee = float(tx.fee or 0)
 
             if tx.status == "bought":
-                cost_basis += amt * px
+                cost_basis += amt * px + fee
                 units += amt
             elif tx.status == "sold" and units > 0:
                 avg = cost_basis / units
-                pnl = (px - avg) * amt
+                pnl = (px - avg) * amt - fee
                 cost_basis -= amt * avg
                 units -= amt
 
@@ -369,16 +373,24 @@ def compute_crypto_tax(user, current_symbol=None):
                 symbol = tx.instrument.symbol
             amt = float(tx.amount)
             px = float(tx.price)
+            fee = float(tx.fee or 0)
 
             if tx.status == "bought":
-                lots.append({"date": tx.date, "amount": amt, "price": px})
+                # Bake buy fee into the lot's per-unit price so cost basis
+                # for FIFO remains correct without tracking fee separately.
+                effective_price = px + (fee / amt if amt > 0 else 0)
+                lots.append({"date": tx.date, "amount": amt, "price": effective_price})
             elif tx.status == "sold":
+                # Allocate the sell fee proportionally across consumed lots.
+                # `fee_per_unit` is the slice of this sell's fee borne by
+                # each unit consumed below.
+                fee_per_unit = (fee / amt) if amt > 0 else 0
                 remaining_to_sell = amt
                 while remaining_to_sell > 0 and lots:
                     lot = lots[0]
                     sell_from_lot = min(remaining_to_sell, lot["amount"])
                     holding_days = (tx.date - lot["date"]).days
-                    pnl = (px - lot["price"]) * sell_from_lot
+                    pnl = (px - lot["price"]) * sell_from_lot - fee_per_unit * sell_from_lot
 
                     if tx.date.year == current_year:
                         if holding_days <= 365:
@@ -503,14 +515,19 @@ def get_eur_usd_rate():
 
 
 def cost_basis_for(txs):
-    """Weighted-average cost basis for a queryset of buy/sell transactions."""
+    """
+    Weighted-average remaining cost basis for a queryset of buy/sell
+    transactions. Buy fees increase the basis; sell fees do not (they hit
+    realized P&L instead, not the basis of remaining units).
+    """
     cb = 0.0
     units = 0.0
     for tx in txs.order_by("date", "status", "pk"):
         amt = float(tx.amount)
         px = float(tx.price)
+        fee = float(tx.fee or 0)
         if tx.status == "bought":
-            cb += amt * px
+            cb += amt * px + fee
             units += amt
         elif tx.status == "sold" and units > 0:
             avg = cb / units

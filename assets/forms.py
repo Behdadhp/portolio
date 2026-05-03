@@ -104,13 +104,16 @@ class _TransactionFormBase(forms.ModelForm):
 
     class Meta:
         model = Transaction
-        fields = ["instrument", "price", "amount", "date", "status"]
+        fields = ["instrument", "price", "amount", "fee", "date", "status"]
         widgets = {
             "price": forms.NumberInput(
                 attrs={"class": "form-control", "step": "0.01"}
             ),
             "amount": forms.NumberInput(
                 attrs={"class": "form-control", "step": "0.00000001"}
+            ),
+            "fee": forms.NumberInput(
+                attrs={"class": "form-control", "step": "0.01", "placeholder": "0.00"}
             ),
             "date": forms.DateInput(attrs={"class": "form-control", "type": "date"}),
             "status": forms.Select(attrs={"class": "form-control"}),
@@ -120,10 +123,30 @@ class _TransactionFormBase(forms.ModelForm):
         super().__init__(*args, **kwargs)
         # Restrict the instrument dropdown to this kind, and rename the field
         # so the POST/initial keys remain `stock` / `crypto` / `etf`.
+        # Keep the widget that ModelChoiceField wired up — it carries the
+        # ModelChoiceIterator as `choices`, which is what populates the
+        # <option> tags. Replacing it would render an empty <select>.
         old_field = self.fields.pop("instrument")
         old_field.queryset = Instrument.objects.filter(kind=self.kind)
-        old_field.widget = forms.Select(attrs={"class": "form-control"})
+        old_field.widget.attrs.setdefault("class", "form-control")
         self.fields[self.instrument_field_name] = old_field
+
+        # When editing an existing Transaction, ModelForm populated
+        # `self.initial["instrument"]` from the instance — but the field was
+        # just renamed, so move the initial value across so the dropdown
+        # pre-selects the right asset.
+        if "instrument" in self.initial:
+            self.initial[self.instrument_field_name] = self.initial.pop("instrument")
+        if self.instance and self.instance.pk and self.instrument_field_name not in self.initial:
+            self.initial[self.instrument_field_name] = self.instance.instrument_id
+
+    def clean_fee(self):
+        # Fee is optional. Treat blank/None as zero so the model's NOT NULL
+        # column stays satisfied.
+        from decimal import Decimal
+
+        fee = self.cleaned_data.get("fee")
+        return fee if fee is not None else Decimal("0")
 
     def _post_clean(self):
         # Map the renamed field back onto the model's `instrument` attribute
@@ -169,11 +192,20 @@ class ETFSavingsPlanForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         # Keep the form field name as `etf` for template/POST compatibility,
-        # but restrict the queryset to ETF-kind instruments.
+        # but restrict the queryset to ETF-kind instruments. Mutate the
+        # existing widget rather than replace it so the ModelChoiceIterator
+        # that backs the <option> list is preserved.
         old_field = self.fields.pop("instrument")
         old_field.queryset = Instrument.objects.filter(kind=Instrument.Kind.ETF)
-        old_field.widget = forms.Select(attrs={"class": "form-control"})
+        old_field.widget.attrs.setdefault("class", "form-control")
         self.fields["etf"] = old_field
+
+        # Carry the instance's instrument value across to the renamed field
+        # so editing an existing plan pre-selects the correct ETF.
+        if "instrument" in self.initial:
+            self.initial["etf"] = self.initial.pop("instrument")
+        if self.instance and self.instance.pk and "etf" not in self.initial:
+            self.initial["etf"] = self.instance.instrument_id
 
     def _post_clean(self):
         data = self.cleaned_data

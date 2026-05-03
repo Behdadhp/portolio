@@ -40,14 +40,14 @@
                         <label for="id_last_price" class="form-label">Last Price</label>
                         <div class="input-group">
                             {{ form.last_price }}
-                            <button type="button" class="btn btn-outline-secondary currency-toggle" id="currencyToggle"
-                                    data-currency="USD" data-rate="{{ eur_usd_rate|default:'0' }}"
-                                    data-target="id_last_price"
+                            <button type="button" class="btn btn-outline-secondary currency-toggle"
+                                    data-target="id_last_price" data-hint="currencyHintLastPrice"
+                                    data-rate="{{ eur_usd_rate|default:'0' }}"
                                     style="min-width:54px;font-weight:700;font-size:0.85rem;">
                                 USD
                             </button>
                         </div>
-                        <div id="currencyHint" class="form-text" style="font-size:0.72rem;color:var(--text-muted);display:none;"></div>
+                        <div id="currencyHintLastPrice" class="form-text" style="font-size:0.72rem;color:var(--text-muted);display:none;"></div>
                         <div class="form-text" style="font-size:0.72rem;color:var(--text-muted);">
                             Optional. Used for savings-plan auto-purchases and analytics. Leave blank if unknown.
                         </div>

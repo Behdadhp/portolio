@@ -75,6 +75,9 @@
                     <td style="padding-left:1.25rem;">{{ tx.date }}</td>
                     <td style="font-family:'SF Mono','Fira Code',monospace;font-size:0.9rem;">${{ tx.price|floatformat:2 }}</td>
                     <td>{{ tx.amount|floatformat:6 }}</td>
+                    <td style="font-family:'SF Mono','Fira Code',monospace;font-size:0.85rem;">
+                        {% if tx.fee %}${{ tx.fee|floatformat:2 }}{% else %}<span class="text-muted">—</span>{% endif %}
+                    </td>
                     <td>
                         <span class="badge {% if tx.status == 'bought' %}bg-success{% else %}bg-danger{% endif %}">
                             {{ tx.get_status_display }}

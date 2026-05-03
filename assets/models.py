@@ -88,6 +88,17 @@ class Transaction(models.Model):
     )
     price = models.DecimalField(max_digits=18, decimal_places=2)
     amount = models.DecimalField(max_digits=24, decimal_places=8)
+    fee = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        default=0,
+        blank=True,
+        help_text=(
+            "Broker commission / network fee (USD). For buys, increases the "
+            "cost basis. For sells, reduces the realized proceeds. Leave 0 "
+            "if there's no fee."
+        ),
+    )
     date = models.DateField()
     status = models.CharField(
         max_length=10, choices=Status.choices, default=Status.BOUGHT
