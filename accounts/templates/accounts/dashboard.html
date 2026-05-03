@@ -77,7 +77,61 @@
         font-weight: 600;
     }
     .history-chart-wrap { position: relative; }
-    .history-chart-wrap canvas { width: 100%; height: 220px; display: block; cursor: crosshair; }
+    .history-chart-wrap canvas {
+        width: 100%; height: 220px; display: block; cursor: crosshair;
+        touch-action: pan-y; /* let the page scroll vertically; we handle horizontal */
+    }
+    .history-chart-wrap canvas.panning { cursor: grabbing; }
+    .history-toolbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.75rem;
+        flex-wrap: wrap;
+        margin-bottom: 0.75rem;
+    }
+    .history-ranges {
+        display: inline-flex;
+        gap: 4px;
+        background: rgba(255,255,255,0.03);
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        padding: 3px;
+    }
+    .history-range-btn {
+        background: transparent;
+        border: none;
+        color: var(--text-secondary);
+        font-size: 0.75rem;
+        font-weight: 600;
+        padding: 4px 12px;
+        border-radius: 6px;
+        cursor: pointer;
+        transition: background-color 0.15s, color 0.15s;
+    }
+    .history-range-btn:hover:not(.active):not(:disabled) {
+        background: rgba(255,255,255,0.05);
+        color: var(--text-primary);
+    }
+    .history-range-btn.active {
+        background: rgba(79,70,229,0.2);
+        color: var(--accent-light);
+    }
+    .history-range-btn:disabled {
+        opacity: 0.35;
+        cursor: not-allowed;
+    }
+    .history-range-info {
+        font-size: 0.72rem;
+        color: var(--text-muted);
+        font-family: 'SF Mono', 'Fira Code', monospace;
+    }
+    .history-range-info .hint {
+        color: var(--text-muted);
+        font-family: system-ui, -apple-system, sans-serif;
+        margin-left: 8px;
+        opacity: 0.7;
+    }
     .history-tooltip {
         position: absolute;
         pointer-events: none;
@@ -181,6 +235,19 @@
         </small>
     </div>
     <div class="card-body">
+        <div class="history-toolbar">
+            <div class="history-ranges" id="historyRanges">
+                <button type="button" class="history-range-btn" data-range="7">Week</button>
+                <button type="button" class="history-range-btn" data-range="30">Month</button>
+                <button type="button" class="history-range-btn" data-range="90">3M</button>
+                <button type="button" class="history-range-btn" data-range="365">Year</button>
+                <button type="button" class="history-range-btn active" data-range="all">All</button>
+            </div>
+            <div class="history-range-info" id="historyRangeInfo">
+                <span id="historyRangeText">—</span>
+                <span class="hint d-none d-md-inline">Scroll to zoom · drag to pan</span>
+            </div>
+        </div>
         <div class="history-chart-wrap">
             <canvas id="historyChart"></canvas>
             <div class="history-tooltip" id="historyTooltip">
@@ -324,8 +391,8 @@
 
     /* Portfolio history chart */
     (function() {
-        const history = {{ history_json|safe }};
-        if (!history || history.length < 2) return;
+        const fullHistory = {{ history_json|safe }};
+        if (!fullHistory || fullHistory.length < 2) return;
 
         const card = document.getElementById("historyCard");
         const canvas = document.getElementById("historyChart");
@@ -333,10 +400,72 @@
         const ttDate = document.getElementById("ttDate");
         const ttWorth = document.getElementById("ttWorth");
         const ttInvested = document.getElementById("ttInvested");
+        const rangesEl = document.getElementById("historyRanges");
+        const rangeText = document.getElementById("historyRangeText");
         if (!card || !canvas) return;
         card.style.display = "";
 
-        let layout = null; // {padL, padT, innerW, innerH, stepX, minV, maxV, w, h}
+        // ── Visible-window state ─────────────────────────────────────────
+        // Clients work on a slice of fullHistory: indices [viewStart, viewEnd].
+        // `history` is rebound to that slice each time the view changes, so
+        // the existing draw / tooltip / hover code below keeps working
+        // unchanged.
+        let viewStart = 0;
+        let viewEnd = fullHistory.length - 1;
+        let history = fullHistory;
+        const totalDays = fullHistory.length; // days are 1-per-row
+
+        // Disable any preset that's longer than what we actually have.
+        rangesEl.querySelectorAll(".history-range-btn").forEach(btn => {
+            const r = btn.dataset.range;
+            if (r === "all") return;
+            const days = parseInt(r, 10);
+            // -1 because totalDays days span totalDays-1 intervals
+            if (days >= totalDays - 1) {
+                btn.disabled = true;
+                btn.title = "Need more history (only " + totalDays + " day" + (totalDays === 1 ? "" : "s") + " available)";
+            }
+        });
+
+        function applyViewBounds() {
+            viewStart = Math.max(0, Math.min(fullHistory.length - 2, Math.round(viewStart)));
+            viewEnd = Math.max(viewStart + 1, Math.min(fullHistory.length - 1, Math.round(viewEnd)));
+            history = fullHistory.slice(viewStart, viewEnd + 1);
+        }
+
+        function updateRangeDisplay() {
+            // Text: "Mar 3 → May 3 (62 days)"
+            const first = history[0].date;
+            const last = history[history.length - 1].date;
+            const span = history.length;
+            rangeText.textContent = first + " → " + last + "  ·  " + span + " day" + (span === 1 ? "" : "s");
+
+            // Highlight the matching preset, if any.
+            const days = span - 1;
+            const isAll = (viewStart === 0 && viewEnd === fullHistory.length - 1);
+            rangesEl.querySelectorAll(".history-range-btn").forEach(btn => {
+                const r = btn.dataset.range;
+                let active = false;
+                if (r === "all") active = isAll;
+                else active = !isAll && parseInt(r, 10) === days;
+                btn.classList.toggle("active", active);
+            });
+        }
+
+        function setViewByDays(days) {
+            // days === null → "All". Otherwise show the last `days` days (clamped).
+            if (days == null) {
+                viewStart = 0;
+                viewEnd = fullHistory.length - 1;
+            } else {
+                viewEnd = fullHistory.length - 1;
+                viewStart = Math.max(0, viewEnd - days);
+            }
+            applyViewBounds();
+            updateRangeDisplay();
+            draw(null);
+            showTooltip(null);
+        }
 
         function fmt(v) {
             return "$" + v.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -480,7 +609,64 @@
         }
 
         let lastIdx = null;
+
+        // ── Click-drag to pan ───────────────────────────────────────────
+        // Track drag separately from hover. A drag of more than ~3 px
+        // suppresses the click-style hover/tooltip until release.
+        let dragState = null; // {startX, startViewStart, startViewEnd}
+        const PAN_THRESHOLD_PX = 3;
+
+        function pxPerStep() {
+            return layout ? layout.stepX : 0;
+        }
+
+        canvas.addEventListener("mousedown", (e) => {
+            // Only left-click pans.
+            if (e.button !== 0) return;
+            const rect = canvas.getBoundingClientRect();
+            dragState = {
+                startX: e.clientX - rect.left,
+                startViewStart: viewStart,
+                startViewEnd: viewEnd,
+                moved: false,
+            };
+        });
+
+        window.addEventListener("mousemove", (e) => {
+            if (!dragState || !layout) return;
+            const rect = canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const dx = x - dragState.startX;
+            if (!dragState.moved && Math.abs(dx) < PAN_THRESHOLD_PX) return;
+            dragState.moved = true;
+            canvas.classList.add("panning");
+
+            // Convert pixel dx → index dx. Dragging right shows older days
+            // (so view shifts left).
+            const step = pxPerStep();
+            if (step <= 0) return;
+            const idxDelta = -dx / step;
+            const range = dragState.startViewEnd - dragState.startViewStart;
+            let newStart = dragState.startViewStart + idxDelta;
+            // Clamp so the window stays inside [0, fullHistory.length-1].
+            newStart = Math.max(0, Math.min(fullHistory.length - 1 - range, newStart));
+            viewStart = newStart;
+            viewEnd = newStart + range;
+            applyViewBounds();
+            updateRangeDisplay();
+            draw(null);
+            showTooltip(null);
+        });
+
+        window.addEventListener("mouseup", () => {
+            if (dragState) {
+                canvas.classList.remove("panning");
+                dragState = null;
+            }
+        });
+
         canvas.addEventListener("mousemove", (e) => {
+            if (dragState && dragState.moved) return; // suppress hover during drag
             const rect = canvas.getBoundingClientRect();
             const x = e.clientX - rect.left;
             const idx = nearestIndex(x);
@@ -491,8 +677,7 @@
         });
         canvas.addEventListener("mouseleave", () => {
             lastIdx = null;
-            draw(null);
-            showTooltip(null);
+            if (!dragState) { draw(null); showTooltip(null); }
         });
         canvas.addEventListener("touchstart", (e) => {
             const rect = canvas.getBoundingClientRect();
@@ -502,6 +687,52 @@
             showTooltip(idx);
         });
 
+        // ── Scroll-wheel zoom (anchored on cursor) ───────────────────────
+        // Up = zoom in (shrink visible window). Down = zoom out (grow it).
+        // The day under the cursor stays put: we anchor the zoom on its
+        // index, then proportionally shrink/grow around it.
+        canvas.addEventListener("wheel", (e) => {
+            e.preventDefault();
+            if (!layout) return;
+            const rect = canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            // Cursor as a fraction along the inner plot area, clamped.
+            const frac = Math.max(0, Math.min(1, (x - layout.padL) / Math.max(1, layout.innerW)));
+            const range = viewEnd - viewStart;
+            const focus = viewStart + frac * range;
+
+            // Step ~= 15% of current range, but at least 1 day, at most 30.
+            let step = Math.max(1, Math.min(30, Math.round(range * 0.15)));
+            const zoomIn = e.deltaY < 0;
+            const newRange = zoomIn
+                ? Math.max(2, range - step)
+                : Math.min(fullHistory.length - 1, range + step);
+            if (newRange === range) return;
+
+            let newStart = Math.round(focus - newRange * frac);
+            newStart = Math.max(0, Math.min(fullHistory.length - 1 - newRange, newStart));
+            viewStart = newStart;
+            viewEnd = newStart + newRange;
+            applyViewBounds();
+            updateRangeDisplay();
+            // Keep the hover marker on the same calendar day under the cursor.
+            const idx = nearestIndex(x);
+            lastIdx = idx;
+            draw(idx);
+            showTooltip(idx);
+        }, { passive: false });
+
+        // ── Range buttons ───────────────────────────────────────────────
+        rangesEl.addEventListener("click", (e) => {
+            const btn = e.target.closest(".history-range-btn");
+            if (!btn || btn.disabled) return;
+            const r = btn.dataset.range;
+            setViewByDays(r === "all" ? null : parseInt(r, 10));
+        });
+
+        // ── First paint ─────────────────────────────────────────────────
+        applyViewBounds();
+        updateRangeDisplay();
         draw(null);
         window.addEventListener("resize", () => draw(lastIdx));
     })();
