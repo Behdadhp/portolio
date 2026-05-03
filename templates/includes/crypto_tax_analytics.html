@@ -43,15 +43,15 @@
                 <table class="table table-sm table-borderless mb-0">
                     <tbody>
                         <tr>
-                            <td class="text-muted">Short-term Gains</td>
+                            <td class="text-muted">Short-term Gains<span class="metric-info" data-bs-toggle="tooltip" data-bs-placement="top" title="Profits this year from sells of this coin where the matched buy lot was held LESS than 1 year. Calculated FIFO: each sell is matched against your oldest unsold buy lots. Per-lot P&L = (sell price − lot's effective buy price) × lot units, minus the prorated sell fee.">!</span></td>
                             <td class="text-end fw-semibold text-success" data-ctax-fmt>{{ crypto_tax.current_crypto_short_gains }}</td>
                         </tr>
                         <tr>
-                            <td class="text-muted">Short-term Losses</td>
+                            <td class="text-muted">Short-term Losses<span class="metric-info" data-bs-toggle="tooltip" data-bs-placement="top" title="Losses this year from sells of this coin where the matched buy lot was held LESS than 1 year (shown positive). Same FIFO matching as gains.">!</span></td>
                             <td class="text-end fw-semibold text-danger" data-ctax-fmt>{{ crypto_tax.current_crypto_short_losses }}</td>
                         </tr>
                         <tr>
-                            <td class="text-muted">Net P&L
+                            <td class="text-muted">Net P&L<span class="metric-info" data-bs-toggle="tooltip" data-bs-placement="top" title="Short-term Gains − Short-term Losses for this coin only. Long-term lots (held > 1 year) are excluded — they're tax-free under §23 EStG.">!</span>
                                 <div class="text-muted small fst-italic" style="font-size:.7rem;">From sales held &lt; 1 year</div>
                             </td>
                             <td class="text-end fw-semibold {% if crypto_tax.current_crypto_net >= 0 %}text-success{% else %}text-danger{% endif %}" data-ctax-fmt>{{ crypto_tax.current_crypto_net }}</td>
@@ -66,19 +66,19 @@
                 <table class="table table-sm table-borderless mb-0">
                     <tbody>
                         <tr>
-                            <td class="text-muted">Short-term Gains</td>
+                            <td class="text-muted">Short-term Gains<span class="metric-info" data-bs-toggle="tooltip" data-bs-placement="top" title="Sum of every short-term gain across ALL your crypto holdings in {{ crypto_tax.year }} (lots held < 1 year, FIFO-matched).">!</span></td>
                             <td class="text-end fw-semibold text-success" data-ctax-fmt>{{ crypto_tax.total_short_term_gains }}</td>
                         </tr>
                         <tr>
-                            <td class="text-muted">Short-term Losses</td>
+                            <td class="text-muted">Short-term Losses<span class="metric-info" data-bs-toggle="tooltip" data-bs-placement="top" title="Sum of every short-term loss across ALL your crypto holdings in {{ crypto_tax.year }} (lots held < 1 year, FIFO-matched, shown positive).">!</span></td>
                             <td class="text-end fw-semibold text-danger" data-ctax-fmt>{{ crypto_tax.total_short_term_losses }}</td>
                         </tr>
                         <tr>
-                            <td class="text-muted">Net Short-term</td>
+                            <td class="text-muted">Net Short-term<span class="metric-info" data-bs-toggle="tooltip" data-bs-placement="top" title="Total Short-term Gains − Total Short-term Losses across all crypto. This is the figure compared against the €1,000 Freigrenze.">!</span></td>
                             <td class="text-end fw-semibold {% if crypto_tax.net_short_term >= 0 %}text-success{% else %}text-danger{% endif %}" data-ctax-fmt>{{ crypto_tax.net_short_term }}</td>
                         </tr>
                         <tr>
-                            <td class="text-muted">Long-term Gains
+                            <td class="text-muted">Long-term Gains<span class="metric-info" data-bs-toggle="tooltip" data-bs-placement="top" title="Profits from coins held more than 1 year before selling. Under §23 EStG these are 100% tax-free in Germany regardless of size — they are NOT counted toward the Freigrenze.">!</span>
                                 <div class="text-muted small fst-italic" style="font-size:.7rem;">Held &gt; 1 year — fully tax-free</div>
                             </td>
                             <td class="text-end fw-semibold text-success" data-ctax-fmt>{{ crypto_tax.total_long_term_gains }}</td>
@@ -93,17 +93,17 @@
                 <table class="table table-sm table-borderless mb-0">
                     <tbody>
                         <tr>
-                            <td class="text-muted">Limit
+                            <td class="text-muted">Limit<span class="metric-info" data-bs-toggle="tooltip" data-bs-placement="top" title="German private-sale Freigrenze (§23 EStG): €1,000/year for short-term crypto gains. WARNING: this is a Freigrenze (exemption limit), NOT a Freibetrag (allowance). If you go €1 over, the ENTIRE Net Short-term becomes taxable, not just the excess. Stored here as a USD figure for consistency with the rest of the app.">!</span>
                                 <div class="text-muted small fst-italic" style="font-size:.7rem;">If exceeded, entire amount is taxable</div>
                             </td>
                             <td class="text-end fw-semibold" data-ctax-fmt>{{ crypto_tax.freigrenze }}</td>
                         </tr>
                         <tr>
-                            <td class="text-muted">Used</td>
+                            <td class="text-muted">Used<span class="metric-info" data-bs-toggle="tooltip" data-bs-placement="top" title="How much of the Freigrenze your year-to-date Net Short-term has consumed. Mirrors the 'Net Short-term' figure on the left.">!</span></td>
                             <td class="text-end fw-semibold" style="color:#fbbf24;" data-ctax-fmt>{{ crypto_tax.net_short_term }}</td>
                         </tr>
                         <tr>
-                            <td class="text-muted">Room Left
+                            <td class="text-muted">Room Left<span class="metric-info" data-bs-toggle="tooltip" data-bs-placement="top" title="Additional short-term gains you could still realize this year before the Freigrenze trips = Limit − Used. Once it hits zero, every euro of further short-term gain pulls the entire net into taxable territory.">!</span>
                                 <div class="text-muted small fst-italic" style="font-size:.7rem;">Short-term gains still tax-free</div>
                             </td>
                             <td class="text-end fw-semibold {% if crypto_tax.room_to_freigrenze > 0 %}text-success{% else %}text-danger{% endif %}" data-ctax-fmt>{{ crypto_tax.room_to_freigrenze }}</td>
@@ -112,7 +112,7 @@
                             <td colspan="2"><hr class="my-1"></td>
                         </tr>
                         <tr>
-                            <td class="text-muted fw-semibold" style="color:var(--text-primary);">Status</td>
+                            <td class="text-muted fw-semibold" style="color:var(--text-primary);">Status<span class="metric-info" data-bs-toggle="tooltip" data-bs-placement="top" title="'Tax-free' = your Net Short-term is at or below the Freigrenze, so nothing is owed. 'Freigrenze exceeded' = you've crossed the limit and the FULL Net Short-term is now taxable at your personal income-tax rate (Einkommensteuersatz).">!</span></td>
                             <td class="text-end fw-bold" style="font-size:0.95rem;">
                                 {% if crypto_tax.exceeds_freigrenze %}
                                 <span class="text-danger">Freigrenze exceeded</span>

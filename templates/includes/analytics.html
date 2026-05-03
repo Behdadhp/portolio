@@ -43,10 +43,22 @@
             </div>
         </div>
         <div class="an-grid an-grid-2">
-            <div class="an-stat"><div class="an-stat-label">Holdings</div><div class="an-stat-value text-danger">{{ analytics.units|floatformat:6 }}</div></div>
-            <div class="an-stat"><div class="an-stat-label">Total Invested</div><div class="an-stat-value" data-fmt-number="$">{{ analytics.total_invested|floatformat:2 }}</div></div>
-            <div class="an-stat"><div class="an-stat-label">Total Sold Value</div><div class="an-stat-value" data-fmt-number="$">{{ analytics.total_sold_value|floatformat:2 }}</div></div>
-            <div class="an-stat"><div class="an-stat-label">Realized P&L</div><div class="an-stat-value {% if analytics.realized_pnl >= 0 %}text-success{% else %}text-danger{% endif %}" data-fmt-number="$">{{ analytics.realized_pnl|floatformat:2 }}</div></div>
+            <div class="an-stat">
+                <div class="an-stat-label">Holdings<span class="metric-info" data-bs-toggle="tooltip" data-bs-placement="top" title="Net units you currently hold = bought units − sold units (only completed transactions). A negative number means you've recorded more sells than buys.">!</span></div>
+                <div class="an-stat-value text-danger">{{ analytics.units|floatformat:6 }}</div>
+            </div>
+            <div class="an-stat">
+                <div class="an-stat-label">Total Invested<span class="metric-info" data-bs-toggle="tooltip" data-bs-placement="top" title="Total cash that went into buys this asset = Σ (price × amount + fee) for every completed buy. Fees are added because they're part of what you paid.">!</span></div>
+                <div class="an-stat-value" data-fmt-number="$">{{ analytics.total_invested|floatformat:2 }}</div>
+            </div>
+            <div class="an-stat">
+                <div class="an-stat-label">Total Sold Value<span class="metric-info" data-bs-toggle="tooltip" data-bs-placement="top" title="Net cash received from sells = Σ (price × amount − fee) for every completed sell. Fees are subtracted because they reduced your actual proceeds.">!</span></div>
+                <div class="an-stat-value" data-fmt-number="$">{{ analytics.total_sold_value|floatformat:2 }}</div>
+            </div>
+            <div class="an-stat">
+                <div class="an-stat-label">Realized P&L<span class="metric-info" data-bs-toggle="tooltip" data-bs-placement="top" title="Profit or loss locked in from sells = Σ (sell price − weighted-average buy price) × sold amount − fee on each sell. Only counts units you've already sold.">!</span></div>
+                <div class="an-stat-value {% if analytics.realized_pnl >= 0 %}text-success{% else %}text-danger{% endif %}" data-fmt-number="$">{{ analytics.realized_pnl|floatformat:2 }}</div>
+            </div>
         </div>
 
         {% else %}
@@ -55,28 +67,28 @@
         <!-- Stat cards row -->
         <div class="an-grid">
             <div class="an-stat">
-                <div class="an-stat-label">Avg. Cost</div>
+                <div class="an-stat-label">Avg. Cost<span class="metric-info" data-bs-toggle="tooltip" data-bs-placement="top" title="Weighted-average price per unit you currently hold = Cost Basis ÷ Holdings. Tells you the break-even price for the units still in your portfolio.">!</span></div>
                 <div class="an-stat-value" data-fmt-number="$">{{ analytics.avg_price|floatformat:2 }}</div>
             </div>
             <div class="an-stat">
-                <div class="an-stat-label">Holdings</div>
+                <div class="an-stat-label">Holdings<span class="metric-info" data-bs-toggle="tooltip" data-bs-placement="top" title="Net units you currently hold = bought units − sold units (completed transactions only).">!</span></div>
                 <div class="an-stat-value">{{ analytics.units|floatformat:6 }}</div>
             </div>
             <div class="an-stat">
-                <div class="an-stat-label">Cost Basis</div>
+                <div class="an-stat-label">Cost Basis<span class="metric-info" data-bs-toggle="tooltip" data-bs-placement="top" title="What you paid for the units you still hold (incl. fees). Each sell removes its share of the basis at the running weighted-average price, so this is the cost portion that hasn't been realized yet.">!</span></div>
                 <div class="an-stat-value" data-fmt-number="$">{{ analytics.cost_basis|floatformat:2 }}</div>
             </div>
             <div class="an-stat">
-                <div class="an-stat-label">Total Invested</div>
+                <div class="an-stat-label">Total Invested<span class="metric-info" data-bs-toggle="tooltip" data-bs-placement="top" title="Lifetime cash put into buys = Σ (price × amount + fee) for every completed buy. Unlike Cost Basis, this never goes down when you sell — it shows total capital you've ever deployed.">!</span></div>
                 <div class="an-stat-value" data-fmt-number="$">{{ analytics.total_invested|floatformat:2 }}</div>
             </div>
             {% if analytics.current_price != None %}
             <div class="an-stat">
-                <div class="an-stat-label">Current Price</div>
+                <div class="an-stat-label">Current Price<span class="metric-info" data-bs-toggle="tooltip" data-bs-placement="top" title="Latest market price from the price-snapshot cache (refreshed periodically from the live data provider).">!</span></div>
                 <div class="an-stat-value" data-fmt-number="$">{{ analytics.current_price|floatformat:2 }}</div>
             </div>
             <div class="an-stat">
-                <div class="an-stat-label">Current Value</div>
+                <div class="an-stat-label">Current Value<span class="metric-info" data-bs-toggle="tooltip" data-bs-placement="top" title="Market value of your remaining position = Holdings × Current Price.">!</span></div>
                 <div class="an-stat-value" data-fmt-number="$">{{ analytics.current_value|floatformat:2 }}</div>
             </div>
             {% endif %}
@@ -86,7 +98,7 @@
         <div class="an-pnl-row">
             {% if analytics.current_price != None %}
             <div class="an-pnl-card {% if analytics.unrealized_pnl >= 0 %}an-pnl-up{% else %}an-pnl-down{% endif %}">
-                <div class="an-pnl-label">Unrealized P&L</div>
+                <div class="an-pnl-label">Unrealized P&L<span class="metric-info" data-bs-toggle="tooltip" data-bs-placement="top" title="Paper gain/loss on units you still hold = Current Value − Cost Basis. Percentage = (Unrealized P&L ÷ Cost Basis) × 100. Becomes 'realized' the moment you sell.">!</span></div>
                 <div class="an-pnl-value" data-fmt-pnl="${{ analytics.unrealized_pnl|floatformat:2 }}|{{ analytics.unrealized_pnl_pct|floatformat:2 }}">
                     ${{ analytics.unrealized_pnl|floatformat:2 }}
                     <small>({{ analytics.unrealized_pnl_pct|floatformat:2 }}%)</small>
@@ -95,7 +107,7 @@
             </div>
             {% endif %}
             <div class="an-pnl-card {% if analytics.realized_pnl >= 0 %}an-pnl-up{% else %}an-pnl-down{% endif %}">
-                <div class="an-pnl-label">Realized P&L</div>
+                <div class="an-pnl-label">Realized P&L<span class="metric-info" data-bs-toggle="tooltip" data-bs-placement="top" title="Profit or loss already locked in from past sells = Σ (sell price − weighted-avg buy price) × sold amount − fee, across every completed sell.">!</span></div>
                 <div class="an-pnl-value" data-fmt-number="$">{{ analytics.realized_pnl|floatformat:2 }}</div>
                 <div class="an-pnl-hint">Locked in from previous sales</div>
             </div>
@@ -108,27 +120,27 @@
              data-cost-basis="{{ analytics.cost_basis }}"
              data-units="{{ analytics.units }}"
              data-avg-price="{{ analytics.avg_price }}">
-            <h6 class="an-section-title">Targets</h6>
+            <h6 class="an-section-title">Targets<span class="metric-info" data-bs-toggle="tooltip" data-bs-placement="top" title="Suggested price points for action. Sell targets are computed off your weighted-average cost; the buy target shows the price at which doubling your position would lower the average by 10%. Click the bell on any row to set a price alert.">!</span></h6>
 
             <!-- Preset targets -->
             <div class="an-targets">
                 <div class="an-target-row an-target-sell" data-target-price="{{ analytics.sell_5 }}" data-target-dir="above">
-                    <span class="an-target-label">Sell @ +5%</span>
+                    <span class="an-target-label">Sell @ +5%<span class="metric-info" data-bs-toggle="tooltip" data-bs-placement="top" title="Price that would give a 5% return over your average cost = Avg. Cost × 1.05.">!</span></span>
                     <span class="an-target-price" data-fmt-number="$">{{ analytics.sell_5|floatformat:2 }}</span>
                     <span class="an-target-bell"></span>
                 </div>
                 <div class="an-target-row an-target-sell" data-target-price="{{ analytics.sell_10 }}" data-target-dir="above">
-                    <span class="an-target-label">Sell @ +10%</span>
+                    <span class="an-target-label">Sell @ +10%<span class="metric-info" data-bs-toggle="tooltip" data-bs-placement="top" title="Price that would give a 10% return over your average cost = Avg. Cost × 1.10.">!</span></span>
                     <span class="an-target-price" data-fmt-number="$">{{ analytics.sell_10|floatformat:2 }}</span>
                     <span class="an-target-bell"></span>
                 </div>
                 <div class="an-target-row an-target-sell" data-target-price="{{ analytics.sell_25 }}" data-target-dir="above">
-                    <span class="an-target-label">Sell @ +25%</span>
+                    <span class="an-target-label">Sell @ +25%<span class="metric-info" data-bs-toggle="tooltip" data-bs-placement="top" title="Price that would give a 25% return over your average cost = Avg. Cost × 1.25.">!</span></span>
                     <span class="an-target-price" data-fmt-number="$">{{ analytics.sell_25|floatformat:2 }}</span>
                     <span class="an-target-bell"></span>
                 </div>
                 <div class="an-target-row an-target-buy" data-target-price="{{ analytics.buy_avg_minus_10 }}" data-target-dir="below" data-target-invest="{{ analytics.buy_avg_minus_10_spend }}">
-                    <span class="an-target-label">Lower avg by 10%<span class="an-target-hint">Buy {{ analytics.units|floatformat:6 }} more (&asymp; ${{ analytics.buy_avg_minus_10_spend|floatformat:2 }})</span></span>
+                    <span class="an-target-label">Lower avg by 10%<span class="metric-info" data-bs-toggle="tooltip" data-bs-placement="top" title="Buy price at which adding the suggested amount drops your weighted-average cost by 10%. Solved from new_avg = (cost_basis + spend) / (units + spend / price) = old_avg × 0.9.">!</span><span class="an-target-hint">Buy {{ analytics.units|floatformat:6 }} more (&asymp; ${{ analytics.buy_avg_minus_10_spend|floatformat:2 }})</span></span>
                     <span class="an-target-price" data-fmt-number="$">{{ analytics.buy_avg_minus_10|floatformat:2 }}</span>
                     <span class="an-target-bell"></span>
                 </div>

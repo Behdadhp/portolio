@@ -33,15 +33,15 @@
                 <table class="table table-sm table-borderless mb-0">
                     <tbody>
                         <tr>
-                            <td class="text-muted">Realized Gains</td>
+                            <td class="text-muted">Realized Gains<span class="metric-info" data-bs-toggle="tooltip" data-bs-placement="top" title="Sum of profitable sells of this ETF in {{ tax.year }}. For each sell with positive P&L: (sell price − weighted-avg cost) × amount − fee.">!</span></td>
                             <td class="text-end fw-semibold text-success" data-tax-fmt="$">{{ tax.current_etf_gains }}</td>
                         </tr>
                         <tr>
-                            <td class="text-muted">Realized Losses</td>
+                            <td class="text-muted">Realized Losses<span class="metric-info" data-bs-toggle="tooltip" data-bs-placement="top" title="Sum of losing sells of this ETF in {{ tax.year }} (shown positive). For each sell with negative P&L: |(sell price − weighted-avg cost) × amount − fee|.">!</span></td>
                             <td class="text-end fw-semibold text-danger" data-tax-fmt="$">{{ tax.current_etf_losses }}</td>
                         </tr>
                         <tr>
-                            <td class="text-muted">Net P&L</td>
+                            <td class="text-muted">Net P&L<span class="metric-info" data-bs-toggle="tooltip" data-bs-placement="top" title="This ETF's net realized result for {{ tax.year }} = Realized Gains − Realized Losses.">!</span></td>
                             <td class="text-end fw-semibold {% if tax.current_etf_net >= 0 %}text-success{% else %}text-danger{% endif %}" data-tax-fmt="$">{{ tax.current_etf_net }}</td>
                         </tr>
                     </tbody>
@@ -54,21 +54,21 @@
                 <table class="table table-sm table-borderless mb-0">
                     <tbody>
                         <tr>
-                            <td class="text-muted">Total Gains</td>
+                            <td class="text-muted">Total Gains<span class="metric-info" data-bs-toggle="tooltip" data-bs-placement="top" title="Sum of profits from every winning ETF sell across your whole portfolio in {{ tax.year }}.">!</span></td>
                             <td class="text-end fw-semibold text-success" data-tax-fmt="$">{{ tax.total_gains }}</td>
                         </tr>
                         <tr>
-                            <td class="text-muted">Total Losses
+                            <td class="text-muted">Total Losses<span class="metric-info" data-bs-toggle="tooltip" data-bs-placement="top" title="Sum of losses from every losing ETF sell across your whole portfolio in {{ tax.year }}. Under German rules these offset gains within the same asset class before tax is computed.">!</span>
                                 <div class="text-muted small fst-italic" style="font-size:.7rem;">Offsets gains before tax</div>
                             </td>
                             <td class="text-end fw-semibold text-danger" data-tax-fmt="$">{{ tax.total_losses }}</td>
                         </tr>
                         <tr>
-                            <td class="text-muted">Net Gain</td>
+                            <td class="text-muted">Net Gain<span class="metric-info" data-bs-toggle="tooltip" data-bs-placement="top" title="Total Gains − Total Losses across all ETFs for {{ tax.year }}. This is the figure the Freibetrag is applied to.">!</span></td>
                             <td class="text-end fw-semibold {% if tax.net_gain >= 0 %}text-success{% else %}text-danger{% endif %}" data-tax-fmt="$">{{ tax.net_gain }}</td>
                         </tr>
                         <tr>
-                            <td class="text-muted">Sells This Year</td>
+                            <td class="text-muted">Sells This Year<span class="metric-info" data-bs-toggle="tooltip" data-bs-placement="top" title="Number of completed ETF sell transactions dated in {{ tax.year }}.">!</span></td>
                             <td class="text-end fw-semibold">{{ tax.sell_count }}</td>
                         </tr>
                     </tbody>
@@ -81,17 +81,17 @@
                 <table class="table table-sm table-borderless mb-0">
                     <tbody>
                         <tr>
-                            <td class="text-muted">Freibetrag
+                            <td class="text-muted">Freibetrag<span class="metric-info" data-bs-toggle="tooltip" data-bs-placement="top" title="German Sparer-Pauschbetrag — annual tax-free allowance on capital gains (€1,000 for singles, €2,000 for joint filers since 2023). Stored here as a USD figure for consistency with the rest of the app.">!</span>
                                 <div class="text-muted small fst-italic" style="font-size:.7rem;">Tax-free allowance per year</div>
                             </td>
                             <td class="text-end fw-semibold" data-tax-fmt="$">{{ tax.freibetrag }}</td>
                         </tr>
                         <tr>
-                            <td class="text-muted">Used</td>
+                            <td class="text-muted">Used<span class="metric-info" data-bs-toggle="tooltip" data-bs-placement="top" title="How much of this year's allowance is already consumed = min(Net Gain, Freibetrag), capped at 0 if Net Gain is negative.">!</span></td>
                             <td class="text-end fw-semibold" style="color:#fbbf24;" data-tax-fmt="$">{{ tax.freibetrag_used }}</td>
                         </tr>
                         <tr>
-                            <td class="text-muted">Remaining</td>
+                            <td class="text-muted">Remaining<span class="metric-info" data-bs-toggle="tooltip" data-bs-placement="top" title="Allowance still available this year = Freibetrag − Used.">!</span></td>
                             <td class="text-end fw-semibold {% if tax.freibetrag_remaining > 0 %}text-success{% else %}text-danger{% endif %}" data-tax-fmt="$">{{ tax.freibetrag_remaining }}</td>
                         </tr>
 
@@ -100,7 +100,7 @@
                             <td colspan="2"><hr class="my-1"></td>
                         </tr>
                         <tr>
-                            <td class="text-muted">Tax-free room left
+                            <td class="text-muted">Tax-free room left<span class="metric-info" data-bs-toggle="tooltip" data-bs-placement="top" title="Additional gains you could still realize this year before paying any tax. Equals the unused Freibetrag.">!</span>
                                 <div class="text-muted small fst-italic" style="font-size:.7rem;">Gains you can still realize tax-free</div>
                             </td>
                             <td class="text-end fw-semibold text-success" data-tax-fmt="$">{{ tax.gain_until_taxed }}</td>
@@ -111,21 +111,21 @@
                             <td colspan="2"><hr class="my-1"></td>
                         </tr>
                         <tr>
-                            <td class="text-muted">Taxable Amount</td>
+                            <td class="text-muted">Taxable Amount<span class="metric-info" data-bs-toggle="tooltip" data-bs-placement="top" title="The portion of Net Gain that's actually taxed = max(0, Net Gain − Freibetrag).">!</span></td>
                             <td class="text-end fw-semibold" data-tax-fmt="$">{{ tax.taxable }}</td>
                         </tr>
                         <tr>
-                            <td class="text-muted">Tax Rate
+                            <td class="text-muted">Tax Rate<span class="metric-info" data-bs-toggle="tooltip" data-bs-placement="top" title="Effective rate = 25% Kapitalertragsteuer + 5.5% Solidaritätszuschlag on top of that = 26.375%. Church tax (Kirchensteuer) is NOT included. Note: this estimate also doesn't apply the ETF Teilfreistellung partial-exemption (typically 30% for equity ETFs).">!</span>
                                 <div class="text-muted small fst-italic" style="font-size:.7rem;">25% + 5.5% Soli (no Kirchensteuer)</div>
                             </td>
                             <td class="text-end fw-semibold">{{ tax.tax_rate_pct }}%</td>
                         </tr>
                         <tr>
-                            <td class="text-muted fw-semibold" style="color:var(--text-primary);">Estimated Tax</td>
+                            <td class="text-muted fw-semibold" style="color:var(--text-primary);">Estimated Tax<span class="metric-info" data-bs-toggle="tooltip" data-bs-placement="top" title="Rough tax owed = Taxable Amount × Tax Rate. This is an estimate — your actual ETF tax depends on partial-exemption rules (Teilfreistellung), Vorabpauschale already paid, church tax, and your full filing situation.">!</span></td>
                             <td class="text-end fw-bold" style="color:#f87171;font-size:1.05rem;" data-tax-fmt="$">{{ tax.tax_owed }}</td>
                         </tr>
                         <tr>
-                            <td class="text-muted">Net After Tax</td>
+                            <td class="text-muted">Net After Tax<span class="metric-info" data-bs-toggle="tooltip" data-bs-placement="top" title="What you keep = Net Gain − Estimated Tax.">!</span></td>
                             <td class="text-end fw-semibold {% if tax.net_after_tax >= 0 %}text-success{% else %}text-danger{% endif %}" data-tax-fmt="$">{{ tax.net_after_tax }}</td>
                         </tr>
                     </tbody>

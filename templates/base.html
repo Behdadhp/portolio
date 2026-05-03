@@ -609,6 +609,48 @@
         ::-webkit-scrollbar { width: 8px; }
         ::-webkit-scrollbar-track { background: var(--bg-body); }
         ::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 4px; }
+
+        /* ── Metric info icon (hover for tooltip with definition + formula) ── */
+        .metric-info {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            background: rgba(79, 70, 229, 0.15);
+            color: var(--accent-light);
+            font-size: 0.66rem;
+            font-weight: 800;
+            font-family: system-ui, -apple-system, sans-serif;
+            line-height: 1;
+            margin-left: 5px;
+            cursor: help;
+            vertical-align: middle;
+            border: 1px solid rgba(79, 70, 229, 0.25);
+            user-select: none;
+            transition: background-color 0.15s, color 0.15s;
+        }
+        .metric-info:hover {
+            background: rgba(79, 70, 229, 0.3);
+            color: #fff;
+        }
+        /* Bootstrap tooltip override for darker theme + readable width */
+        .tooltip { --bs-tooltip-max-width: 280px; }
+        .tooltip-inner {
+            background: #0b1220;
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
+            box-shadow: 0 4px 14px rgba(0,0,0,0.5);
+            font-size: 0.78rem;
+            line-height: 1.4;
+            padding: 0.55rem 0.75rem;
+            text-align: left;
+        }
+        .tooltip .tooltip-arrow::before { border-top-color: var(--border-color) !important; }
+        .bs-tooltip-bottom .tooltip-arrow::before { border-bottom-color: var(--border-color) !important; }
+        .bs-tooltip-start .tooltip-arrow::before { border-left-color: var(--border-color) !important; }
+        .bs-tooltip-end .tooltip-arrow::before { border-right-color: var(--border-color) !important; }
     </style>
     {% block extra_css %}{% endblock %}
 </head>
@@ -894,6 +936,27 @@
                 menu.classList.remove('open');
             }
         });
+    })();
+
+    /* ── Bootstrap tooltip init (used by .metric-info `!` icons in analytics/tax) ──
+       Initialize once on load and again whenever new tooltips are added — e.g.
+       a collapsed analytics card revealed by clicking the chevron. We watch the
+       `<main>` subtree with a MutationObserver so any element with
+       data-bs-toggle="tooltip" gets wired up exactly once. */
+    (function() {
+        function initTooltips(root) {
+            (root || document).querySelectorAll('[data-bs-toggle="tooltip"]:not([data-tooltip-init])').forEach(function(el) {
+                el.setAttribute('data-tooltip-init', '1');
+                new bootstrap.Tooltip(el);
+            });
+        }
+        initTooltips();
+        const main = document.querySelector('main') || document.body;
+        new MutationObserver(function(mutations) {
+            for (const m of mutations) {
+                m.addedNodes.forEach(function(n) { if (n.nodeType === 1) initTooltips(n); });
+            }
+        }).observe(main, { childList: true, subtree: true });
     })();
     </script>
     {% block extra_js %}{% endblock %}
