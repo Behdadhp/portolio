@@ -32,6 +32,10 @@ def holdings_view(request):
     allocation = []
     pnl_ranking = []
     seen_symbols = set()
+    # Per-asset-class allocation totals — drives the second donut on the
+    # Overview card. Brand-consistent colors so the slice for "Stocks" is
+    # the same accent purple used elsewhere in the UI, etc.
+    kind_totals = {"stock": 0.0, "etf": 0.0, "crypto": 0.0}
 
     for row in summary:
         symbol = row["symbol"]
@@ -50,6 +54,7 @@ def holdings_view(request):
                 "symbol": symbol,
                 "value": worth or 0,
             })
+            kind_totals[row["kind"]] = kind_totals.get(row["kind"], 0.0) + (worth or 0)
             cb = cost_basis_for(base_qs.filter(instrument__symbol=symbol))
             value = worth or 0
             pnl = round(value - cb, 2)
@@ -63,6 +68,27 @@ def holdings_view(request):
             })
 
     pnl_ranking.sort(key=lambda r: r["pnl_pct"], reverse=True)
+
+    # Compact per-kind breakdown — rendered as a small pill row on the
+    # Overview card (only visible on the "All" filter). Includes the
+    # percentage so the user can read it without doing the math themselves.
+    KIND_DISPLAY = [
+        ("stock", "Stocks", "#818cf8"),
+        ("etf", "ETFs", "#c084fc"),
+        ("crypto", "Crypto", "#22d3ee"),
+    ]
+    kind_total_sum = sum(v for v in kind_totals.values() if v > 0)
+    kind_breakdown = [
+        {
+            "key": key,
+            "label": display,
+            "color": color,
+            "value": round(kind_totals[key], 2),
+            "pct": round(kind_totals[key] / kind_total_sum * 100, 1) if kind_total_sum > 0 else 0,
+        }
+        for key, display, color in KIND_DISPLAY
+        if kind_totals.get(key, 0) > 0
+    ]
 
     # ETFs the user has a savings plan for but no transactions yet.
     if kind in ("all", "etf"):
@@ -84,6 +110,7 @@ def holdings_view(request):
     return render(request, "assets/holdings.html", {
         "rows": enriched,
         "allocation_json": json.dumps(allocation),
+        "kind_breakdown": kind_breakdown,
         "pnl_ranking": pnl_ranking,
         "current_kind": kind,
         "kind_choices": KIND_CHOICES,

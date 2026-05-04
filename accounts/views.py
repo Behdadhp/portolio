@@ -88,17 +88,29 @@ def dashboard_view(request):
         )
 
     # Top 5 nearest active alerts (by % distance to target if we have a price).
+    # We annotate each alert with its last-known cached price and the signed
+    # delta vs target so the template can show "Now $X · −Y%" — the user
+    # asked for a side-by-side comparison without having to leave the page.
     all_active = list(
         PriceAlert.objects.filter(user=request.user, email_sent=False)
         .select_related("instrument")
     )
+
     def _alert_distance(a):
         live = cache.get(f"finnhub_{a.instrument.symbol}")
         if live is None or not a.target_price:
             return float("inf")
         return abs(float(live) - float(a.target_price)) / float(a.target_price)
+
     all_active.sort(key=_alert_distance)
-    active_alerts = all_active[:5]
+
+    active_alerts = []
+    for a in all_active[:5]:
+        live = cache.get(f"finnhub_{a.instrument.symbol}")
+        active_alerts.append({
+            "alert": a,
+            "last_price": float(live) if live is not None else None,
+        })
 
     # Recent activity: last 5 asset transactions + last 5 cash flows, merged.
     recent_tx = list(

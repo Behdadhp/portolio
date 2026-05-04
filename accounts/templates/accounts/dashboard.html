@@ -76,6 +76,29 @@
         font-size: 0.85rem;
         font-weight: 600;
     }
+    /* Closest-Alerts last-known price. Server-side snapshot of the live
+       cache at page load — not WebSocket-updating — so the user can eyeball
+       "how close is it to the target" without leaving the dashboard. */
+    .alert-last-price {
+        text-align: right;
+        flex-shrink: 0;
+        min-width: 60px;
+        line-height: 1.1;
+    }
+    .alert-last-price .alp-label {
+        font-size: 0.62rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.4px;
+        color: var(--text-muted);
+    }
+    .alert-last-price .alp-now {
+        font-family: 'SF Mono', 'Fira Code', monospace;
+        font-size: 0.82rem;
+        font-weight: 700;
+        color: var(--text-secondary);
+        margin-top: 2px;
+    }
     .history-chart-wrap { position: relative; }
     .history-chart-wrap canvas {
         width: 100%; height: 220px; display: block; cursor: crosshair;
@@ -322,19 +345,28 @@
             </div>
             <div class="card-body p-0">
                 {% if active_alerts %}
-                {% for alert in active_alerts %}
+                {% for row in active_alerts %}
                 <div class="activity-row">
-                    <div class="activity-icon" style="background: {% if alert.direction == 'above' %}rgba(52,211,153,0.15);color:var(--color-success){% else %}rgba(79,70,229,0.15);color:var(--accent-light){% endif %};">
-                        {% if alert.direction == 'above' %}↑{% else %}↓{% endif %}
+                    <div class="activity-icon" style="background: {% if row.alert.direction == 'above' %}rgba(52,211,153,0.15);color:var(--color-success){% else %}rgba(79,70,229,0.15);color:var(--accent-light){% endif %};">
+                        {% if row.alert.direction == 'above' %}↑{% else %}↓{% endif %}
                     </div>
                     <div class="activity-meta">
-                        <div class="activity-title">{{ alert.instrument.symbol }}
-                            <span class="text-muted" style="font-weight:400;font-size:0.78rem;">· {{ alert.instrument.kind }}</span>
+                        <div class="activity-title">{{ row.alert.instrument.symbol }}
+                            <span class="text-muted" style="font-weight:400;font-size:0.78rem;">· {{ row.alert.instrument.kind }}</span>
                         </div>
                         <div class="activity-sub">
-                            {% if alert.direction == 'above' %}Sell{% else %}Buy{% endif %} @ ${{ alert.target_price|floatformat:2 }}
-                            {% if alert.invest_amount %} · ${{ alert.invest_amount|floatformat:2 }} spend{% endif %}
+                            {% if row.alert.direction == 'above' %}Sell{% else %}Buy{% endif %} @ ${{ row.alert.target_price|floatformat:2 }}
+                            {% if row.alert.invest_amount %} · ${{ row.alert.invest_amount|floatformat:2 }} spend{% endif %}
                         </div>
+                    </div>
+                    <div class="alert-last-price">
+                        {% if row.last_price != None %}
+                        <div class="alp-label">Last</div>
+                        <div class="alp-now">${{ row.last_price|floatformat:2 }}</div>
+                        {% else %}
+                        <div class="alp-label">Last</div>
+                        <div class="alp-now text-muted">—</div>
+                        {% endif %}
                     </div>
                 </div>
                 {% endfor %}

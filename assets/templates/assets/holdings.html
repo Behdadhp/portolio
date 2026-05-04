@@ -2,6 +2,58 @@
 
 {% block title %}Holdings — Folio{% endblock %}
 
+{% block extra_css %}
+<style>
+    /* Compact category breakdown row — only shown on the All filter so it
+       doesn't repeat info that's obvious from the filter pills. Inline pill
+       layout keeps it readable without needing a chart. */
+    .kind-breakdown {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.5rem 0.85rem;
+        padding: 0.6rem 0.85rem;
+        background: rgba(255,255,255,0.02);
+        border: 1px solid var(--border-color);
+        border-radius: 10px;
+    }
+    .kind-breakdown .kb-label {
+        font-size: 0.7rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.4px;
+        color: var(--text-muted);
+        margin-right: 0.25rem;
+    }
+    .kind-breakdown .kb-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 0.82rem;
+    }
+    .kind-breakdown .kb-dot {
+        width: 9px; height: 9px;
+        border-radius: 3px;
+        flex-shrink: 0;
+    }
+    .kind-breakdown .kb-name {
+        color: var(--text-secondary);
+        font-weight: 600;
+    }
+    .kind-breakdown .kb-value {
+        font-family: 'SF Mono', 'Fira Code', monospace;
+        color: var(--text-primary);
+        font-weight: 700;
+    }
+    .kind-breakdown .kb-pct {
+        font-family: 'SF Mono', 'Fira Code', monospace;
+        font-size: 0.74rem;
+        color: var(--text-muted);
+        font-weight: 600;
+    }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="page-header">
     <div>
@@ -49,6 +101,19 @@
     </div>
     <div class="collapse show" id="overviewBody">
         <div class="card-body">
+            {% if current_kind == "all" and kind_breakdown %}
+            <div class="kind-breakdown mb-4">
+                <span class="kb-label">By category</span>
+                {% for k in kind_breakdown %}
+                <span class="kb-pill">
+                    <span class="kb-dot" style="background:{{ k.color }};"></span>
+                    <span class="kb-name">{{ k.label }}</span>
+                    <span class="kb-value">${{ k.value|floatformat:2 }}</span>
+                    <span class="kb-pct">{{ k.pct }}%</span>
+                </span>
+                {% endfor %}
+            </div>
+            {% endif %}
             <div class="row g-4">
                 <div class="col-lg-5">
                     <h6 class="text-muted text-uppercase small fw-bold mb-3">Allocation</h6>
